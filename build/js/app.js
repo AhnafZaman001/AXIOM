@@ -43,6 +43,58 @@ function normalizeSheetName(s){
 }
 const SHEETNAME_TO_KEY = Object.fromEntries(SECTION_DEFS.map(d=>[normalizeSheetName(d.sheetName), d.key]));
 
+// ---- Forgiving sheet-name matching (handles typos, missing spaces, hyphens
+// instead of parentheses/spaces, etc.) so an import doesn't dead-end just
+// because a tab is named "F1-A" or "F16PM" instead of the exact expected name.
+function compactSheetName(s){
+  // Strip everything except letters/digits so spacing/punctuation differences
+  // (hyphens, underscores, dots, parentheses, extra spaces) don't matter.
+  return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+const SHEETNAME_COMPACT_TO_KEY = Object.fromEntries(SECTION_DEFS.map(d=>[compactSheetName(d.sheetName), d.key]));
+
+function levenshteinDistance(a, b){
+  const m = a.length, n = b.length;
+  if(m === 0) return n;
+  if(n === 0) return m;
+  const dp = Array.from({length:m+1}, ()=>new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0] = i;
+  for(let j=0;j<=n;j++) dp[0][j] = j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Tries, in order: exact normalized match -> punctuation/spacing-insensitive
+// match -> small-edit-distance fuzzy match (only if there's one unambiguous
+// closest known section). Returns {key, method} or null if nothing is close.
+function matchSheetNameToKey(sheetName){
+  const norm = normalizeSheetName(sheetName);
+  if(SHEETNAME_TO_KEY[norm]) return {key: SHEETNAME_TO_KEY[norm], method:'exact'};
+
+  const compact = compactSheetName(sheetName);
+  if(SHEETNAME_COMPACT_TO_KEY[compact]) return {key: SHEETNAME_COMPACT_TO_KEY[compact], method:'normalized'};
+
+  let bestKey = null, bestDist = Infinity, tiedAtBest = 0;
+  Object.entries(SHEETNAME_COMPACT_TO_KEY).forEach(([candidateCompact, key])=>{
+    const dist = levenshteinDistance(compact, candidateCompact);
+    const threshold = Math.max(1, Math.floor(candidateCompact.length * 0.25));
+    if(dist <= threshold){
+      if(dist < bestDist){ bestDist = dist; bestKey = key; tiedAtBest = 1; }
+      else if(dist === bestDist){ tiedAtBest++; }
+    }
+  });
+  // Only accept the fuzzy match if exactly one known section is that close —
+  // an ambiguous guess is worse than surfacing it as unmatched.
+  if(bestKey && tiedAtBest === 1) return {key: bestKey, method:'fuzzy'};
+  return null;
+}
+
 /* ------------- Dynamic add/remove of sections (used by the UI's
    "Add Section" / "Delete Section" controls). SECTION_DEFS, SECTION_BY_KEY
    and SHEETNAME_TO_KEY are mutated in place (push/splice, not reassigned)
@@ -817,14 +869,17 @@ function runImport(workbook, testName, testDate){
   const matched = [];
   const unmatched = [];
   workbook.SheetNames.forEach(sheetName=>{
-    const norm = normalizeSheetName(sheetName);
-    const key = SHEETNAME_TO_KEY[norm];
-    if(!key){ unmatched.push(sheetName); return; }
-    const def = SECTION_BY_KEY[key];
+    const match = matchSheetNameToKey(sheetName);
+    if(!match){ unmatched.push(sheetName); return; }
+    const def = SECTION_BY_KEY[match.key];
     const ws = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
     const result = parseSheetForSection(rows, def);
     if(result.error){ unmatched.push(`${sheetName} (${result.error})`); return; }
+    if(match.method !== 'exact'){
+      const how = match.method === 'fuzzy' ? 'a close-match guess' : 'punctuation/spacing-insensitive matching';
+      result.warnings.unshift(`Tab "${sheetName}" matched to section "${def.sheetName}" via ${how} — please double-check this is the right section before confirming.`);
+    }
     matched.push(result);
   });
   return {matched, unmatched, testName, testDate};
