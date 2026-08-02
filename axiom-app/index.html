@@ -45,7 +45,7 @@
   <div class="hero-strip" id="heroStrip"></div>
 
   <div id="overallSummaryPage" style="display:none;">
-    <div class="section-title">Overall Summary <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— every section, every subject</span><span style="flex:1;"></span><button class="ghost small" id="printOverallBtn" title="Download a PDF report of the Overall Summary"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
+    <div class="section-title">Overall Summary <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— every section, every subject</span><span style="flex:1;"></span><button class="ghost small" id="backFromOverallBtn" title="Return to Section View">← Back to Section View</button><button class="ghost small" id="printOverallBtn" title="Download a PDF report of the Overall Summary"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
     <div class="hero-strip" id="osQuickStats"></div>
 
     <div class="section-title">Smart Insights</div>
@@ -79,7 +79,7 @@
   </div>
 
   <div id="sectionSummaryPage" style="display:none;">
-    <div class="section-title">Section Summary <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;" id="ssSectionLabelTag"></span><span style="flex:1;"></span><button class="ghost small" id="printSectionBtn" title="Download a PDF report of this Section Summary"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
+    <div class="section-title">Section Summary <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;" id="ssSectionLabelTag"></span><span style="flex:1;"></span><button class="ghost small" id="backFromSectionSummaryBtn" title="Return to Section View">← Back to Section View</button><button class="ghost small" id="printSectionBtn" title="Download a PDF report of this Section Summary"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
     <div class="hero-strip" id="ssQuickStats"></div>
 
     <div class="section-title">Insights</div>
@@ -107,15 +107,93 @@
         <tbody id="ssCompareBody"></tbody>
       </table>
     </div>
+
+    <div class="section-title">Student Roster <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— independent of the Section View table; browse any section</span></div>
+    <div class="toolbar" id="ssRFiltersToolbar">
+      <select id="ssRSection"></select>
+    </div>
+    <div class="field">
+      <label>Subject Filter</label>
+      <select id="ssRSubject"></select>
+    </div>
+    <div class="field">
+      <label>Zone Filter</label>
+      <select id="ssRZone">
+        <option value="">All Zones</option>
+        <option value="green">🟢 Green (90%+)</option>
+        <option value="blue">🔵 Blue (80-89%)</option>
+        <option value="yellow">🟡 Yellow (70-79%)</option>
+        <option value="pink">🩷 Pink (60-69%)</option>
+        <option value="red">🔴 Red (below 60%)</option>
+        <option value="grey">⚪ Absent</option>
+      </select>
+    </div>
+    <div class="field" style="flex:1;min-width:200px;">
+      <label>Search Student</label>
+      <input type="text" id="ssRSearch" placeholder="Type a name…" style="width:100%;">
+    </div>
+    <div class="chip-row" id="ssRChipRow" role="group" aria-label="Quick filters">
+      <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">🔴</span>At Risk</span>
+      <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📈</span>Improving</span>
+      <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📉</span>Declining</span>
+      <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">⚪</span>Absent</span>
+    </div>
+    <div id="ssRTableWrap" class="table-wrap">
+      <table class="main-table">
+        <thead><tr id="ssRTableHead"></tr></thead>
+        <tbody id="ssRTableBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="ssREmptyState" style="display:none;"></div>
   </div>
 
   <div id="teacherReportPage" style="display:none;">
-    <div class="section-title">Teacher Report <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— performance by teacher, across their subjects and sections</span><span style="flex:1;"></span><button class="ghost small" id="printTeacherBtn" title="Download a PDF report for the selected teacher"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
+    <div class="section-title">Teacher Report <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— performance by teacher, across their subjects and sections</span><span style="flex:1;"></span><button class="ghost small" id="backFromTeacherReportBtn" title="Return to Section View">← Back to Section View</button><button class="ghost small" id="printTeacherBtn" title="Download a PDF report for the selected teacher"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
     <div class="field" style="max-width:340px;">
       <label>Select Teacher</label>
       <select id="teacherSelect"><option value="">— Choose a teacher —</option></select>
     </div>
     <div id="teacherReportBody"></div>
+
+    <div id="trRRosterWrap" style="display:none;">
+      <div class="section-title">Student Roster <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— independent of the Section View table; limited to this teacher's own sections</span></div>
+      <div class="toolbar" id="trRFiltersToolbar">
+        <select id="trRSection"></select>
+      </div>
+      <div class="field">
+        <label>Subject Filter</label>
+        <select id="trRSubject"></select>
+      </div>
+      <div class="field">
+        <label>Zone Filter</label>
+        <select id="trRZone">
+          <option value="">All Zones</option>
+          <option value="green">🟢 Green (90%+)</option>
+          <option value="blue">🔵 Blue (80-89%)</option>
+          <option value="yellow">🟡 Yellow (70-79%)</option>
+          <option value="pink">🩷 Pink (60-69%)</option>
+          <option value="red">🔴 Red (below 60%)</option>
+          <option value="grey">⚪ Absent</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1;min-width:200px;">
+        <label>Search Student</label>
+        <input type="text" id="trRSearch" placeholder="Type a name…" style="width:100%;">
+      </div>
+      <div class="chip-row" id="trRChipRow" role="group" aria-label="Quick filters">
+        <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">🔴</span>At Risk</span>
+        <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📈</span>Improving</span>
+        <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📉</span>Declining</span>
+        <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">⚪</span>Absent</span>
+      </div>
+      <div id="trRTableWrap" class="table-wrap">
+        <table class="main-table">
+          <thead><tr id="trRTableHead"></tr></thead>
+          <tbody id="trRTableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="trREmptyState" style="display:none;"></div>
+    </div>
   </div>
 
   <div class="toolbar" id="actionsToolbar">
@@ -210,7 +288,6 @@
       <label>Search Student</label>
       <input type="text" id="studentSearch" placeholder="Type a name…" style="width:100%;">
     </div>
-  </div>
 
   <div class="chip-row" id="quickChipRow" role="group" aria-label="Quick filters">
     <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">🔴</span>At Risk</span>
@@ -249,6 +326,7 @@
       </div>
       <button class="ghost small" id="cloudImportBtn" title="Download the selected file from Supabase Storage and load it below">Load from Cloud</button>
       <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
+      <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone">🗑 Delete</button>
     </div>
     <div class="hint" id="cloudImportHint" style="display:none;"></div>
     <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>Nothing is applied until you review the detected mapping below and confirm.</b></div>
@@ -440,7 +518,7 @@
   <div class="cards" id="transitionCardsWrap"></div>
   </div>
 
-  <footer>Workspace stored locally on this device / pendrive. No data leaves this browser.</footer>
+  <footer id="appFooter">Workspace stored locally on this device / pendrive. No data leaves this browser.</footer>
 </div>
 
 <div class="drawer-overlay" id="statListOverlay">

@@ -46,6 +46,11 @@
     // but not manage sections, students, or teacher assignments.
     hide('addSectionBtn'); hide('deleteSectionBtn'); hide('renameSectionBtn');
     hide('addStudentBtn'); hide('manageTeacherBtn');
+    // Restrict the Section View (subject filter, table columns, charts,
+    // reports) to just the subject(s) this teacher is on record teaching —
+    // otherwise every subject for every student shows, which is confusing
+    // for a teacher who should only see their own.
+    currentTeacherRestriction = profile.teacher_name || null;
   }
   // principal / coordinator: nothing hidden — full access.
 

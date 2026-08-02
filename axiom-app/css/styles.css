@@ -232,6 +232,9 @@
   .delta-tag.up{color:#4ADE80;}
   .delta-tag.down{color:#F87171;}
   .delta-tag.flat{color:var(--muted);}
+  .prev-percent{font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);margin-right:4px;}
+  .prev-arrow{color:var(--muted);margin-right:6px;font-size:0.78rem;}
+  .zone-pill.prev-pill{margin-right:6px;}
 
   .zone-list{display:flex;flex-direction:column;gap:8px;justify-content:center;padding:0 6px;}
   .zone-list-row{display:flex;align-items:center;gap:9px;font-size:0.8rem;}
@@ -256,6 +259,10 @@
   .person-link{cursor:pointer;}
   .person-link:hover{text-decoration:underline;color:var(--accent-2);}
   .card ul li.person-link{padding-left:2px;}
+  .card ul li.hide-extra{display:none;}
+  .card ul.expanded li.hide-extra{display:list-item;}
+  .more-toggle{cursor:pointer;}
+  .more-toggle:hover{text-decoration:underline;color:var(--accent-2);}
 
   /* ===== student detail drawer ===== */
   .drawer-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.55);backdrop-filter:blur(2px);display:none;z-index:60;}

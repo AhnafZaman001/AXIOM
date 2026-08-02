@@ -980,12 +980,13 @@ function currentSectionDef(){ return SECTION_BY_KEY[currentSectionKey()]; }
 
 function populateSubjectFilter(){
   const def = currentSectionDef();
+  const subjects = visibleSubjectsFor(def);
   const sel = document.getElementById('subjectFilter');
-  sel.innerHTML = `<option value="">All Subjects</option>` + def.subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
+  sel.innerHTML = `<option value="">All Subjects</option>` + subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
   const chartSel = document.getElementById('chartSubjectSelect');
-  chartSel.innerHTML = def.subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
+  chartSel.innerHTML = subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
   const reportSel = document.getElementById('reportSubjectSelect');
-  reportSel.innerHTML = def.subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
+  reportSel.innerHTML = subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
   const compSel = document.getElementById('compareSectionSelect');
   const otherSections = SECTION_DEFS.filter(d=>d.key!==currentSectionKey());
   compSel.innerHTML = otherSections.map(d=>`<option value="${d.key}">${d.label}</option>`).join('');
@@ -1051,6 +1052,24 @@ function latestTest(student, subject){
 let quickFilter = null; // 'atrisk' | 'improving' | 'declining' | 'absent' | null
 let searchQuery = '';
 
+// Set by auth-guard.js when the signed-in user's role is 'teacher' (their
+// profile's teacher_name). Left null for every other role, meaning "no
+// restriction — see every subject" (principal/coordinator/HOD/student roles
+// are unaffected; students already see just their own record).
+let currentTeacherRestriction = null;
+
+// Returns the subjects that should actually be visible for this section:
+// every subject normally, or — when signed in as a teacher — only the
+// subject(s) that teacher is on record teaching in this section, so a
+// teacher never sees (or is asked to filter/chart/report on) a subject
+// that isn't theirs. Falls back to the full list if the restriction would
+// otherwise leave nothing to show (e.g. reassigned away from every subject).
+function visibleSubjectsFor(def){
+  if(!currentTeacherRestriction) return def.subjects;
+  const mine = def.subjects.filter(s=>lookupTeacher(s, def) === currentTeacherRestriction);
+  return mine.length ? mine : def.subjects;
+}
+
 function studentMatchesQuick(student, def, quick){
   const subjFilter = document.getElementById('subjectFilter').value;
   const subjectsToCheck = subjFilter ? [subjFilter] : def.subjects;
@@ -1067,10 +1086,11 @@ function studentMatchesQuick(student, def, quick){
     });
   }
   if(quick === 'improving' || quick === 'declining'){
+    const wantKey = quick === 'improving' ? 'improved' : 'declined';
     return subjectsToCheck.some(subj=>{
       const arr = (student.tests||{})[subj] || [];
       const c = classifyTransition(arr);
-      return c && c.key === quick;
+      return c && c.key === wantKey;
     });
   }
   return true;
@@ -1110,7 +1130,7 @@ function renderTable(){
 
   const subjFilter = document.getElementById('subjectFilter').value;
   const zoneFilterVal = document.getElementById('zoneFilter').value;
-  const subjectsShown = subjFilter ? [subjFilter] : def.subjects;
+  const subjectsShown = subjFilter ? [subjFilter] : visibleSubjectsFor(def);
 
   let headHtml = `<th>Student</th>`;
   if(showExtra) headHtml += `<th>Roll No.</th><th>Matric</th><th>Position</th>`;
@@ -1158,7 +1178,22 @@ function renderTable(){
       // subject(s) actually matching that zone should display their real value —
       // every other subject cell for this student collapses to a dash.
       const zoneMismatch = zoneFilterVal && (!subjFilter) && z !== zoneFilterVal;
-      if(zoneMismatch){
+      // When a quick filter chip (At Risk / Improving / Declining) is active and
+      // "All Subjects" is shown, only the subject(s) actually matching that
+      // filter should display their real value — everything else collapses to
+      // a dash, so the viewer isn't misled into thinking every visible subject
+      // is at risk / improving / declining.
+      let quickMismatch = false;
+      if(quickFilter && !subjFilter){
+        if(quickFilter === 'atrisk'){
+          quickMismatch = !(t && z === 'red');
+        } else if(quickFilter === 'improving' || quickFilter === 'declining'){
+          const c = classifyTransition(arr);
+          const wantKey = quickFilter === 'improving' ? 'improved' : 'declined';
+          quickMismatch = !(c && c.key === wantKey);
+        }
+      }
+      if(zoneMismatch || quickMismatch){
         row += `<td class="zone-cell"><span class="zone-pill none">—</span></td>`;
         return;
       }
@@ -1235,7 +1270,7 @@ function renderTransitionCards(def, store){
     return `<div class="${cls}">
       <h4>${escapeHtml(g.label)}</h4>
       <div class="count">${g.names.length}</div>
-      <ul>${g.names.slice(0,10).map(n=>`<li class="person-link" data-sid="${n.id}">${escapeHtml(n.name)}</li>`).join('')}${g.names.length>10?`<li class="empty">+${g.names.length-10} more</li>`:''}</ul>
+      <ul>${g.names.map((n,i)=>`<li class="person-link${i>=10?' hide-extra':''}" data-sid="${n.id}">${escapeHtml(n.name)}</li>`).join('')}${g.names.length>10?`<li class="empty more-toggle" data-more="${g.names.length-10}">+${g.names.length-10} more</li>`:''}</ul>
     </div>`;
   }).join('');
 }
@@ -1394,7 +1429,7 @@ function renderMovers(def, store){
     <div class="card">
       <h4>Needs Attention</h4>
       <div class="count">${attention.length}</div>
-      <ul>${attention.length ? attention.slice(0,10).map(a=>`<li class="person-link" data-sid="${a.id}">${escapeHtml(a.name)}${a.rollNo!=null&&a.rollNo!==''?` <span class="extra-detail">(Roll ${escapeHtml(a.rollNo)})</span>`:''} — ${escapeHtml(a.reason)}</li>`).join('') + (attention.length>10?`<li class="empty">+${attention.length-10} more</li>`:'') : '<li class="empty">Nobody flagged right now.</li>'}</ul>
+      <ul>${attention.length ? attention.map((a,i)=>`<li class="person-link${i>=10?' hide-extra':''}" data-sid="${a.id}">${escapeHtml(a.name)}${a.rollNo!=null&&a.rollNo!==''?` <span class="extra-detail">(Roll ${escapeHtml(a.rollNo)})</span>`:''} — ${escapeHtml(a.reason)}</li>`).join('') + (attention.length>10?`<li class="empty more-toggle" data-more="${attention.length-10}">+${attention.length-10} more</li>`:'') : '<li class="empty">Nobody flagged right now.</li>'}</ul>
     </div>
   `;
 }
@@ -1681,6 +1716,8 @@ function togglePinStudent(id, sectionKeyHint){
   found.student.pinned = !found.student.pinned;
   markDirty();
   renderTable();
+  if(typeof renderSSRoster === 'function') renderSSRoster();
+  if(typeof renderTRRoster === 'function') renderTRRoster();
   renderPinnedPanel();
   const overlay = document.getElementById('studentDrawerOverlay');
   if(overlay.classList.contains('open') && document.getElementById('drawerStudentName').dataset.sid === id){
@@ -1760,8 +1797,14 @@ function openStudentDrawerById(id, sectionKeyHint){
     const z = t ? zoneOf(t.percent, t.absent) : null;
     const pillLabel = t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—';
     let trendTag = '';
+    let prevTag = '';
     if(arr.length >= 2){
       const prev = arr[arr.length-2];
+      const prevLabel = prev.absent ? 'Absent' : (prev.percent!=null ? `${prev.percent}%` : null);
+      if(prevLabel){
+        const prevZone = zoneOf(prev.percent, prev.absent);
+        prevTag = `<span class="zone-pill prev-pill ${prevZone||'none'}" title="Previous test">${ZONE_EMOJI[prevZone]||''} ${prevLabel}</span>`;
+      }
       if(t && !t.absent && prev && !prev.absent && t.percent!=null && prev.percent!=null){
         const d = Math.round((t.percent - prev.percent)*10)/10;
         if(d > 0) trendTag = `<span class="delta-tag up">▲+${d}</span>`;
@@ -1780,7 +1823,7 @@ function openStudentDrawerById(id, sectionKeyHint){
         <div class="trend-dots" style="margin-top:5px;">${dots}</div>
       </div>
       <div style="text-align:right;">
-        <span class="zone-pill ${z||'none'}">${ZONE_EMOJI[z]||''} ${pillLabel}</span>${trendTag}
+        ${prevTag}<span class="zone-pill ${z||'none'}">${ZONE_EMOJI[z]||''} ${pillLabel}</span>${trendTag}
         ${absentCount ? `<div class="hint" style="margin-top:3px;">${absentCount} absence${absentCount>1?'s':''} recorded</div>` : ''}
       </div>
     </div>`;
@@ -1861,6 +1904,18 @@ document.addEventListener('click', (e)=>{
   const link = e.target.closest('.person-link[data-sid], tr[data-sid]');
   if(!link) return;
   openStudentDrawerById(link.getAttribute('data-sid'), link.getAttribute('data-skey') || null);
+});
+
+// Clicking the "+N more" line in a card list (e.g. Zone Transition cards)
+// expands the list to show every name, and collapses it back on a second click.
+document.addEventListener('click', (e)=>{
+  const toggle = e.target.closest('.more-toggle');
+  if(!toggle) return;
+  const ul = toggle.closest('ul');
+  if(!ul) return;
+  const expanded = ul.classList.toggle('expanded');
+  const remaining = toggle.getAttribute('data-more');
+  toggle.textContent = expanded ? 'Show less' : `+${remaining} more`;
 });
 
 /* ---- 019_ui-wiring.js ---- */
@@ -2112,6 +2167,14 @@ function setActivePage(page){
   document.getElementById('teacherReportPage').style.display = page==='teacherReport' ? 'block' : 'none';
   document.getElementById('sectionViewPage').style.display = page==='section' ? 'block' : 'none';
   document.getElementById('heroStrip').style.display = page==='section' ? 'grid' : 'none';
+  document.getElementById('importBtn').style.display = page==='section' ? '' : 'none';
+  // Report pages (overall/sectionSummary/teacherReport) are self-contained —
+  // nothing should trail after their own content, so hide the shared nav
+  // toolbar and footer entirely and rely on each report's own "← Back to
+  // Section View" button instead.
+  document.getElementById('actionsToolbar').style.display = page==='section' ? 'flex' : 'none';
+  document.getElementById('appFooter').style.display = page==='section' ? 'block' : 'none';
+  if(page!=='section') document.getElementById('importPanel').classList.remove('open');
   document.getElementById('overallSummaryBtn').classList.toggle('primary', page==='overall');
   document.getElementById('overallSummaryBtn').classList.toggle('ghost', page!=='overall');
   document.getElementById('overallSummaryBtn').textContent = page==='overall' ? '← Back to Section View' : 'Overall Summary';
@@ -2232,6 +2295,7 @@ function renderSectionSummary(){
     <td><span class="zone-pill ${zoneOf(s.avg,false)}">${s.avg}%</span></td><td>${s.studentCount}</td></tr>
   `).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No section data yet.</td></tr>`;
 
+  renderSSRoster();
   triggerEntranceAnimations();
 }
 document.getElementById('ssQuickStats').addEventListener('click', (e)=>{
@@ -2256,6 +2320,26 @@ document.getElementById('ssCompareBody').addEventListener('click', (e)=>{
   document.getElementById('sectionSelect').value = tr.getAttribute('data-jump-section');
   refreshAllUI();
   renderSectionSummary();
+});
+
+// Clicking a section row in the Teacher Report jumps into that section's
+// Section View, pre-filtered to the exact subject that row is about — so a
+// principal drilling in from "this teacher's Physics in F1A" lands on a
+// table showing just Physics zone colours for F1A students, not every
+// subject for every student (which would be confusing given the context).
+document.getElementById('teacherReportBody').addEventListener('click', (e)=>{
+  const tr = e.target.closest('tr[data-jump-section]');
+  if(!tr) return;
+  const sectionKey = tr.getAttribute('data-jump-section');
+  const subject = tr.getAttribute('data-jump-subject');
+  document.getElementById('sectionSelect').value = sectionKey;
+  setActivePage('section');
+  refreshAllUI();
+  const subjSel = document.getElementById('subjectFilter');
+  if(subject && Array.from(subjSel.options).some(o=>o.value===subject)){
+    subjSel.value = subject;
+    renderTable();
+  }
 });
 
 /* ---- 021_teacher-report.js ---- */
@@ -2371,7 +2455,7 @@ function renderTeacherReport(){
             const isWorst = worst && r===worst && scored.length>1;
             const rowStyle = isBest ? 'background:var(--gold-bg);font-weight:600;' : isWorst ? 'background:rgba(200,60,60,0.08);' : '';
             const avgCell = r.avg!=null ? `<span class="zone-pill ${zoneOf(r.avg,false)}">${r.avg}%</span>` : '<span style="color:var(--muted);">—</span>';
-            return `<tr style="${rowStyle}">
+            return `<tr style="${rowStyle}cursor:pointer;" class="person-link" data-jump-section="${r.def.key}" data-jump-subject="${escapeHtml(a.subject)}" title="View ${escapeHtml(a.subject)} for ${escapeHtml(r.def.label)} students">
               <td class="name-cell">${escapeHtml(r.def.label)}${isBest?' 🏆':''}${isWorst?' ⚠️':''}</td>
               <td>${avgCell}</td><td>${r.studentCount}</td><td>${r.redCount}</td><td>${r.greenCount}</td>
             </tr>`;
@@ -2382,8 +2466,294 @@ function renderTeacherReport(){
   });
 
   body.innerHTML = html;
+  renderTRRoster();
   triggerEntranceAnimations();
 }
+
+/* ---- 028_independent-roster-widgets.js ---- */
+
+/* ===================== INDEPENDENT ROSTER TABLE WIDGETS =====================
+   A second, third copy of "student table + Section/Subject/Zone/Search
+   filters + quick-filter chips", standalone on the Section Summary and
+   Teacher Report pages. Each keeps its own state — never reads from or
+   writes to the main Section View's #sectionSelect/#subjectFilter/
+   #zoneFilter/#studentSearch/#quickChipRow. */
+
+function subjectsForRoster(def, subjFilterVal, restrictToTeacher){
+  if(subjFilterVal) return [subjFilterVal];
+  if(restrictToTeacher){
+    const mine = def.subjects.filter(s=>lookupTeacher(s, def) === restrictToTeacher);
+    return mine.length ? mine : def.subjects;
+  }
+  return def.subjects;
+}
+
+function rosterStudentMatchesQuick(student, def, quick, subjFilterVal){
+  const subjectsToCheck = subjFilterVal ? [subjFilterVal] : def.subjects;
+  if(quick === 'atrisk'){
+    return subjectsToCheck.some(subj=>{ const t=latestTest(student,subj); return t && zoneOf(t.percent,t.absent)==='red'; });
+  }
+  if(quick === 'absent'){
+    return subjectsToCheck.some(subj=>{ const t=latestTest(student,subj); return t && t.absent; });
+  }
+  if(quick === 'improving' || quick === 'declining'){
+    const wantKey = quick === 'improving' ? 'improved' : 'declined';
+    return subjectsToCheck.some(subj=>{
+      const arr = (student.tests||{})[subj] || [];
+      const c = classifyTransition(arr);
+      return c && c.key === wantKey;
+    });
+  }
+  return true;
+}
+
+function rosterStudentPassesFilters(student, def, f){
+  if(f.searchQueryVal && !student.name.toLowerCase().includes(f.searchQueryVal)) return false;
+  if(f.quickFilterVal && !rosterStudentMatchesQuick(student, def, f.quickFilterVal, f.subjFilterVal)) return false;
+  if(!f.zoneFilterVal) return true;
+  const subjectsToCheck = f.subjFilterVal ? [f.subjFilterVal] : def.subjects;
+  return subjectsToCheck.some(subj=>{
+    const t = latestTest(student, subj);
+    if(!t) return false;
+    return zoneOf(t.percent, t.absent) === f.zoneFilterVal;
+  });
+}
+
+// Renders one full roster table (head + body + empty state) into the
+// elements given in cfg — driven entirely by cfg, so multiple independent
+// instances can share this without stepping on each other.
+function renderRosterTable(cfg){
+  const {sectionKey, subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal,
+         restrictToTeacher, headEl, bodyEl, wrapEl, emptyEl, emptyHtmlNoStudents, emptyHtmlNoMatches} = cfg;
+  const def = SECTION_BY_KEY[sectionKey];
+  if(!def){ wrapEl.style.display='none'; emptyEl.style.display='none'; return; }
+  const store = ensureSection(def.key);
+  const subjectsShown = subjectsForRoster(def, subjFilterVal, restrictToTeacher);
+
+  let headHtml = `<th>Student</th>`;
+  subjectsShown.forEach(s=>{
+    const avg = subjectClassAverage(store, s);
+    headHtml += `<th>${s}${avg!=null?`<span class="subject-th-avg">avg ${avg}%</span>`:''}</th>`;
+  });
+  headEl.innerHTML = headHtml;
+
+  const students = store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal}));
+
+  if(store.students.length === 0){
+    wrapEl.style.display='none'; emptyEl.style.display='block';
+    emptyEl.innerHTML = emptyHtmlNoStudents;
+    return;
+  }
+  if(students.length === 0){
+    wrapEl.style.display='none'; emptyEl.style.display='block';
+    emptyEl.innerHTML = emptyHtmlNoMatches;
+    return;
+  }
+  wrapEl.style.display='block'; emptyEl.style.display='none';
+
+  bodyEl.innerHTML = students.map(st=>{
+    let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" data-pin-skey="${def.key}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}${escapeHtml(st.name)}</td>`;
+    subjectsShown.forEach(subj=>{
+      const arr = (st.tests||{})[subj] || [];
+      const t = arr.length ? arr[arr.length-1] : null;
+      const z = t ? zoneOf(t.percent, t.absent) : null;
+      const zoneMismatch = zoneFilterVal && (!subjFilterVal) && z !== zoneFilterVal;
+      let quickMismatch = false;
+      if(quickFilterVal && !subjFilterVal){
+        if(quickFilterVal === 'atrisk'){
+          quickMismatch = !(t && z === 'red');
+        } else if(quickFilterVal === 'improving' || quickFilterVal === 'declining'){
+          const c = classifyTransition(arr);
+          const wantKey = quickFilterVal === 'improving' ? 'improved' : 'declined';
+          quickMismatch = !(c && c.key === wantKey);
+        }
+      }
+      if(zoneMismatch || quickMismatch){
+        row += `<td class="zone-cell"><span class="zone-pill none">—</span></td>`;
+        return;
+      }
+      const pillLabel = t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—';
+      let trendTag = '';
+      if(arr.length >= 2){
+        const prev = arr[arr.length-2];
+        if(t && !t.absent && prev && !prev.absent && t.percent!=null && prev.percent!=null){
+          const d = Math.round((t.percent - prev.percent)*10)/10;
+          if(d > 0) trendTag = `<span class="delta-tag up">▲+${d}</span>`;
+          else if(d < 0) trendTag = `<span class="delta-tag down">▼${d}</span>`;
+          else trendTag = `<span class="delta-tag flat">·0</span>`;
+        }
+      }
+      const dots = arr.map(tt=>{
+        const zz = zoneOf(tt.percent, tt.absent);
+        return `<span class="d ${zz||'none'}" title="${escapeHtml(tt.test)}: ${tt.absent?'Absent':(tt.percent+'%')}"></span>`;
+      }).join('');
+      row += `<td class="zone-cell">
+        <span class="zone-pill ${z||'none'}">${ZONE_EMOJI[z]||''} ${pillLabel}</span>${trendTag}
+        <div class="trend-dots">${dots}</div>
+      </td>`;
+    });
+    return `<tr data-sid="${st.id}" data-skey="${def.key}">${row}</tr>`;
+  }).join('');
+}
+
+const ROSTER_EMPTY_NO_STUDENTS = `<h3>No students in this section yet</h3><div>Import an Excel file, or add a student manually to get started.</div>`;
+const ROSTER_EMPTY_NO_MATCHES = `<h3>No students match the current filters</h3><div>Try clearing the zone filter or quick filter chips above.</div>`;
+
+/* ---- Section Summary's independent roster ---- */
+let ssRosterState = { sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'' };
+
+function renderSSRoster(){
+  if(!ssRosterState.sectionKey || !SECTION_BY_KEY[ssRosterState.sectionKey]) ssRosterState.sectionKey = currentSectionKey();
+  const sel = document.getElementById('ssRSection');
+  sel.innerHTML = SECTION_DEFS.map(d=>`<option value="${d.key}">${d.label}</option>`).join('');
+  sel.value = ssRosterState.sectionKey;
+
+  const def = SECTION_BY_KEY[ssRosterState.sectionKey];
+  const subjSel = document.getElementById('ssRSubject');
+  subjSel.innerHTML = `<option value="">All Subjects</option>` + def.subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(!def.subjects.includes(ssRosterState.subjFilter)) ssRosterState.subjFilter = '';
+  subjSel.value = ssRosterState.subjFilter;
+
+  document.getElementById('ssRZone').value = ssRosterState.zoneFilter;
+  document.getElementById('ssRSearch').value = ssRosterState.searchQuery;
+  document.querySelectorAll('#ssRChipRow .chip').forEach(c=>{
+    const pressed = c.getAttribute('data-quick') === ssRosterState.quickFilter;
+    c.classList.toggle('active', pressed);
+    c.setAttribute('aria-pressed', String(pressed));
+  });
+
+  renderRosterTable({
+    sectionKey: ssRosterState.sectionKey,
+    subjFilterVal: ssRosterState.subjFilter,
+    zoneFilterVal: ssRosterState.zoneFilter,
+    searchQueryVal: ssRosterState.searchQuery,
+    quickFilterVal: ssRosterState.quickFilter,
+    restrictToTeacher: null,
+    headEl: document.getElementById('ssRTableHead'),
+    bodyEl: document.getElementById('ssRTableBody'),
+    wrapEl: document.getElementById('ssRTableWrap'),
+    emptyEl: document.getElementById('ssREmptyState'),
+    emptyHtmlNoStudents: ROSTER_EMPTY_NO_STUDENTS,
+    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES
+  });
+}
+
+document.getElementById('ssRSection').addEventListener('change', (e)=>{ ssRosterState.sectionKey = e.target.value; ssRosterState.subjFilter=''; renderSSRoster(); });
+document.getElementById('ssRSubject').addEventListener('change', (e)=>{ ssRosterState.subjFilter = e.target.value; renderSSRoster(); });
+document.getElementById('ssRZone').addEventListener('change', (e)=>{ ssRosterState.zoneFilter = e.target.value; renderSSRoster(); });
+document.getElementById('ssRSearch').addEventListener('input', (e)=>{ ssRosterState.searchQuery = e.target.value.trim().toLowerCase(); renderSSRoster(); });
+document.querySelectorAll('#ssRChipRow .chip').forEach(chip=>{
+  const activate = ()=>{
+    const key = chip.getAttribute('data-quick');
+    ssRosterState.quickFilter = (ssRosterState.quickFilter === key) ? null : key;
+    renderSSRoster();
+  };
+  chip.addEventListener('click', activate);
+  chip.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(); } });
+});
+
+/* ---- Teacher Report's independent roster (scoped to the selected teacher's own sections/subjects) ---- */
+let trRosterState = { teacherName:null, sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'' };
+
+function trRosterSectionsForTeacher(teacherName){
+  if(!teacherName) return [];
+  const keys = new Set();
+  getTeacherAssignments(teacherName).forEach(a=>a.rows.forEach(r=>keys.add(r.def.key)));
+  return SECTION_DEFS.filter(d=>keys.has(d.key));
+}
+
+function renderTRRoster(){
+  const teacherName = document.getElementById('teacherSelect').value;
+  const outerWrap = document.getElementById('trRRosterWrap');
+  if(!teacherName){
+    outerWrap.style.display = 'none';
+    return;
+  }
+  outerWrap.style.display = '';
+
+  const sections = trRosterSectionsForTeacher(teacherName);
+  if(trRosterState.teacherName !== teacherName){
+    // Switched teacher — reset to that teacher's first section/subject.
+    trRosterState.teacherName = teacherName;
+    trRosterState.sectionKey = sections.length ? sections[0].key : null;
+    trRosterState.subjFilter = '';
+  }
+  if(!trRosterState.sectionKey || !sections.some(d=>d.key===trRosterState.sectionKey)){
+    trRosterState.sectionKey = sections.length ? sections[0].key : null;
+  }
+
+  const sel = document.getElementById('trRSection');
+  sel.innerHTML = sections.length ? sections.map(d=>`<option value="${d.key}">${d.label}</option>`).join('') : `<option value="">— no sections on record —</option>`;
+  sel.value = trRosterState.sectionKey || '';
+
+  const def = trRosterState.sectionKey ? SECTION_BY_KEY[trRosterState.sectionKey] : null;
+  const subjSel = document.getElementById('trRSubject');
+  const teacherSubjectsHere = def ? def.subjects.filter(s=>lookupTeacher(s, def) === teacherName) : [];
+  subjSel.innerHTML = `<option value="">All Subjects</option>` + teacherSubjectsHere.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(!teacherSubjectsHere.includes(trRosterState.subjFilter)) trRosterState.subjFilter = '';
+  subjSel.value = trRosterState.subjFilter;
+
+  document.getElementById('trRZone').value = trRosterState.zoneFilter;
+  document.getElementById('trRSearch').value = trRosterState.searchQuery;
+  document.querySelectorAll('#trRChipRow .chip').forEach(c=>{
+    const pressed = c.getAttribute('data-quick') === trRosterState.quickFilter;
+    c.classList.toggle('active', pressed);
+    c.setAttribute('aria-pressed', String(pressed));
+  });
+
+  if(!def){
+    document.getElementById('trRTableWrap').style.display='none';
+    const emptyEl = document.getElementById('trREmptyState');
+    emptyEl.style.display='block';
+    emptyEl.innerHTML = `<h3>No sections found</h3><div>${escapeHtml(teacherName)} isn't on record teaching any section yet.</div>`;
+    return;
+  }
+
+  renderRosterTable({
+    sectionKey: trRosterState.sectionKey,
+    subjFilterVal: trRosterState.subjFilter,
+    zoneFilterVal: trRosterState.zoneFilter,
+    searchQueryVal: trRosterState.searchQuery,
+    quickFilterVal: trRosterState.quickFilter,
+    restrictToTeacher: teacherName,
+    headEl: document.getElementById('trRTableHead'),
+    bodyEl: document.getElementById('trRTableBody'),
+    wrapEl: document.getElementById('trRTableWrap'),
+    emptyEl: document.getElementById('trREmptyState'),
+    emptyHtmlNoStudents: ROSTER_EMPTY_NO_STUDENTS,
+    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES
+  });
+}
+
+document.getElementById('trRSection').addEventListener('change', (e)=>{ trRosterState.sectionKey = e.target.value; trRosterState.subjFilter=''; renderTRRoster(); });
+document.getElementById('trRSubject').addEventListener('change', (e)=>{ trRosterState.subjFilter = e.target.value; renderTRRoster(); });
+document.getElementById('trRZone').addEventListener('change', (e)=>{ trRosterState.zoneFilter = e.target.value; renderTRRoster(); });
+document.getElementById('trRSearch').addEventListener('input', (e)=>{ trRosterState.searchQuery = e.target.value.trim().toLowerCase(); renderTRRoster(); });
+document.querySelectorAll('#trRChipRow .chip').forEach(chip=>{
+  const activate = ()=>{
+    const key = chip.getAttribute('data-quick');
+    trRosterState.quickFilter = (trRosterState.quickFilter === key) ? null : key;
+    renderTRRoster();
+  };
+  chip.addEventListener('click', activate);
+  chip.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(); } });
+});
+
+// Pin-star / row-click handling for both independent tables (mirrors the
+// main #tableBody listener, but resolves the section from data-skey on the
+// row itself rather than the main Section View's current selection).
+['ssRTableBody','trRTableBody'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', (e)=>{
+    const star = e.target.closest('.pin-star[data-pin-sid]');
+    if(star){
+      togglePinStudent(star.getAttribute('data-pin-sid'), star.getAttribute('data-pin-skey'));
+      return;
+    }
+    const tr = e.target.closest('tr[data-sid]');
+    if(!tr) return;
+    openStudentDrawerById(tr.getAttribute('data-sid'), tr.getAttribute('data-skey'));
+  });
+});
 
 function toggleOverallSummary(open){ setActivePage(open ? 'overall' : 'section'); }
 function toggleSectionSummary(open){ setActivePage(open ? 'sectionSummary' : 'section'); }
@@ -2391,6 +2761,9 @@ function toggleTeacherReport(open){ setActivePage(open ? 'teacherReport' : 'sect
 document.getElementById('overallSummaryBtn').addEventListener('click', ()=>toggleOverallSummary(!overallSummaryOpen));
 document.getElementById('sectionSummaryBtn').addEventListener('click', ()=>toggleSectionSummary(!sectionSummaryOpen));
 document.getElementById('teacherReportBtn').addEventListener('click', ()=>toggleTeacherReport(!teacherReportOpen));
+document.getElementById('backFromOverallBtn').addEventListener('click', ()=>toggleOverallSummary(false));
+document.getElementById('backFromSectionSummaryBtn').addEventListener('click', ()=>toggleSectionSummary(false));
+document.getElementById('backFromTeacherReportBtn').addEventListener('click', ()=>toggleTeacherReport(false));
 document.getElementById('teacherSelect').addEventListener('change', renderTeacherReport);
 document.getElementById('homeBtn').addEventListener('click', ()=>setActivePage('section'));
 
@@ -2479,6 +2852,26 @@ async function refreshCloudFileList(){
 }
 
 document.getElementById('cloudRefreshBtn').addEventListener('click', refreshCloudFileList);
+
+document.getElementById('cloudDeleteBtn').addEventListener('click', async ()=>{
+  const sel = document.getElementById('cloudFileSelect');
+  const fileName = sel.value;
+  if(!fileName){ showToast('Choose a cloud file first.', 'warning'); return; }
+  if(!confirm(`Delete "${fileName}" from the cloud? This removes it for everyone and can't be undone.`)) return;
+  const btn = document.getElementById('cloudDeleteBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try{
+    await axDeleteCloudFile(fileName);
+    showToast(`✓ "${fileName}" deleted from the cloud.`, 'success');
+    await refreshCloudFileList();
+  }catch(err){
+    showToast(`Delete failed: ${err.message || err} (only principal/coordinator accounts can delete)`, 'error');
+    console.error('axDeleteCloudFile failed:', err);
+  }finally{
+    btn.disabled = false; btn.textContent = originalLabel;
+  }
+});
 
 document.getElementById('cloudImportBtn').addEventListener('click', async ()=>{
   const fileName = document.getElementById('cloudFileSelect').value;
@@ -3011,6 +3404,8 @@ populateSubjectFilter();
 updateStatusLine();
 updateLastUpdatedNow();
 renderTable();
+renderSSRoster();
+renderTRRoster();
 renderPinnedPanel();
 
 (function runLoadingSequence(){
