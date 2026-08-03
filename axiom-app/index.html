@@ -251,6 +251,49 @@
     <input type="file" id="cloudUploadFileInput" accept=".xls,.xlsx" style="display:none;">
   </div>
 
+  <!-- Import panel — kept directly under the Import Excel Results button so the
+       test name / date / file / cloud controls open right where the button is,
+       instead of appearing below the section filters. -->
+  <div class="panel" id="importPanel">
+    <h3>Import Excel Results</h3>
+    <div class="panel-row">
+      <div class="field">
+        <label>Test / Exam Name</label>
+        <input type="text" id="importTestName" placeholder="e.g. Pre-Board (PB1+PB2)" required style="width:240px;">
+      </div>
+      <div class="field">
+        <label>Date (optional)</label>
+        <input type="date" id="importTestDate">
+      </div>
+      <div class="field">
+        <label>File (.xls / .xlsx)</label>
+        <input type="file" id="importFileInput" accept=".xls,.xlsx">
+      </div>
+    </div>
+    <div class="panel-row" style="align-items:flex-end;margin-top:2px;">
+      <div class="field" style="flex:1;min-width:220px;">
+        <label>Or import from Cloud (no file needed on this computer)</label>
+        <select id="cloudFileSelect"><option value="">— Loading cloud files… —</option></select>
+      </div>
+      <button class="ghost small" id="cloudImportBtn" title="Download the selected file from Supabase Storage and load it below">Load from Cloud</button>
+      <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
+      <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone">🗑 Delete</button>
+    </div>
+    <div class="hint" id="cloudImportHint" style="display:none;"></div>
+    <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>Nothing is applied until you review the detected mapping below and confirm.</b></div>
+    <div id="importPreviewArea"></div>
+    <div class="panel-row" id="acceptMappingRow" style="display:none;margin-top:4px;align-items:center;">
+      <label style="display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--ink-soft);cursor:pointer;">
+        <input type="checkbox" id="acceptMappingCheck">
+        I've reviewed the column mapping and sample rows above and confirm they're correct.
+      </label>
+    </div>
+    <div class="panel-row" style="margin-top:12px;">
+      <button class="primary" id="applyImportBtn" disabled title="Review the detected mapping and check the confirmation box above to enable this">Apply Import</button>
+      <button class="ghost" id="cancelImportBtn">Cancel</button>
+    </div>
+  </div>
+
   <div id="sectionViewPage">
   <div class="toolbar" id="filtersToolbar">
       <select id="sectionSelect"></select>
@@ -300,47 +343,6 @@
   <div class="pinned-panel" id="pinnedPanel" role="group" aria-label="Pinned favourite students" style="display:none;">
     <div class="pinned-panel-head">⭐ Pinned Students</div>
     <div class="pinned-panel-list" id="pinnedPanelList"></div>
-  </div>
-
-  <!-- Import panel -->
-  <div class="panel" id="importPanel">
-    <h3>Import Excel Results</h3>
-    <div class="panel-row">
-      <div class="field">
-        <label>Test / Exam Name</label>
-        <input type="text" id="importTestName" placeholder="e.g. Pre-Board (PB1+PB2)" required style="width:240px;">
-      </div>
-      <div class="field">
-        <label>Date (optional)</label>
-        <input type="date" id="importTestDate">
-      </div>
-      <div class="field">
-        <label>File (.xls / .xlsx)</label>
-        <input type="file" id="importFileInput" accept=".xls,.xlsx">
-      </div>
-    </div>
-    <div class="panel-row" style="align-items:flex-end;margin-top:2px;">
-      <div class="field" style="flex:1;min-width:220px;">
-        <label>Or import from Cloud (no file needed on this computer)</label>
-        <select id="cloudFileSelect"><option value="">— Loading cloud files… —</option></select>
-      </div>
-      <button class="ghost small" id="cloudImportBtn" title="Download the selected file from Supabase Storage and load it below">Load from Cloud</button>
-      <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
-      <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone">🗑 Delete</button>
-    </div>
-    <div class="hint" id="cloudImportHint" style="display:none;"></div>
-    <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>Nothing is applied until you review the detected mapping below and confirm.</b></div>
-    <div id="importPreviewArea"></div>
-    <div class="panel-row" id="acceptMappingRow" style="display:none;margin-top:4px;align-items:center;">
-      <label style="display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--ink-soft);cursor:pointer;">
-        <input type="checkbox" id="acceptMappingCheck">
-        I've reviewed the column mapping and sample rows above and confirm they're correct.
-      </label>
-    </div>
-    <div class="panel-row" style="margin-top:12px;">
-      <button class="primary" id="applyImportBtn" disabled title="Review the detected mapping and check the confirmation box above to enable this">Apply Import</button>
-      <button class="ghost" id="cancelImportBtn">Cancel</button>
-    </div>
   </div>
 
   <!-- Add/Edit test panel -->

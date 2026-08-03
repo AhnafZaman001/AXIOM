@@ -2380,8 +2380,11 @@ function getTeacherAssignments(teacherName){
       const students = store ? store.students : [];
       const avg = store ? subjectClassAverage(store, subject) : null;
       const redCount = students.filter(st=>{ const t=latestTest(st,subject); return t && !t.absent && t.percent!=null && t.percent<60; }).length;
+      const pinkCount = students.filter(st=>{ const t=latestTest(st,subject); return t && !t.absent && t.percent!=null && t.percent>=60 && t.percent<70; }).length;
+      const yellowCount = students.filter(st=>{ const t=latestTest(st,subject); return t && !t.absent && t.percent!=null && t.percent>=70 && t.percent<80; }).length;
+      const blueCount = students.filter(st=>{ const t=latestTest(st,subject); return t && !t.absent && t.percent!=null && t.percent>=80 && t.percent<90; }).length;
       const greenCount = students.filter(st=>{ const t=latestTest(st,subject); return t && !t.absent && t.percent!=null && t.percent>=90; }).length;
-      (bySubject[subject] = bySubject[subject] || []).push({def, raw: rawSectionLabel(def), avg, studentCount: students.length, redCount, greenCount});
+      (bySubject[subject] = bySubject[subject] || []).push({def, raw: rawSectionLabel(def), avg, studentCount: students.length, redCount, pinkCount, yellowCount, blueCount, greenCount});
     });
   });
   return Object.entries(bySubject).map(([subject, rows])=>({subject, rows}));
@@ -2409,6 +2412,9 @@ function renderTeacherReport(){
   const overallAvg = totalWeight ? Math.round((scoredRows.reduce((s,r)=>s+r.avg*r.studentCount,0)/totalWeight)*10)/10 : null;
   const totalStudents = allRows.reduce((s,r)=>s+r.studentCount,0);
   const totalRed = allRows.reduce((s,r)=>s+r.redCount,0);
+  const totalPink = allRows.reduce((s,r)=>s+r.pinkCount,0);
+  const totalYellow = allRows.reduce((s,r)=>s+r.yellowCount,0);
+  const totalBlue = allRows.reduce((s,r)=>s+r.blueCount,0);
   const totalGreen = allRows.reduce((s,r)=>s+r.greenCount,0);
 
   let html = `<div class="hero-strip">
@@ -2416,8 +2422,11 @@ function renderTeacherReport(){
     <div class="hero-metric"><div class="hm-label">🏫 Sections Covered</div><div class="hm-value">${allRows.length}</div></div>
     <div class="hero-metric"><div class="hm-label">👨‍🎓 Total Students</div><div class="hm-value">${totalStudents}</div></div>
     <div class="hero-metric accent"><div class="hm-label">📈 Overall Average</div><div class="hm-value">${overallAvg!=null?overallAvg+'%':'—'}</div></div>
-    <div class="hero-metric warn"><div class="hm-label">🔴 Red Zone</div><div class="hm-value">${totalRed}</div></div>
     <div class="hero-metric good"><div class="hm-label">🟢 Green Zone</div><div class="hm-value">${totalGreen}</div></div>
+    <div class="hero-metric"><div class="hm-label">🔵 Blue Zone</div><div class="hm-value">${totalBlue}</div></div>
+    <div class="hero-metric"><div class="hm-label">🟡 Yellow Zone</div><div class="hm-value">${totalYellow}</div></div>
+    <div class="hero-metric"><div class="hm-label">🩷 Pink Zone</div><div class="hm-value">${totalPink}</div></div>
+    <div class="hero-metric warn"><div class="hm-label">🔴 Red Zone</div><div class="hm-value">${totalRed}</div></div>
   </div>`;
 
   assignments.forEach(a=>{
@@ -2447,7 +2456,7 @@ function renderTeacherReport(){
     html += `<div class="table-wrap" style="max-height:320px;margin-bottom:6px;">
       <table class="main-table">
         <thead><tr>
-          <th>Section</th><th>Average %</th><th>Students</th><th>🔴 Red</th><th>🟢 Green</th>
+          <th>Section</th><th>Average %</th><th>Students</th><th>🟢 Green</th><th>🔵 Blue</th><th>🟡 Yellow</th><th>🩷 Pink</th><th>🔴 Red</th>
         </tr></thead>
         <tbody>
           ${rows.map(r=>{
@@ -2457,7 +2466,7 @@ function renderTeacherReport(){
             const avgCell = r.avg!=null ? `<span class="zone-pill ${zoneOf(r.avg,false)}">${r.avg}%</span>` : '<span style="color:var(--muted);">—</span>';
             return `<tr style="${rowStyle}cursor:pointer;" class="person-link" data-jump-section="${r.def.key}" data-jump-subject="${escapeHtml(a.subject)}" title="View ${escapeHtml(a.subject)} for ${escapeHtml(r.def.label)} students">
               <td class="name-cell">${escapeHtml(r.def.label)}${isBest?' 🏆':''}${isWorst?' ⚠️':''}</td>
-              <td>${avgCell}</td><td>${r.studentCount}</td><td>${r.redCount}</td><td>${r.greenCount}</td>
+              <td>${avgCell}</td><td>${r.studentCount}</td><td>${r.greenCount}</td><td>${r.blueCount}</td><td>${r.yellowCount}</td><td>${r.pinkCount}</td><td>${r.redCount}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -3624,6 +3633,9 @@ function generateTeacherReportPDF(){
   const overallAvg = totalWeight ? Math.round((scoredRows.reduce((s,r)=>s+r.avg*r.studentCount,0)/totalWeight)*10)/10 : null;
   const totalStudents = allRows.reduce((s,r)=>s+r.studentCount,0);
   const totalRed = allRows.reduce((s,r)=>s+r.redCount,0);
+  const totalPink = allRows.reduce((s,r)=>s+r.pinkCount,0);
+  const totalYellow = allRows.reduce((s,r)=>s+r.yellowCount,0);
+  const totalBlue = allRows.reduce((s,r)=>s+r.blueCount,0);
   const totalGreen = allRows.reduce((s,r)=>s+r.greenCount,0);
 
   let body = '';
@@ -3632,8 +3644,11 @@ function generateTeacherReportPDF(){
     ['Sections Covered', String(allRows.length)],
     ['Total Students', String(totalStudents)],
     ['Overall Average', overallAvg!=null?overallAvg+'%':'—'],
-    ['Red Zone', String(totalRed)],
     ['Green Zone', String(totalGreen)],
+    ['Blue Zone', String(totalBlue)],
+    ['Yellow Zone', String(totalYellow)],
+    ['Pink Zone', String(totalPink)],
+    ['Red Zone', String(totalRed)],
   ]));
 
   assignments.forEach(a=>{
@@ -3643,8 +3658,8 @@ function generateTeacherReportPDF(){
       if(y2.avg==null) return -1;
       return y2.avg-x.avg;
     });
-    body += reportSectionHtml(a.subject, reportTableHtml(['Section','Average %','Students','Red','Green'],
-      rows.map(r=>[r.def.label, r.avg!=null?r.avg+'%':'—', r.studentCount, r.redCount, r.greenCount])));
+    body += reportSectionHtml(a.subject, reportTableHtml(['Section','Average %','Students','Green','Blue','Yellow','Pink','Red'],
+      rows.map(r=>[r.def.label, r.avg!=null?r.avg+'%':'—', r.studentCount, r.greenCount, r.blueCount, r.yellowCount, r.pinkCount, r.redCount])));
   });
 
   printReport(`${teacherName} — Teacher Performance Report`, `${assignments.length} subject${assignments.length===1?'':'s'} · ${allRows.length} section${allRows.length===1?'':'s'} · ${totalStudents} student${totalStudents===1?'':'s'}`, body);
