@@ -273,12 +273,13 @@
     <div class="panel-row" style="align-items:flex-end;margin-top:2px;">
       <div class="field" style="flex:1;min-width:220px;">
         <label>Or import from Cloud (no file needed on this computer)</label>
-        <select id="cloudFileSelect"><option value="">— Loading cloud files… —</option></select>
+        <select id="cloudFileSelect" multiple size="3"><option value="">— Loading cloud files… —</option></select>
       </div>
-      <button class="ghost small" id="cloudImportBtn" title="Download the selected file from Supabase Storage and load it below">Load from Cloud</button>
+      <button class="ghost small" id="cloudImportBtn" title="Download the selected file(s) from Supabase Storage and load them below">Load from Cloud</button>
       <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
       <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone">🗑 Delete</button>
     </div>
+    <div class="hint">Hold Ctrl (⌘ on Mac) and click to pick several files, or Ctrl/⌘+A while the list is focused to select all — then Load from Cloud imports every selected file at once.</div>
     <div class="hint" id="cloudImportHint" style="display:none;"></div>
     <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>Nothing is applied until you review the detected mapping below and confirm.</b></div>
     <div id="importPreviewArea"></div>

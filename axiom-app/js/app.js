@@ -2874,20 +2874,43 @@ async function refreshCloudFileList(){
       sel.innerHTML = `<option value="">— No files uploaded to the cloud yet —</option>`;
       return;
     }
-    sel.innerHTML = `<option value="">— Choose a cloud file —</option>` +
-      files.map(f=>`<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)}</option>`).join('');
+    sel.innerHTML = files.map(f=>`<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)}</option>`).join('');
+    // Grow the list box a bit as more files pile up, so more are visible for
+    // multi-select at a glance without needing to scroll (capped so it
+    // doesn't take over the panel).
+    sel.size = Math.max(3, Math.min(files.length, 8));
+    updateCloudImportBtnLabel();
   }catch(err){
     sel.innerHTML = `<option value="">— Could not load cloud files —</option>`;
     console.error('axListCloudFiles failed:', err);
   }
 }
 
+// Reflects how many cloud files are currently selected in the existing
+// "Load from Cloud" button, instead of adding a separate "select all" or
+// batch-import control.
+function updateCloudImportBtnLabel(){
+  const sel = document.getElementById('cloudFileSelect');
+  const n = sel.selectedOptions ? sel.selectedOptions.length : 0;
+  const btn = document.getElementById('cloudImportBtn');
+  btn.textContent = n > 1 ? `Load ${n} Files from Cloud` : 'Load from Cloud';
+}
+document.getElementById('cloudFileSelect').addEventListener('change', updateCloudImportBtnLabel);
+
+// Turns a cloud filename into a sensible test name for batch imports, e.g.
+// "Monthly_Test_1.xlsx" -> "Monthly Test 1".
+function deriveTestNameFromFilename(fileName){
+  const name = fileName.replace(/\.[^./\\]+$/, '').replace(/[_-]+/g, ' ').trim();
+  return name || 'Untitled Test';
+}
+
 document.getElementById('cloudRefreshBtn').addEventListener('click', refreshCloudFileList);
 
 document.getElementById('cloudDeleteBtn').addEventListener('click', async ()=>{
   const sel = document.getElementById('cloudFileSelect');
-  const fileName = sel.value;
+  const fileName = sel.selectedOptions.length ? sel.selectedOptions[0].value : '';
   if(!fileName){ showToast('Choose a cloud file first.', 'warning'); return; }
+  if(sel.selectedOptions.length > 1){ showToast('Delete removes one file at a time — deleting the first one selected.', 'warning'); }
   if(!confirm(`Delete "${fileName}" from the cloud? This removes it for everyone and can't be undone.`)) return;
   const btn = document.getElementById('cloudDeleteBtn');
   const originalLabel = btn.textContent;
@@ -2905,27 +2928,65 @@ document.getElementById('cloudDeleteBtn').addEventListener('click', async ()=>{
 });
 
 document.getElementById('cloudImportBtn').addEventListener('click', async ()=>{
-  const fileName = document.getElementById('cloudFileSelect').value;
+  const sel = document.getElementById('cloudFileSelect');
+  const selectedNames = Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean);
   const hint = document.getElementById('cloudImportHint');
-  if(!fileName){ showToast('Choose a cloud file first.', 'warning'); return; }
-  const testName = document.getElementById('importTestName').value.trim() || generateDefaultTestName();
-  const testDate = document.getElementById('importTestDate').value || null;
   const btn = document.getElementById('cloudImportBtn');
   const originalLabel = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Downloading…';
   hint.style.display = 'none';
+  if(!selectedNames.length){
+    showToast('Choose at least one cloud file first (Ctrl/⌘-click to pick several).', 'warning');
+    return;
+  }
   try{
-    const buf = await axDownloadCloudFile(fileName);
-    const wb = XLSX.read(buf, {type:'array', cellDates:false});
-    pendingImport = runImport(wb, testName, testDate);
-    renderImportPreview(pendingImport);
-    showToast(`Loaded "${fileName}" from the cloud — review the mapping below.`, 'success');
+    if(selectedNames.length === 1){
+      // Single file: unchanged behavior — respects the Test / Exam Name field.
+      const fileName = selectedNames[0];
+      const testName = document.getElementById('importTestName').value.trim() || generateDefaultTestName();
+      const testDate = document.getElementById('importTestDate').value || null;
+      btn.disabled = true; btn.textContent = 'Downloading…';
+      const buf = await axDownloadCloudFile(fileName);
+      const wb = XLSX.read(buf, {type:'array', cellDates:false});
+      pendingImport = runImport(wb, testName, testDate);
+      renderImportPreview(pendingImport);
+      showToast(`Loaded "${fileName}" from the cloud — review the mapping below.`, 'success');
+    } else {
+      // Batch: several different files almost certainly represent several
+      // different tests, so each gets its own name derived from its
+      // filename rather than sharing the single Test / Exam Name field.
+      const testDate = document.getElementById('importTestDate').value || null;
+      const results = [];
+      const failed = [];
+      for(let i=0;i<selectedNames.length;i++){
+        const fileName = selectedNames[i];
+        btn.disabled = true; btn.textContent = `Downloading ${i+1}/${selectedNames.length}…`;
+        try{
+          const buf = await axDownloadCloudFile(fileName);
+          const wb = XLSX.read(buf, {type:'array', cellDates:false});
+          results.push(runImport(wb, deriveTestNameFromFilename(fileName), testDate));
+        }catch(err){
+          failed.push(fileName);
+          console.error(`axDownloadCloudFile failed for ${fileName}:`, err);
+        }
+      }
+      if(!results.length){
+        hint.style.display = 'block';
+        hint.innerHTML = `<span class="warn-text">Could not download any of the selected files.</span>`;
+        return;
+      }
+      pendingImport = results;
+      renderImportPreview(pendingImport);
+      let msg = `Loaded ${results.length} file${results.length>1?'s':''} from the cloud — review below.`;
+      if(failed.length) msg += ` (${failed.length} failed: ${failed.join(', ')})`;
+      showToast(msg, failed.length ? 'warning' : 'success');
+    }
   }catch(err){
     hint.style.display = 'block';
-    hint.innerHTML = `<span class="warn-text">Could not download this file from the cloud: ${escapeHtml(err.message || String(err))}</span>`;
+    hint.innerHTML = `<span class="warn-text">Could not download from the cloud: ${escapeHtml(err.message || String(err))}</span>`;
     console.error('axDownloadCloudFile failed:', err);
   }finally{
     btn.disabled = false; btn.textContent = originalLabel;
+    updateCloudImportBtnLabel();
   }
 });
 
@@ -2978,9 +3039,14 @@ document.getElementById('importFileInput').addEventListener('change', async (e)=
   renderImportPreview(pendingImport);
 });
 
-function renderImportPreview(parsed){
-  const area = document.getElementById('importPreviewArea');
+// Builds the preview markup for one parsed workbook. Factored out of
+// renderImportPreview so the same block can be stacked for a batch of
+// several cloud files, or shown alone for the normal single-file case.
+function buildSinglePreviewHtml(parsed, showTestNameHeading){
   let html = `<div class="preview-box">`;
+  if(showTestNameHeading){
+    html += `<div class="hint" style="margin-bottom:6px;"><b>Test: ${escapeHtml(parsed.testName)}</b></div>`;
+  }
   html += `<table><thead><tr><th>Section</th><th>Subjects Detected</th><th>Students Found</th><th>Absent</th><th>Notes</th></tr></thead><tbody>`;
   parsed.matched.forEach(sec=>{
     const subjInfo = sec.subjects.map(s=>{
@@ -3016,14 +3082,22 @@ function renderImportPreview(parsed){
     html += `<div class="warn-text">No recognizable sections were found in this file.</div>`;
   }
   html += `</div>`;
-  area.innerHTML = html;
+  return html;
+}
+
+function renderImportPreview(parsedOrList){
+  const area = document.getElementById('importPreviewArea');
+  const list = Array.isArray(parsedOrList) ? parsedOrList : [parsedOrList];
+  area.innerHTML = list.map(p=>buildSinglePreviewHtml(p, list.length > 1)).join('');
+  const hasMatches = list.some(p=>p.matched.length);
   document.getElementById('acceptMappingCheck').checked = false;
-  document.getElementById('acceptMappingRow').style.display = parsed.matched.length ? 'flex' : 'none';
+  document.getElementById('acceptMappingRow').style.display = hasMatches ? 'flex' : 'none';
   updateApplyImportEnabled();
 }
 
 function updateApplyImportEnabled(){
-  const hasMatches = !!(pendingImport && pendingImport.matched.length);
+  const list = Array.isArray(pendingImport) ? pendingImport : (pendingImport ? [pendingImport] : []);
+  const hasMatches = list.some(p=>p.matched && p.matched.length);
   const accepted = document.getElementById('acceptMappingCheck').checked;
   document.getElementById('applyImportBtn').disabled = !(hasMatches && accepted);
 }
@@ -3032,12 +3106,15 @@ document.getElementById('acceptMappingCheck').addEventListener('change', updateA
 document.getElementById('applyImportBtn').addEventListener('click', ()=>{
   if(!pendingImport) return;
   if(!document.getElementById('acceptMappingCheck').checked) return;
-  // Snapshot the workspace so this import can be undone in one click if it turns out wrong.
+  const list = Array.isArray(pendingImport) ? pendingImport : [pendingImport];
+  // Snapshot the workspace once so the whole batch can be undone in one click if it turns out wrong.
   lastImportSnapshot = JSON.stringify(workspace);
-  lastImportLabel = pendingImport.testName || 'last import';
+  lastImportLabel = list.length > 1
+    ? `${list.length} imports (${list.map(p=>p.testName).join(', ')})`
+    : (list[0].testName || 'last import');
   document.getElementById('undoImportBtn').disabled = false;
   document.getElementById('undoImportBtn').title = `Undo "${lastImportLabel}" and restore the workspace to how it was before this import`;
-  applyImport(pendingImport);
+  list.forEach(p=>applyImport(p));
   document.getElementById('importPanel').classList.remove('open');
   document.getElementById('importPreviewArea').innerHTML='';
   document.getElementById('applyImportBtn').disabled = true;
@@ -3046,7 +3123,7 @@ document.getElementById('applyImportBtn').addEventListener('click', ()=>{
   document.getElementById('importFileInput').value='';
   pendingImport = null;
   refreshAllUI();
-  showToast('✓ Import applied — undo anytime from the ⋯ More menu.', 'success');
+  showToast(list.length > 1 ? `✓ ${list.length} imports applied — undo anytime from the ⋯ More menu.` : '✓ Import applied — undo anytime from the ⋯ More menu.', 'success');
   launchConfetti();
 });
 
