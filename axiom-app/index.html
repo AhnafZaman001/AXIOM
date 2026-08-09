@@ -279,14 +279,13 @@
       <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
       <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone">🗑 Delete</button>
     </div>
-    <div class="hint">Hold Ctrl (⌘ on Mac) and click to pick several files, or Ctrl/⌘+A while the list is focused to select all — then Load from Cloud imports every selected file at once.</div>
     <div class="hint" id="cloudImportHint" style="display:none;"></div>
-    <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>Nothing is applied until you review the detected mapping below and confirm.</b></div>
+    <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>If everything matches the expected format it's imported right away; if anything looks off, you'll see the detected mapping below and can choose whether to import anyway.</b></div>
     <div id="importPreviewArea"></div>
     <div class="panel-row" id="acceptMappingRow" style="display:none;margin-top:4px;align-items:center;">
       <label style="display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--ink-soft);cursor:pointer;">
         <input type="checkbox" id="acceptMappingCheck">
-        I've reviewed the column mapping and sample rows above and confirm they're correct.
+        This file doesn't fully match the expected format (see notes above) — I've reviewed it and want to import anyway.
       </label>
     </div>
     <div class="panel-row" style="margin-top:12px;">

@@ -3085,9 +3085,59 @@ function buildSinglePreviewHtml(parsed, showTestNameHeading){
   return html;
 }
 
+// A parsed file/batch counts as "clean" only if every sheet matched a known
+// section, every expected subject column was actually found, and no section
+// raised a warning. Anything short of that is an abnormality and still needs
+// human eyes before it gets applied.
+function importListIsClean(list){
+  if(!list.length) return false;
+  return list.every(p=>{
+    if(!p.matched.length) return false;
+    if(p.unmatched.length) return false;
+    return p.matched.every(sec=>{
+      if(sec.warnings.length) return false;
+      return sec.subjects.every(s=>(sec.subjectCols[s]||[]).length > 0);
+    });
+  });
+}
+
+// Shared by both the manual "Apply Import" button and the automatic
+// clean-format path below, so the snapshot/undo/toast/reset behavior stays
+// identical either way.
+function applyPendingImportList(list, auto){
+  lastImportSnapshot = JSON.stringify(workspace);
+  lastImportLabel = list.length > 1
+    ? `${list.length} imports (${list.map(p=>p.testName).join(', ')})`
+    : (list[0].testName || 'last import');
+  document.getElementById('undoImportBtn').disabled = false;
+  document.getElementById('undoImportBtn').title = `Undo "${lastImportLabel}" and restore the workspace to how it was before this import`;
+  list.forEach(p=>applyImport(p));
+  document.getElementById('importPanel').classList.remove('open');
+  document.getElementById('importPreviewArea').innerHTML='';
+  document.getElementById('applyImportBtn').disabled = true;
+  document.getElementById('acceptMappingRow').style.display = 'none';
+  document.getElementById('acceptMappingCheck').checked = false;
+  document.getElementById('importFileInput').value='';
+  pendingImport = null;
+  refreshAllUI();
+  const countMsg = list.length > 1 ? `${list.length} imports applied` : 'Import applied';
+  showToast(auto ? `✓ ${countMsg} automatically — format matched, undo anytime from the ⋯ More menu.` : `✓ ${countMsg} — undo anytime from the ⋯ More menu.`, 'success');
+  launchConfetti();
+}
+
 function renderImportPreview(parsedOrList){
-  const area = document.getElementById('importPreviewArea');
   const list = Array.isArray(parsedOrList) ? parsedOrList : [parsedOrList];
+
+  // Clean match against the expected keyword scheme: skip the review step
+  // entirely and import right away, no checkbox needed.
+  if(importListIsClean(list)){
+    applyPendingImportList(list, true);
+    return;
+  }
+
+  // Anything abnormal (unmatched sheet, missing subject column, or a
+  // section-level warning) still gets the full preview + override checkbox.
+  const area = document.getElementById('importPreviewArea');
   area.innerHTML = list.map(p=>buildSinglePreviewHtml(p, list.length > 1)).join('');
   const hasMatches = list.some(p=>p.matched.length);
   document.getElementById('acceptMappingCheck').checked = false;
@@ -3107,24 +3157,7 @@ document.getElementById('applyImportBtn').addEventListener('click', ()=>{
   if(!pendingImport) return;
   if(!document.getElementById('acceptMappingCheck').checked) return;
   const list = Array.isArray(pendingImport) ? pendingImport : [pendingImport];
-  // Snapshot the workspace once so the whole batch can be undone in one click if it turns out wrong.
-  lastImportSnapshot = JSON.stringify(workspace);
-  lastImportLabel = list.length > 1
-    ? `${list.length} imports (${list.map(p=>p.testName).join(', ')})`
-    : (list[0].testName || 'last import');
-  document.getElementById('undoImportBtn').disabled = false;
-  document.getElementById('undoImportBtn').title = `Undo "${lastImportLabel}" and restore the workspace to how it was before this import`;
-  list.forEach(p=>applyImport(p));
-  document.getElementById('importPanel').classList.remove('open');
-  document.getElementById('importPreviewArea').innerHTML='';
-  document.getElementById('applyImportBtn').disabled = true;
-  document.getElementById('acceptMappingRow').style.display = 'none';
-  document.getElementById('acceptMappingCheck').checked = false;
-  document.getElementById('importFileInput').value='';
-  pendingImport = null;
-  refreshAllUI();
-  showToast(list.length > 1 ? `✓ ${list.length} imports applied — undo anytime from the ⋯ More menu.` : '✓ Import applied — undo anytime from the ⋯ More menu.', 'success');
-  launchConfetti();
+  applyPendingImportList(list, false);
 });
 
 document.getElementById('undoImportBtn').addEventListener('click', ()=>{
