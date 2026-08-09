@@ -250,7 +250,26 @@
   .insights-list{list-style:none;margin:0;padding:0;font-size:0.84rem;color:var(--ink-soft);}
   .insights-list li{padding:9px 0;border-top:1px solid var(--line);display:flex;gap:9px;}
   .insights-list li:first-child{border-top:none;}
-  .insights-list li .ins-icon{flex:none;}
+  .insights-list li .ins-icon{flex:none;width:14px;text-align:center;font-size:0.72rem;font-weight:700;color:var(--muted);}
+  .insights-list li .ins-icon.up{color:#4ADE80;}
+  .insights-list li .ins-icon.down{color:#F87171;}
+  .insights-list li .ins-icon.alert{color:#F87171;font-size:0.5rem;}
+  .insights-list li .ins-icon.muted{color:var(--muted);font-size:0.5rem;}
+
+  /* Small static color dots — replace circular zone emoji in table headers,
+     hero-metric labels, dropdown chips, etc. Deliberately plain: no glow,
+     no animation, just a color swatch next to the label. */
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+  .dot.green{background:#4ADE80;}
+  .dot.blue{background:#60A5FA;}
+  .dot.yellow{background:#FCD34D;}
+  .dot.pink{background:#F472B6;}
+  .dot.red{background:#F87171;}
+  .dot.grey{background:#94A3B8;}
+
+  .tag-best,.tag-worst{font-size:0.66rem;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:5px;vertical-align:middle;}
+  .tag-best{background:rgba(250,204,21,0.16);color:var(--gold);}
+  .tag-worst{background:rgba(239,68,68,0.12);color:#F87171;}
 
   .tooltip-hint{font-size:0.68rem;color:var(--muted);text-align:right;margin-top:2px;}
 
@@ -371,17 +390,13 @@
   .confetti-container{position:fixed;inset:0;pointer-events:none;z-index:300;overflow:hidden;}
   .confetti-piece{position:absolute;top:-10px;width:7px;height:7px;border-radius:1px;opacity:0.9;
     animation-name:confettiFall;animation-timing-function:ease-in;animation-fill-mode:forwards;}
-  @keyframes confettiFall{to{transform:translateY(100vh) rotate(360deg);opacity:0;}}  /* ===== micro-interactions: ripple, spotlight, press, tooltip ===== */
+  @keyframes confettiFall{to{transform:translateY(100vh) rotate(360deg);opacity:0;}}  /* ===== micro-interactions: ripple, press, tooltip ===== */
   button, .chip{ position:relative; overflow:hidden; will-change:transform; }
   .card, .chart-card, .hero-metric{ position:relative; will-change:transform; }
   .table-wrap, .modal{ overflow:auto; }
   button{ transition:background .2s cubic-bezier(.22,.9,.32,1), color .2s cubic-bezier(.22,.9,.32,1), box-shadow .2s cubic-bezier(.22,.9,.32,1), transform .15s cubic-bezier(.22,.9,.32,1), border-color .2s cubic-bezier(.22,.9,.32,1); }
   button:active{ transform:translateY(0) scale(0.97); transition-duration:.08s; }
   .card, .chart-card, .hero-metric{ transition:transform .22s cubic-bezier(.22,.9,.32,1), box-shadow .22s cubic-bezier(.22,.9,.32,1), border-color .22s cubic-bezier(.22,.9,.32,1); }
-
-  .spotlight-layer{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s ease;border-radius:inherit;
-    background:radial-gradient(220px circle at var(--mx,50%) var(--my,50%), rgba(79,140,255,0.14), transparent 70%);}
-  .card:hover .spotlight-layer, .chart-card:hover .spotlight-layer, .hero-metric:hover .spotlight-layer{opacity:1;}
 
   .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,0.35);transform:scale(0);
     animation:rippleAnim .55s cubic-bezier(.22,.9,.32,1) forwards;pointer-events:none;}

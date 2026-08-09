@@ -1470,7 +1470,7 @@ function renderInsights(def, store){
       if(last != null && prev != null){
         const d = Math.round((last-prev)*10)/10;
         if(Math.abs(d) >= 0.1){
-          facts.push({icon: d<0 ? '📉' : '📈', text:`${subj} average ${d<0?'dropped':'rose'} ${Math.abs(d)}% since ${testOrder[testOrder.length-2]}.`});
+          facts.push({icon: d<0 ? '▼' : '▲', cls: d<0 ? 'down' : 'up', text:`${subj} average ${d<0?'dropped':'rose'} ${Math.abs(d)}% since ${testOrder[testOrder.length-2]}.`});
         }
       }
     }
@@ -1478,10 +1478,10 @@ function renderInsights(def, store){
     const totalGraded = Object.values(zc).reduce((a,b)=>a+b,0) - zc.grey;
     if(totalGraded > 0 && zc.red > 0){
       const share = Math.round((zc.red/totalGraded)*1000)/10;
-      if(share >= 20) facts.push({icon:'⚠️', text:`${subj}: ${zc.red} student${zc.red===1?'':'s'} (${share}%) currently in the Red zone.`});
+      if(share >= 20) facts.push({icon:'●', cls:'alert', text:`${subj}: ${zc.red} student${zc.red===1?'':'s'} (${share}%) currently in the Red zone.`});
     }
     if(zc.grey >= 2){
-      facts.push({icon:'⚪', text:`${subj}: ${zc.grey} students marked Absent on the latest test.`});
+      facts.push({icon:'●', cls:'muted', text:`${subj}: ${zc.grey} students marked Absent on the latest test.`});
     }
   });
 
@@ -1489,7 +1489,7 @@ function renderInsights(def, store){
     wrap.innerHTML = `<li class="empty">Not enough data yet to generate insights — import a second test for a subject to see trends.</li>`;
     return;
   }
-  wrap.innerHTML = facts.slice(0,12).map(f=>`<li><span class="ins-icon">${f.icon}</span><span>${f.text}</span></li>`).join('');
+  wrap.innerHTML = facts.slice(0,12).map(f=>`<li><span class="ins-icon ${f.cls||''}">${f.icon}</span><span>${f.text}</span></li>`).join('');
 }
 
 function subjectTestOrderAndStats(store, subj){
@@ -2050,14 +2050,14 @@ function renderOverallSummary(){
   document.getElementById('osQuickStats').innerHTML = totalStudents === 0 ? `
     <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value">0</div></div>
   ` : `
-    <div class="hero-metric"><div class="hm-label">👨‍🎓 Total Students</div><div class="hm-value" data-count="${totalStudents}">0</div></div>
-    <div class="hero-metric"><div class="hm-label">📚 Total Subjects</div><div class="hm-value" data-count="${totalSubjects}">0</div></div>
-    <div class="hero-metric accent"><div class="hm-label">📈 Overall Average</div><div class="hm-value" data-count="${overallAvgAll}" data-suffix="%">0%</div></div>
-    <div class="hero-metric gold"><div class="hm-label">🏆 Highest Percentage</div><div class="hm-value small">${highest?`${escapeHtml(highest.name)} (${highest.overall}%)${rollSectionTag(highest.rollNo, highest.sectionLabel)}`:'—'}</div></div>
-    <div class="hero-metric warn clickable" data-filter="critical"><div class="hm-label">⚠ Critical Students</div><div class="hm-value" data-count="${critical.length}">0</div></div>
-    <div class="hero-metric good clickable" data-filter="exceptional"><div class="hm-label">⭐ Exceptional Students</div><div class="hm-value" data-count="${exceptional.length}">0</div></div>
-    <div class="hero-metric good"><div class="hm-label">📊 Pass Rate</div><div class="hm-value" ${passRateAll!=null?`data-count="${passRateAll}" data-suffix="%"`:''}>${passRateAll!=null?'0%':'—'}</div></div>
-    <div class="hero-metric warn"><div class="hm-label">📉 Failure Rate</div><div class="hm-value" ${passRateAll!=null?`data-count="${Math.round((100-passRateAll)*10)/10}" data-suffix="%"`:''}>${passRateAll!=null?'0%':'—'}</div></div>
+    <div class="hero-metric"><div class="hm-label">Total Students</div><div class="hm-value" data-count="${totalStudents}">0</div></div>
+    <div class="hero-metric"><div class="hm-label">Total Subjects</div><div class="hm-value" data-count="${totalSubjects}">0</div></div>
+    <div class="hero-metric accent"><div class="hm-label">Overall Average</div><div class="hm-value" data-count="${overallAvgAll}" data-suffix="%">0%</div></div>
+    <div class="hero-metric gold"><div class="hm-label">Highest Percentage</div><div class="hm-value small">${highest?`${escapeHtml(highest.name)} (${highest.overall}%)${rollSectionTag(highest.rollNo, highest.sectionLabel)}`:'—'}</div></div>
+    <div class="hero-metric warn clickable" data-filter="critical"><div class="hm-label">Critical Students</div><div class="hm-value" data-count="${critical.length}">0</div></div>
+    <div class="hero-metric good clickable" data-filter="exceptional"><div class="hm-label">Exceptional Students</div><div class="hm-value" data-count="${exceptional.length}">0</div></div>
+    <div class="hero-metric good"><div class="hm-label">Pass Rate</div><div class="hm-value" ${passRateAll!=null?`data-count="${passRateAll}" data-suffix="%"`:''}>${passRateAll!=null?'0%':'—'}</div></div>
+    <div class="hero-metric warn"><div class="hm-label">Failure Rate</div><div class="hm-value" ${passRateAll!=null?`data-count="${Math.round((100-passRateAll)*10)/10}" data-suffix="%"`:''}>${passRateAll!=null?'0%':'—'}</div></div>
   `;
   animateCounters(document.getElementById('osQuickStats'));
 
@@ -2076,7 +2076,7 @@ function renderOverallSummary(){
   const subjNames = Object.keys(toppers).sort();
   document.getElementById('osSubjectToppersWrap').innerHTML = subjNames.length ? subjNames.map(subj=>{
     const t = toppers[subj];
-    return `<div class="card"><h4>🥇 ${escapeHtml(subj)}</h4>
+    return `<div class="card"><h4>${escapeHtml(subj)}</h4>
       <div class="count">${t.percent}%</div>
       <ul><li>${escapeHtml(t.name)}</li><li class="extra-detail">${t.rollNo!=null&&t.rollNo!==''?`Roll ${escapeHtml(t.rollNo)} · `:''}${t.sectionLabel}${t.obtained!=null&&t.max!=null?` · ${t.obtained}/${t.max}`:''}</li></ul>
     </div>`;
@@ -2166,7 +2166,7 @@ document.getElementById('osQuickStats').addEventListener('click', (e)=>{
   if(!el) return;
   const key = el.getAttribute('data-filter');
   const list = getOverallFilteredStudents(key);
-  const title = key==='critical' ? '⚠ Critical Students (below 50%)' : '⭐ Exceptional Students (90%+)';
+  const title = key==='critical' ? 'Critical Students (below 50%)' : 'Exceptional Students (90%+)';
   openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across all sections`, list);
 });
 document.getElementById('osZoneCardsWrap').addEventListener('click', (e)=>{
@@ -2253,12 +2253,12 @@ function renderSectionSummary(){
   document.getElementById('ssQuickStats').innerHTML = totalInSection===0 ? `
     <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value">0</div></div>
   ` : `
-    <div class="hero-metric"><div class="hm-label">👨‍🎓 Students</div><div class="hm-value" data-count="${totalInSection}">0</div></div>
-    <div class="hero-metric accent"><div class="hm-label">📈 Section Average</div><div class="hm-value" ${avg!=null?`data-count="${avg}" data-suffix="%"`:''}>${avg!=null?'0%':'—'}</div></div>
-    <div class="hero-metric warn clickable" data-filter="red"><div class="hm-label">🔴 Red Zone</div><div class="hm-value" data-count="${redStudents.length}">0</div></div>
-    <div class="hero-metric good clickable" data-filter="green"><div class="hm-label">🟢 Green Zone</div><div class="hm-value" data-count="${greenStudents.length}">0</div></div>
-    <div class="hero-metric good"><div class="hm-label">📊 Pass Rate</div><div class="hm-value" ${passRate!=null?`data-count="${passRate}" data-suffix="%"`:''}>${passRate!=null?'0%':'—'}</div></div>
-    <div class="hero-metric gold"><div class="hm-label">🏅 Rank</div><div class="hm-value small">${rank!=null?`#${rank} of ${totalRankedSections}`:'—'}</div></div>
+    <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value" data-count="${totalInSection}">0</div></div>
+    <div class="hero-metric accent"><div class="hm-label">Section Average</div><div class="hm-value" ${avg!=null?`data-count="${avg}" data-suffix="%"`:''}>${avg!=null?'0%':'—'}</div></div>
+    <div class="hero-metric warn clickable" data-filter="red"><div class="hm-label"><span class="dot red"></span>Red Zone</div><div class="hm-value" data-count="${redStudents.length}">0</div></div>
+    <div class="hero-metric good clickable" data-filter="green"><div class="hm-label"><span class="dot green"></span>Green Zone</div><div class="hm-value" data-count="${greenStudents.length}">0</div></div>
+    <div class="hero-metric good"><div class="hm-label">Pass Rate</div><div class="hm-value" ${passRate!=null?`data-count="${passRate}" data-suffix="%"`:''}>${passRate!=null?'0%':'—'}</div></div>
+    <div class="hero-metric gold"><div class="hm-label">Rank</div><div class="hm-value small">${rank!=null?`#${rank} of ${totalRankedSections}`:'—'}</div></div>
   `;
   animateCounters(document.getElementById('ssQuickStats'));
 
@@ -2325,7 +2325,7 @@ document.getElementById('ssQuickStats').addEventListener('click', (e)=>{
   if(!el) return;
   const filterKey = el.getAttribute('data-filter');
   const list = getSectionFilteredStudents(currentSectionKey(), filterKey);
-  const title = filterKey==='red' ? '🔴 Red Zone Students' : '🟢 Green Zone Students';
+  const title = filterKey==='red' ? 'Red Zone Students' : 'Green Zone Students';
   openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} in ${currentSectionDef().label}`, list);
 });
 document.getElementById('ssZoneCardsWrap').addEventListener('click', (e)=>{
@@ -2440,15 +2440,15 @@ function renderTeacherReport(){
   const totalGreen = allRows.reduce((s,r)=>s+r.greenCount,0);
 
   let html = `<div class="hero-strip">
-    <div class="hero-metric"><div class="hm-label">📚 Subjects Taught</div><div class="hm-value">${assignments.length}</div></div>
-    <div class="hero-metric"><div class="hm-label">🏫 Sections Covered</div><div class="hm-value">${allRows.length}</div></div>
-    <div class="hero-metric"><div class="hm-label">👨‍🎓 Total Students</div><div class="hm-value">${totalStudents}</div></div>
-    <div class="hero-metric accent"><div class="hm-label">📈 Overall Average</div><div class="hm-value">${overallAvg!=null?overallAvg+'%':'—'}</div></div>
-    <div class="hero-metric good"><div class="hm-label">🟢 Green Zone</div><div class="hm-value">${totalGreen}</div></div>
-    <div class="hero-metric"><div class="hm-label">🔵 Blue Zone</div><div class="hm-value">${totalBlue}</div></div>
-    <div class="hero-metric"><div class="hm-label">🟡 Yellow Zone</div><div class="hm-value">${totalYellow}</div></div>
-    <div class="hero-metric"><div class="hm-label">🩷 Pink Zone</div><div class="hm-value">${totalPink}</div></div>
-    <div class="hero-metric warn"><div class="hm-label">🔴 Red Zone</div><div class="hm-value">${totalRed}</div></div>
+    <div class="hero-metric"><div class="hm-label">Subjects Taught</div><div class="hm-value">${assignments.length}</div></div>
+    <div class="hero-metric"><div class="hm-label">Sections Covered</div><div class="hm-value">${allRows.length}</div></div>
+    <div class="hero-metric"><div class="hm-label">Total Students</div><div class="hm-value">${totalStudents}</div></div>
+    <div class="hero-metric accent"><div class="hm-label">Overall Average</div><div class="hm-value">${overallAvg!=null?overallAvg+'%':'—'}</div></div>
+    <div class="hero-metric good"><div class="hm-label"><span class="dot green"></span>Green Zone</div><div class="hm-value">${totalGreen}</div></div>
+    <div class="hero-metric"><div class="hm-label"><span class="dot blue"></span>Blue Zone</div><div class="hm-value">${totalBlue}</div></div>
+    <div class="hero-metric"><div class="hm-label"><span class="dot yellow"></span>Yellow Zone</div><div class="hm-value">${totalYellow}</div></div>
+    <div class="hero-metric"><div class="hm-label"><span class="dot pink"></span>Pink Zone</div><div class="hm-value">${totalPink}</div></div>
+    <div class="hero-metric warn"><div class="hm-label"><span class="dot red"></span>Red Zone</div><div class="hm-value">${totalRed}</div></div>
   </div>`;
 
   assignments.forEach(a=>{
@@ -2478,7 +2478,7 @@ function renderTeacherReport(){
     html += `<div class="table-wrap" style="max-height:320px;margin-bottom:6px;">
       <table class="main-table">
         <thead><tr>
-          <th>Section</th><th>Average %</th><th>Students</th><th>🟢 Green</th><th>🔵 Blue</th><th>🟡 Yellow</th><th>🩷 Pink</th><th>🔴 Red</th>
+          <th>Section</th><th>Average %</th><th>Students</th><th><span class="dot green"></span>Green</th><th><span class="dot blue"></span>Blue</th><th><span class="dot yellow"></span>Yellow</th><th><span class="dot pink"></span>Pink</th><th><span class="dot red"></span>Red</th>
         </tr></thead>
         <tbody>
           ${rows.map(r=>{
@@ -2487,7 +2487,7 @@ function renderTeacherReport(){
             const rowStyle = isBest ? 'background:var(--gold-bg);font-weight:600;' : isWorst ? 'background:rgba(200,60,60,0.08);' : '';
             const avgCell = r.avg!=null ? `<span class="zone-pill ${zoneOf(r.avg,false)}">${r.avg}%</span>` : '<span style="color:var(--muted);">—</span>';
             return `<tr style="${rowStyle}cursor:pointer;" class="person-link" data-jump-section="${r.def.key}" data-jump-subject="${escapeHtml(a.subject)}" title="View ${escapeHtml(a.subject)} for ${escapeHtml(r.def.label)} students">
-              <td class="name-cell">${escapeHtml(r.def.label)}${isBest?' 🏆':''}${isWorst?' ⚠️':''}</td>
+              <td class="name-cell">${escapeHtml(r.def.label)}${isBest?' <span class="tag-best">Best</span>':''}${isWorst?' <span class="tag-worst">Lowest</span>':''}</td>
               <td>${avgCell}</td><td>${r.studentCount}</td><td>${r.greenCount}</td><td>${r.blueCount}</td><td>${r.yellowCount}</td><td>${r.pinkCount}</td><td>${r.redCount}</td>
             </tr>`;
           }).join('')}
@@ -4035,9 +4035,8 @@ document.addEventListener('keydown', (e)=>{
 (function(){
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // --- Ripple + spotlight targets ---
+  // --- Ripple targets ---
   const RIPPLE_SELECTOR = 'button, .chip';
-  const SPOTLIGHT_SELECTOR = '.card, .chart-card, .hero-metric';
 
   if(!reduceMotion){
     document.addEventListener('pointerdown', function(e){
@@ -4054,20 +4053,6 @@ document.addEventListener('keydown', (e)=>{
       setTimeout(()=>{ if(ripple.parentNode) ripple.parentNode.removeChild(ripple); }, 600);
     }, true);
   }
-
-  document.addEventListener('pointermove', function(e){
-    const target = e.target.closest(SPOTLIGHT_SELECTOR);
-    if(!target) return;
-    const rect = target.getBoundingClientRect();
-    let layer = target.querySelector(':scope > .spotlight-layer');
-    if(!layer){
-      layer = document.createElement('div');
-      layer.className = 'spotlight-layer';
-      target.appendChild(layer);
-    }
-    target.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100) + '%');
-    target.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100) + '%');
-  }, true);
 
   // --- Custom floating tooltips (replaces native title tooltip) ---
   let tipEl = null;

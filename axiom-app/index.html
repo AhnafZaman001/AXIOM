@@ -61,7 +61,7 @@
       </table>
     </div>
 
-    <div class="section-title">Subject-Wise Toppers <span class="filters" style="font-weight:400;">🥇 top student per subject, across all sections</span></div>
+    <div class="section-title">Subject-Wise Toppers <span class="filters" style="font-weight:400;">top student per subject, across all sections</span></div>
     <div class="cards" id="osSubjectToppersWrap"></div>
 
     <div class="section-title">Section Ranking</div>
@@ -92,7 +92,7 @@
     <div class="table-wrap" style="max-height:360px;">
       <table class="main-table">
         <thead><tr>
-          <th>Subject</th><th>Average %</th><th>🔴 Red</th><th>🟢 Green</th><th>vs. School Average</th>
+          <th>Subject</th><th>Average %</th><th><span class="dot red"></span>Red</th><th><span class="dot green"></span>Green</th><th>vs. School Average</th>
         </tr></thead>
         <tbody id="ssSubjectBody"></tbody>
       </table>
@@ -120,12 +120,12 @@
       <label>Zone Filter</label>
       <select id="ssRZone">
         <option value="">All Zones</option>
-        <option value="green">🟢 Green (90%+)</option>
-        <option value="blue">🔵 Blue (80-89%)</option>
-        <option value="yellow">🟡 Yellow (70-79%)</option>
-        <option value="pink">🩷 Pink (60-69%)</option>
-        <option value="red">🔴 Red (below 60%)</option>
-        <option value="grey">⚪ Absent</option>
+        <option value="green">Green (90%+)</option>
+        <option value="blue">Blue (80-89%)</option>
+        <option value="yellow">Yellow (70-79%)</option>
+        <option value="pink">Pink (60-69%)</option>
+        <option value="red">Red (below 60%)</option>
+        <option value="grey">Absent</option>
       </select>
     </div>
     <div class="field" style="flex:1;min-width:200px;">
@@ -133,10 +133,10 @@
       <input type="text" id="ssRSearch" placeholder="Type a name…" style="width:100%;">
     </div>
     <div class="chip-row" id="ssRChipRow" role="group" aria-label="Quick filters">
-      <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">🔴</span>At Risk</span>
-      <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📈</span>Improving</span>
-      <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📉</span>Declining</span>
-      <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">⚪</span>Absent</span>
+      <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>At Risk</span>
+      <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="dot green"></span>Improving</span>
+      <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>Declining</span>
+      <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="dot grey"></span>Absent</span>
     </div>
     <div id="ssRTableWrap" class="table-wrap">
       <table class="main-table">
@@ -168,12 +168,12 @@
         <label>Zone Filter</label>
         <select id="trRZone">
           <option value="">All Zones</option>
-          <option value="green">🟢 Green (90%+)</option>
-          <option value="blue">🔵 Blue (80-89%)</option>
-          <option value="yellow">🟡 Yellow (70-79%)</option>
-          <option value="pink">🩷 Pink (60-69%)</option>
-          <option value="red">🔴 Red (below 60%)</option>
-          <option value="grey">⚪ Absent</option>
+          <option value="green">Green (90%+)</option>
+          <option value="blue">Blue (80-89%)</option>
+          <option value="yellow">Yellow (70-79%)</option>
+          <option value="pink">Pink (60-69%)</option>
+          <option value="red">Red (below 60%)</option>
+          <option value="grey">Absent</option>
         </select>
       </div>
       <div class="field" style="flex:1;min-width:200px;">
@@ -181,10 +181,10 @@
         <input type="text" id="trRSearch" placeholder="Type a name…" style="width:100%;">
       </div>
       <div class="chip-row" id="trRChipRow" role="group" aria-label="Quick filters">
-        <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">🔴</span>At Risk</span>
-        <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📈</span>Improving</span>
-        <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📉</span>Declining</span>
-        <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">⚪</span>Absent</span>
+        <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>At Risk</span>
+        <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="dot green"></span>Improving</span>
+        <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>Declining</span>
+        <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="dot grey"></span>Absent</span>
       </div>
       <div id="trRTableWrap" class="table-wrap">
         <table class="main-table">
