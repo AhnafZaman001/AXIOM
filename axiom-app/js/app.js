@@ -1399,13 +1399,54 @@ function renderHeroMetrics(def, store){
   host.innerHTML = `
     <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value" data-count="${total}">0</div></div>
     <div class="hero-metric accent"><div class="hm-label">Class Average</div><div class="hm-value" ${classAvg!=null?`data-count="${classAvg}" data-suffix="%"`:''}>${classAvg!=null?'0%':'—'}</div></div>
-    <div class="hero-metric good"><div class="hm-label">Improving</div><div class="hm-value" data-count="${improving}">0</div></div>
-    <div class="hero-metric warn"><div class="hm-label">At Risk</div><div class="hm-value" data-count="${atRisk}">0</div></div>
+    <div class="hero-metric good clickable" data-filter="improving"><div class="hm-label">Improving</div><div class="hm-value" data-count="${improving}">0</div></div>
+    <div class="hero-metric warn clickable" data-filter="atrisk"><div class="hm-label">At Risk</div><div class="hm-value" data-count="${atRisk}">0</div></div>
     <div class="hero-metric gold"><div class="hm-label">Strongest Subject</div><div class="hm-value small">${strongest?`${escapeHtml(strongest.subj)} (${strongest.avg}%)`:'—'}</div></div>
     <div class="hero-metric"><div class="hm-label">Weakest Subject</div><div class="hm-value small">${weakest?`${escapeHtml(weakest.subj)} (${weakest.avg}%)`:'—'}</div></div>
   `;
   animateCounters(host);
 }
+
+// Returns the roster-shaped student list (matching openStatListDrawer's
+// expected {id, name, rollNo, sectionKey, sectionLabel, overall} shape)
+// for the "Improving" / "At Risk" hero metric cards on the section (home) view.
+function getHeroFilteredStudents(def, store, filterKey){
+  const out = [];
+  store.students.forEach(st=>{
+    let isImproving = false, isAtRisk = false;
+    def.subjects.forEach(subj=>{
+      const arr = (st.tests||{})[subj] || [];
+      const c = classifyTransition(arr);
+      if(c && c.key === 'improved') isImproving = true;
+      const t = latestTest(st, subj);
+      if(t && zoneOf(t.percent, t.absent) === 'red') isAtRisk = true;
+    });
+    const match = (filterKey === 'improving' && isImproving) || (filterKey === 'atrisk' && isAtRisk);
+    if(!match) return;
+    out.push({
+      id: st.id,
+      name: st.name,
+      rollNo: st.rollNo,
+      sectionKey: def.key,
+      sectionLabel: def.label,
+      overall: studentOverallAverage(st, def)
+    });
+  });
+  return out.sort((a,b)=> (b.overall||0) - (a.overall||0));
+}
+
+document.getElementById('heroStrip').addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-filter]');
+  if(!el) return;
+  const key = el.getAttribute('data-filter');
+  if(key !== 'improving' && key !== 'atrisk') return;
+  const def = currentSectionDef();
+  const store = workspace.sections[def.key];
+  if(!store) return;
+  const list = getHeroFilteredStudents(def, store, key);
+  const title = key === 'improving' ? 'Improving Students' : 'At Risk Students';
+  openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} in ${def.label}`, list);
+});
 
 /* ---- 013_top-movers-needs-attention.js ---- */
 
@@ -1816,17 +1857,24 @@ function openStudentDrawerById(id, sectionKeyHint){
   def.subjects.forEach(subj=>{
     const arr = (student.tests||{})[subj] || [];
     const t = arr.length ? arr[arr.length-1] : null;
-    const z = t ? zoneOf(t.percent, t.absent) : null;
-    const pillLabel = t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—';
+
+    // Build one pill per test on record (not just the latest two), each
+    // labelled with its zone colour, in chronological order.
+    let pillsHtml = '';
+    if(arr.length){
+      pillsHtml = arr.map((tt, idx)=>{
+        const zz = zoneOf(tt.percent, tt.absent);
+        const label = tt.absent ? 'Absent' : (tt.percent!=null ? `${tt.percent}%` : '—');
+        const isLatest = idx === arr.length - 1;
+        return `<span class="zone-pill ${isLatest ? '' : 'prev-pill '}${zz||'none'}" title="${escapeHtml(tt.test||'')}">${ZONE_EMOJI[zz]||''} ${label}</span>`;
+      }).join('');
+    } else {
+      pillsHtml = `<span class="zone-pill none">—</span>`;
+    }
+
     let trendTag = '';
-    let prevTag = '';
     if(arr.length >= 2){
       const prev = arr[arr.length-2];
-      const prevLabel = prev.absent ? 'Absent' : (prev.percent!=null ? `${prev.percent}%` : null);
-      if(prevLabel){
-        const prevZone = zoneOf(prev.percent, prev.absent);
-        prevTag = `<span class="zone-pill prev-pill ${prevZone||'none'}" title="Previous test">${ZONE_EMOJI[prevZone]||''} ${prevLabel}</span>`;
-      }
       if(t && !t.absent && prev && !prev.absent && t.percent!=null && prev.percent!=null){
         const d = Math.round((t.percent - prev.percent)*10)/10;
         if(d > 0) trendTag = `<span class="delta-tag up">▲+${d}</span>`;
@@ -1845,7 +1893,7 @@ function openStudentDrawerById(id, sectionKeyHint){
         <div class="trend-dots" style="margin-top:5px;">${dots}</div>
       </div>
       <div style="text-align:right;">
-        ${prevTag}<span class="zone-pill ${z||'none'}">${ZONE_EMOJI[z]||''} ${pillLabel}</span>${trendTag}
+        <div class="pill-row" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;align-items:center;">${pillsHtml}${trendTag}</div>
         ${absentCount ? `<div class="hint" style="margin-top:3px;">${absentCount} absence${absentCount>1?'s':''} recorded</div>` : ''}
       </div>
     </div>`;
