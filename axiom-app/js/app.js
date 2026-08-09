@@ -3893,6 +3893,100 @@ function generateTeacherReportPDF(){
   printReport(`${teacherName} — Teacher Performance Report`, `${assignments.length} subject${assignments.length===1?'':'s'} · ${allRows.length} section${allRows.length===1?'':'s'} · ${totalStudents} student${totalStudents===1?'':'s'}`, body);
 }
 
+// Human-readable summary of whatever combination of roster filters is
+// currently active, e.g. "Physics · All Zones · Improving" — used as the
+// printed report's subtitle so it's clear exactly what was filtered.
+function describeRosterFilters(subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal){
+  const QUICK_LABEL = {atrisk:'At Risk', improving:'Improving', declining:'Declining', absent:'Absent'};
+  const parts = [];
+  parts.push(subjFilterVal || 'All Subjects');
+  parts.push(zoneFilterVal ? `${ZONE_LABEL[zoneFilterVal]} Zone` : 'All Zones');
+  if(quickFilterVal) parts.push(QUICK_LABEL[quickFilterVal] || quickFilterVal);
+  if(searchQueryVal) parts.push(`Search: "${searchQueryVal}"`);
+  return parts.join(' · ');
+}
+
+// Prints exactly the rows currently visible in a roster table (Section
+// Summary's or Teacher Report's independent roster) for whatever
+// permutation of Subject / Zone / Search / quick-filter chip is active.
+// Mirrors renderRosterTable's per-cell filter logic exactly, so a cell
+// that shows "—" on screen (filtered out by a zone/quick mismatch) also
+// shows "—" on the printed page, and nothing is ever printed that wasn't
+// actually visible in the table.
+function generateRosterFilteredPDF(cfg){
+  const {sectionKey, subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal, restrictToTeacher, reportTitle} = cfg;
+  const def = SECTION_BY_KEY[sectionKey];
+  if(!def){ showToast('Select a section first.', 'warn'); return; }
+  const store = ensureSection(def.key);
+  const subjectsShown = subjectsForRoster(def, subjFilterVal, restrictToTeacher);
+  const students = store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal}));
+
+  if(!students.length){
+    showToast('No students match the current filters — nothing to print.', 'warning');
+    return;
+  }
+
+  const headers = ['Student', ...subjectsShown];
+  const rows = students.map(st=>{
+    const row = [st.name];
+    subjectsShown.forEach(subj=>{
+      const arr = (st.tests||{})[subj] || [];
+      const t = arr.length ? arr[arr.length-1] : null;
+      const z = t ? zoneOf(t.percent, t.absent) : null;
+      const zoneMismatch = zoneFilterVal && (!subjFilterVal) && z !== zoneFilterVal;
+      let quickMismatch = false;
+      if(quickFilterVal && !subjFilterVal){
+        if(quickFilterVal === 'atrisk'){
+          quickMismatch = !(t && z === 'red');
+        } else if(quickFilterVal === 'improving' || quickFilterVal === 'declining'){
+          const c = classifyTransition(arr);
+          const wantKey = quickFilterVal === 'improving' ? 'improved' : 'declined';
+          quickMismatch = !(c && c.key === wantKey);
+        }
+      }
+      if(zoneMismatch || quickMismatch){ row.push('—'); return; }
+      row.push(t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—');
+    });
+    return row;
+  });
+
+  const subtitle = `${describeRosterFilters(subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal)} — ${students.length} student${students.length===1?'':'s'}`;
+  printReport(reportTitle, subtitle, reportTableHtml(headers, rows));
+}
+
+function printSSRosterFiltered(){
+  const def = SECTION_BY_KEY[ssRosterState.sectionKey];
+  generateRosterFilteredPDF({
+    sectionKey: ssRosterState.sectionKey,
+    subjFilterVal: ssRosterState.subjFilter,
+    zoneFilterVal: ssRosterState.zoneFilter,
+    searchQueryVal: ssRosterState.searchQuery,
+    quickFilterVal: ssRosterState.quickFilter,
+    restrictToTeacher: null,
+    reportTitle: `${def ? def.label : 'Section'} — Student Roster`
+  });
+}
+
+function printTRRosterFiltered(){
+  const teacherName = document.getElementById('teacherSelect').value;
+  if(!teacherName){ showToast('Select a teacher first.', 'warn'); return; }
+  const def = SECTION_BY_KEY[trRosterState.sectionKey];
+  generateRosterFilteredPDF({
+    sectionKey: trRosterState.sectionKey,
+    subjFilterVal: trRosterState.subjFilter,
+    zoneFilterVal: trRosterState.zoneFilter,
+    searchQueryVal: trRosterState.searchQuery,
+    quickFilterVal: trRosterState.quickFilter,
+    restrictToTeacher: teacherName,
+    reportTitle: `${teacherName} — ${def ? def.label : 'Section'} Roster`
+  });
+}
+
+const ssRPrintBtn = document.getElementById('ssRPrintBtn');
+if(ssRPrintBtn) ssRPrintBtn.addEventListener('click', printSSRosterFiltered);
+const trRPrintBtn = document.getElementById('trRPrintBtn');
+if(trRPrintBtn) trRPrintBtn.addEventListener('click', printTRRosterFiltered);
+
 function generateStatListPDF(){
   if(!lastStatListData || !lastStatListData.students.length){ showToast('No student list to print.', 'warn'); return; }
   const { title, subtitle, students } = lastStatListData;
