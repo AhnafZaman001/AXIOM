@@ -2345,8 +2345,13 @@ function renderSectionSummary(){
   }).join('');
 
   document.getElementById('ssSubjectBody').innerHTML = subjAvgs.length ? subjAvgs.map(sa=>{
-    const redN = (store.students||[]).filter(st=>{ const t=latestTest(st,sa.subject); return t && !t.absent && t.percent!=null && t.percent<60; }).length;
-    const greenN = (store.students||[]).filter(st=>{ const t=latestTest(st,sa.subject); return t && !t.absent && t.percent!=null && t.percent>=90; }).length;
+    const zoneCounts = {red:0, pink:0, yellow:0, blue:0, green:0, grey:0};
+    (store.students||[]).forEach(st=>{
+      const t = latestTest(st, sa.subject);
+      if(!t) return;
+      const zk = zoneOf(t.percent, t.absent);
+      if(zk && zoneCounts.hasOwnProperty(zk)) zoneCounts[zk]++;
+    });
     const schoolVals = [];
     SECTION_DEFS.forEach(d2=>{
       if(!d2.subjects.includes(sa.subject)) return;
@@ -2357,8 +2362,8 @@ function renderSectionSummary(){
     const schoolSubjAvg = schoolVals.length ? Math.round((schoolVals.reduce((a,b)=>a+b,0)/schoolVals.length)*10)/10 : null;
     const delta = schoolSubjAvg!=null ? Math.round((sa.avg-schoolSubjAvg)*10)/10 : null;
     const deltaTag = delta==null ? '—' : delta>0?`<span class="delta-tag up">▲+${delta}</span>`:delta<0?`<span class="delta-tag down">▼${delta}</span>`:`<span class="delta-tag flat">·0</span>`;
-    return `<tr><td class="name-cell">${escapeHtml(sa.subject)}</td><td><span class="zone-pill ${zoneOf(sa.avg,false)}">${sa.avg}%</span></td><td>${redN}</td><td>${greenN}</td><td>${deltaTag}</td></tr>`;
-  }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No subject data yet.</td></tr>`;
+    return `<tr><td class="name-cell">${escapeHtml(sa.subject)}</td><td><span class="zone-pill ${zoneOf(sa.avg,false)}">${sa.avg}%</span></td><td>${zoneCounts.green}</td><td>${zoneCounts.blue}</td><td>${zoneCounts.yellow}</td><td>${zoneCounts.pink}</td><td>${zoneCounts.red}</td><td>${zoneCounts.grey}</td><td>${deltaTag}</td></tr>`;
+  }).join('') : `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">No subject data yet.</td></tr>`;
 
   document.getElementById('ssCompareBody').innerHTML = rankedSections.length ? rankedSections.map((s,i)=>`
     <tr data-jump-section="${s.def.key}" style="cursor:pointer;${s.def.key===key?'background:var(--gold-bg);font-weight:600;':''}"><td>${i+1}</td><td class="name-cell">${escapeHtml(s.def.label)}</td>
