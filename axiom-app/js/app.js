@@ -909,6 +909,28 @@ function parseSheetForSection(rows, def){
   };
 }
 
+// Auto-name a test/import when the user leaves the "Test / Exam Name" field
+// blank, so entering a name is a convenience rather than a requirement.
+// Produces sequential names like "Test 1", "Test 2", ... by checking how many
+// tests already exist across the current workspace data.
+function generateDefaultTestName(){
+  let maxNum = 0;
+  try{
+    const sections = (typeof workspace !== 'undefined' && workspace && workspace.sections) ? workspace.sections : {};
+    Object.values(sections).forEach(sec=>{
+      (sec.students||[]).forEach(stu=>{
+        Object.values(stu.tests||{}).forEach(entries=>{
+          (entries||[]).forEach(entry=>{
+            const m = /^Test (\d+)$/.exec(entry.test||'');
+            if(m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+          });
+        });
+      });
+    });
+  }catch(err){ /* fall back to Test 1 if workspace shape is unexpected */ }
+  return `Test ${maxNum + 1}`;
+}
+
 function runImport(workbook, testName, testDate){
   const matched = [];
   const unmatched = [];
@@ -2886,8 +2908,7 @@ document.getElementById('cloudImportBtn').addEventListener('click', async ()=>{
   const fileName = document.getElementById('cloudFileSelect').value;
   const hint = document.getElementById('cloudImportHint');
   if(!fileName){ showToast('Choose a cloud file first.', 'warning'); return; }
-  const testName = document.getElementById('importTestName').value.trim();
-  if(!testName){ showToast('Please enter a Test / Exam Name before loading the file.', 'warning'); return; }
+  const testName = document.getElementById('importTestName').value.trim() || generateDefaultTestName();
   const testDate = document.getElementById('importTestDate').value || null;
   const btn = document.getElementById('cloudImportBtn');
   const originalLabel = btn.textContent;
@@ -2949,8 +2970,7 @@ document.getElementById('cancelImportBtn').addEventListener('click', ()=>{
 document.getElementById('importFileInput').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  const testName = document.getElementById('importTestName').value.trim();
-  if(!testName){ showToast('Please enter a Test / Exam Name before choosing the file.', 'warning'); e.target.value=''; return; }
+  const testName = document.getElementById('importTestName').value.trim() || generateDefaultTestName();
   const testDate = document.getElementById('importTestDate').value || null;
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array', cellDates:false});
