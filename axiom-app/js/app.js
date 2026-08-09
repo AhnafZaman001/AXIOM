@@ -2494,17 +2494,17 @@ function renderTeacherReport(){
   const totalGreen = allRows.reduce((s,r)=>s+r.greenCount,0);
   const totalGrey = allRows.reduce((s,r)=>s+r.greyCount,0);
 
-  let html = `<div class="hero-strip">
+  let html = `<div class="hero-strip" id="trQuickStats">
     <div class="hero-metric"><div class="hm-label">Subjects Taught</div><div class="hm-value">${assignments.length}</div></div>
     <div class="hero-metric"><div class="hm-label">Sections Covered</div><div class="hm-value">${allRows.length}</div></div>
     <div class="hero-metric"><div class="hm-label">Total Students</div><div class="hm-value">${totalStudents}</div></div>
     <div class="hero-metric accent"><div class="hm-label">Overall Average</div><div class="hm-value">${overallAvg!=null?overallAvg+'%':'—'}</div></div>
-    <div class="hero-metric good"><div class="hm-label"><span class="dot green"></span>Green Zone</div><div class="hm-value">${totalGreen}</div></div>
-    <div class="hero-metric"><div class="hm-label"><span class="dot blue"></span>Blue Zone</div><div class="hm-value">${totalBlue}</div></div>
-    <div class="hero-metric"><div class="hm-label"><span class="dot yellow"></span>Yellow Zone</div><div class="hm-value">${totalYellow}</div></div>
-    <div class="hero-metric"><div class="hm-label"><span class="dot pink"></span>Pink Zone</div><div class="hm-value">${totalPink}</div></div>
-    <div class="hero-metric warn"><div class="hm-label"><span class="dot red"></span>Red Zone</div><div class="hm-value">${totalRed}</div></div>
-    <div class="hero-metric"><div class="hm-label"><span class="dot grey"></span>Absent</div><div class="hm-value">${totalGrey}</div></div>
+    <div class="hero-metric good clickable" data-filter="green"><div class="hm-label"><span class="dot green"></span>Green Zone</div><div class="hm-value">${totalGreen}</div></div>
+    <div class="hero-metric clickable" data-filter="blue"><div class="hm-label"><span class="dot blue"></span>Blue Zone</div><div class="hm-value">${totalBlue}</div></div>
+    <div class="hero-metric clickable" data-filter="yellow"><div class="hm-label"><span class="dot yellow"></span>Yellow Zone</div><div class="hm-value">${totalYellow}</div></div>
+    <div class="hero-metric clickable" data-filter="pink"><div class="hm-label"><span class="dot pink"></span>Pink Zone</div><div class="hm-value">${totalPink}</div></div>
+    <div class="hero-metric warn clickable" data-filter="red"><div class="hm-label"><span class="dot red"></span>Red Zone</div><div class="hm-value">${totalRed}</div></div>
+    <div class="hero-metric clickable" data-filter="grey"><div class="hm-label"><span class="dot grey"></span>Absent</div><div class="hm-value">${totalGrey}</div></div>
   </div>`;
 
   assignments.forEach(a=>{
@@ -2556,6 +2556,46 @@ function renderTeacherReport(){
   renderTRRoster();
   triggerEntranceAnimations();
 }
+
+// Returns roster-shaped student list for the Teacher Report's Green/Blue/
+// Yellow/Pink/Red/Absent KPI cards — scoped to this teacher's own subjects
+// and sections, using each student's latest test in that subject.
+function getTeacherFilteredStudents(teacherName, filterKey){
+  const assignments = getTeacherAssignments(teacherName);
+  const out = [];
+  assignments.forEach(a=>{
+    a.rows.forEach(r=>{
+      const store = workspace.sections[r.def.key];
+      if(!store) return;
+      store.students.forEach(st=>{
+        const t = latestTest(st, a.subject);
+        if(!t) return;
+        const zk = zoneOf(t.percent, t.absent);
+        if(zk !== filterKey) return;
+        out.push({
+          id: st.id,
+          name: st.name,
+          rollNo: st.rollNo,
+          sectionKey: r.def.key,
+          sectionLabel: `${r.def.label} — ${a.subject}`,
+          overall: t.absent ? null : t.percent
+        });
+      });
+    });
+  });
+  return out.sort((a,b)=>(b.overall||0)-(a.overall||0));
+}
+
+document.getElementById('teacherReportBody').addEventListener('click', (e)=>{
+  const el = e.target.closest('#trQuickStats [data-filter]');
+  if(!el) return;
+  const key = el.getAttribute('data-filter');
+  const teacherName = document.getElementById('teacherSelect').value;
+  if(!teacherName) return;
+  const list = getTeacherFilteredStudents(teacherName, key);
+  const title = `${ZONE_LABEL[key]||key} — ${teacherName}`;
+  openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across ${teacherName}'s sections`, list);
+});
 
 /* ---- 028_independent-roster-widgets.js ---- */
 

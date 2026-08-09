@@ -283,18 +283,25 @@
   .more-toggle{cursor:pointer;}
   .more-toggle:hover{text-decoration:underline;color:var(--accent-2);}
 
-  /* ===== student detail drawer ===== */
-  .drawer-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.55);backdrop-filter:blur(2px);display:none;z-index:60;}
+  /* ===== student detail drawer =====
+     Kept isolated from the page's paint/layout via `contain`, and promoted
+     to its own compositing layer via `will-change`, so opening it doesn't
+     force the whole page (counters, hover states, other cards) to repaint
+     every frame during the slide-in. backdrop-filter is intentionally left
+     off the overlay — blurring live content behind a moving panel is one of
+     the most expensive things a browser can do on every frame; a solid
+     translucent overlay looks nearly identical without the repaint cost. */
+  .drawer-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.62);display:none;z-index:60;contain:strict;}
   .drawer-overlay.open{display:block;}
   .drawer{position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--paper-raised);
     box-shadow:-16px 0 40px rgba(2,6,23,0.5);transform:translateX(100%);transition:transform .25s cubic-bezier(.22,.9,.32,1);
-    display:flex;flex-direction:column;border-left:1px solid var(--line);}
+    display:flex;flex-direction:column;border-left:1px solid var(--line);will-change:transform;contain:layout style paint;}
   .drawer-overlay.open .drawer{transform:translateX(0);}
   .drawer-head{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 24px;
     border-bottom:1px solid var(--line);gap:10px;}
   .drawer-head h3{margin:0;font-family:var(--font-display);font-weight:800;font-size:1.3rem;}
   .drawer-sub{font-size:0.76rem;color:var(--muted);margin-top:5px;}
-  .drawer-body{padding:10px 24px 24px;overflow:auto;flex:1;}
+  .drawer-body{padding:10px 24px 24px;overflow:auto;flex:1;contain:content;}
   .drawer-subject-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;margin:8px 0;
     border-top:none;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;gap:8px;flex-wrap:wrap;}
   .drawer-subject-row:first-child{margin-top:0;}
@@ -319,7 +326,7 @@
   }
   :root{ --glass-bg: rgba(21,31,47,0.55); }
   body{transition:background .25s ease, color .25s ease;}
-  .panel, .card, .chart-card, .table-wrap, .modal, .drawer, .toast{transition:background .25s ease, color .25s ease, border-color .25s ease, box-shadow .18s ease, transform .18s ease;}
+  .panel, .card, .chart-card, .table-wrap, .modal, .toast{transition:background .25s ease, color .25s ease, border-color .25s ease, box-shadow .18s ease, transform .18s ease;}
 
   .theme-toggle{font-size:1rem;line-height:1;padding:8px 10px;}
   .masthead-actions{display:flex;align-items:center;gap:12px;}
