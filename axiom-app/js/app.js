@@ -3987,6 +3987,53 @@ if(ssRPrintBtn) ssRPrintBtn.addEventListener('click', printSSRosterFiltered);
 const trRPrintBtn = document.getElementById('trRPrintBtn');
 if(trRPrintBtn) trRPrintBtn.addEventListener('click', printTRRosterFiltered);
 
+// Prints exactly the rows currently visible in the main Section View table
+// (the landing page's own Subject/Zone/Search filters + quick-filter chip),
+// mirroring renderTable's per-cell filter logic exactly so the printout
+// matches the screen for any combination of filters.
+function generateSectionViewFilteredPDF(){
+  const def = currentSectionDef();
+  const store = ensureSection(def.key);
+  const subjFilter = document.getElementById('subjectFilter').value;
+  const zoneFilterVal = document.getElementById('zoneFilter').value;
+  const subjectsShown = subjFilter ? [subjFilter] : visibleSubjectsFor(def);
+
+  const students = store.students.filter(s=>studentPassesFilters(s, def));
+  if(!students.length){
+    showToast('No students match the current filters — nothing to print.', 'warning');
+    return;
+  }
+
+  const headers = ['Student', ...subjectsShown];
+  const rows = students.map(st=>{
+    const row = [st.name];
+    subjectsShown.forEach(subj=>{
+      const arr = (st.tests||{})[subj] || [];
+      const t = arr.length ? arr[arr.length-1] : null;
+      const z = t ? zoneOf(t.percent, t.absent) : null;
+      const zoneMismatch = zoneFilterVal && (!subjFilter) && z !== zoneFilterVal;
+      let quickMismatch = false;
+      if(quickFilter && !subjFilter){
+        if(quickFilter === 'atrisk'){
+          quickMismatch = !(t && z === 'red');
+        } else if(quickFilter === 'improving' || quickFilter === 'declining'){
+          const c = classifyTransition(arr);
+          const wantKey = quickFilter === 'improving' ? 'improved' : 'declined';
+          quickMismatch = !(c && c.key === wantKey);
+        }
+      }
+      if(zoneMismatch || quickMismatch){ row.push('—'); return; }
+      row.push(t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—');
+    });
+    return row;
+  });
+
+  const subtitle = `${describeRosterFilters(subjFilter, zoneFilterVal, searchQuery, quickFilter)} — ${students.length} student${students.length===1?'':'s'}`;
+  printReport(`${def.label} — Student List`, subtitle, reportTableHtml(headers, rows));
+}
+const svPrintBtn = document.getElementById('svPrintBtn');
+if(svPrintBtn) svPrintBtn.addEventListener('click', generateSectionViewFilteredPDF);
+
 function generateStatListPDF(){
   if(!lastStatListData || !lastStatListData.students.length){ showToast('No student list to print.', 'warn'); return; }
   const { title, subtitle, students } = lastStatListData;
