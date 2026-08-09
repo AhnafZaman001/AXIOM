@@ -39,6 +39,7 @@
         <div class="last-updated" id="lastUpdated"></div>
       </div>
       <button class="ghost small theme-toggle" id="themeToggleBtn" title="Toggle dark mode" aria-label="Toggle dark mode" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.16);color:#fff;">🌙</button>
+      <button class="ghost small" id="customReportBtn" title="Print a report for any section / subject / status combination" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.16);color:#fff;">Custom Report</button>
     </div>
   </div>
 
@@ -614,6 +615,33 @@
     <div class="modal-actions">
       <button class="ghost" id="fuCancelBtn">Cancel</button>
       <button class="primary" id="fuSaveBtn">Save Follow-up</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="customReportOverlay">
+  <div class="modal" style="max-width:480px;">
+    <h3>Custom Report</h3>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:14px;">Print a report for any section, subject, and status combination — one file per permutation, for a physical record.</div>
+    <div class="field"><label>Section</label>
+      <select id="crSection"><option value="all">All Sections</option></select>
+    </div>
+    <div class="field"><label>Subject</label>
+      <select id="crSubject"><option value="all">All Subjects</option></select>
+    </div>
+    <div class="field"><label>Status</label>
+      <select id="crStatus">
+        <option value="all">All Students</option>
+        <option value="improving">Improving</option>
+        <option value="declining">Declining</option>
+        <option value="atrisk">At Risk (Red Zone)</option>
+        <option value="absent">Absent</option>
+      </select>
+    </div>
+    <div id="crPreviewCount" class="hint" style="margin-top:4px;"></div>
+    <div class="modal-actions">
+      <button class="ghost" id="crCancelBtn">Cancel</button>
+      <button class="primary" id="crPrintBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button>
     </div>
   </div>
 </div>
