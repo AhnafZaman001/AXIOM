@@ -502,17 +502,18 @@
     </span>
   </div>
   <div class="charts-grid">
-    <div class="chart-card">
+    <div class="chart-card chart-card-wide">
       <h4>Class Average Across Tests</h4>
       <div id="lineChartHost"></div>
       <div id="compareRowWrap"></div>
     </div>
     <div class="chart-card">
-      <h4>Zone Distribution — Latest Test <span id="zoneDeltaHost"></span></h4>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;">
-        <div id="barChartHost"></div>
-        <div class="zone-list" id="zoneListHost"></div>
-      </div>
+      <h4>Zone Shift <span id="zoneDeltaHost"></span></h4>
+      <div id="zoneDivergingHost"></div>
+    </div>
+    <div class="chart-card">
+      <h4>Score Distribution — Latest Test</h4>
+      <div id="histogramHost"></div>
     </div>
   </div>
 

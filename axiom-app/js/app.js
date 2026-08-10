@@ -1315,10 +1315,34 @@ function lineChartSVG(labels, values, color, stats){
     if(!p) return;
     path += (path==='' ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
   });
+
+  // Shaded band: the full high-low spread per test, so the chart shows more
+  // than a single average line — you can see whether the class is moving
+  // together or the average is being carried by a few students.
+  let bandPath = '', hasBand = false;
+  if(stats && labels.length > 1){
+    const bandPts = labels.map((l,i)=>{
+      const s = stats[i] || {};
+      if(s.high==null || s.low==null) return null;
+      const x = pad + i*stepX;
+      return {
+        x,
+        yTop: h-pad-((s.high-min)/(max-min))*(h-2*pad),
+        yBot: h-pad-((s.low-min)/(max-min))*(h-2*pad)
+      };
+    }).filter(Boolean);
+    if(bandPts.length > 1){
+      hasBand = true;
+      const topStr = bandPts.map(p=>`${p.x.toFixed(1)},${p.yTop.toFixed(1)}`).join(' ');
+      const botStr = bandPts.slice().reverse().map(p=>`${p.x.toFixed(1)},${p.yBot.toFixed(1)}`).join(' ');
+      bandPath = `<polygon points="${topStr} ${botStr}" fill="${color}" fill-opacity="0.13" stroke="none"/>`;
+    }
+  }
+
   const gridLines = [0,25,50,75,100].map(v=>{
     const y = h-pad-(v/100)*(h-2*pad);
-    return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="#ded7c6" stroke-width="1"/>
-      <text x="${pad-6}" y="${y+3}" font-size="9" fill="#7a7367" text-anchor="end" font-family="monospace">${v}</text>`;
+    return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="var(--line)" stroke-width="1"/>
+      <text x="${pad-6}" y="${y+3}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="monospace">${v}</text>`;
   }).join('');
   const dots = pts.map((p,i)=>{
     if(!p) return '';
@@ -1329,34 +1353,112 @@ function lineChartSVG(labels, values, color, stats){
   }).join('');
   const xLabels = labels.map((l,i)=>{
     const x = pad+i*stepX;
-    return `<text x="${x}" y="${h-8}" font-size="9" fill="#7a7367" text-anchor="middle" font-family="sans-serif">${escapeHtml(l).slice(0,14)}</text>`;
+    return `<text x="${x}" y="${h-8}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="sans-serif">${escapeHtml(l).slice(0,14)}</text>`;
   }).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
+  const legend = hasBand
+    ? `<div class="chart-legend"><span><i class="lg-swatch lg-line" style="background:${color}"></i>Class average</span><span><i class="lg-swatch lg-band" style="background:${color}"></i>High–low spread</span></div>`
+    : '';
+  return `${legend}<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
+    ${bandPath}
     ${gridLines}
     <path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>
     ${dots}${xLabels}
   </svg>`;
 }
 
-function barChartSVG(zoneCounts){
+// Mirrored bar-per-zone comparison: previous test on the left, latest test on
+// the right of a shared centre axis, so a shift (e.g. Red -> Blue/Green) is
+// visible directly instead of only as a list of +/- numbers.
+function divergingZoneHTML(currCounts, prevCounts, compareLabel){
   const order = ['green','blue','yellow','pink','red','grey'];
-  const colors = {green:'#3f7150',blue:'#3a6ea8',yellow:'#c98f2b',pink:'#b0567a',red:'#b5433a',grey:'#8a8478'};
-  const w=520, h=200, pad=32;
-  const max = Math.max(1, ...order.map(k=>zoneCounts[k]||0));
-  const bw = (w-2*pad)/order.length;
-  const bars = order.map((k,i)=>{
-    const v = zoneCounts[k]||0;
-    const bh = (v/max)*(h-2*pad-16);
-    const x = pad + i*bw + bw*0.2;
-    const y = h-pad-bh;
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(bw*0.6).toFixed(1)}" height="${bh.toFixed(1)}" fill="${colors[k]}" rx="2"/>
-      <text x="${(x+bw*0.3).toFixed(1)}" y="${h-pad+12}" font-size="9" fill="#7a7367" text-anchor="middle" font-family="sans-serif">${ZONE_LABEL[k]}</text>
-      <text x="${(x+bw*0.3).toFixed(1)}" y="${(y-5).toFixed(1)}" font-size="10" fill="#1c2b45" text-anchor="middle" font-family="monospace">${v}</text>`;
+  const max = Math.max(1, ...order.map(k=>Math.max(currCounts[k]||0, prevCounts ? (prevCounts[k]||0) : 0)));
+
+  const headerRow = prevCounts
+    ? `<div class="zdiv-headers"><span>${escapeHtml(compareLabel||'PREVIOUS')}</span><span>LATEST</span></div>`
+    : '';
+
+  const rows = order.map(k=>{
+    const curr = currCounts[k]||0;
+    const prev = prevCounts ? (prevCounts[k]||0) : null;
+    const currPct = (curr/max)*100;
+    const prevPct = prev!=null ? (prev/max)*100 : 0;
+    let deltaHtml = '';
+    if(prev!=null){
+      const d = curr - prev;
+      deltaHtml = d > 0 ? `<span class="delta-tag up">▲+${d}</span>` : d < 0 ? `<span class="delta-tag down">▼${d}</span>` : `<span class="delta-tag flat">·0</span>`;
+    }
+    return `<div class="zdiv-row">
+      <span class="zdiv-label"><i class="zl-dot" style="background:var(--${k})"></i>${ZONE_LABEL[k]}</span>
+      <div class="zdiv-bars">
+        <div class="zdiv-axis"></div>
+        <div class="zdiv-half left"><div class="zdiv-bar prev" style="width:${prevCounts?prevPct:0}%;background:var(--${k})"></div></div>
+        <div class="zdiv-half right"><div class="zdiv-bar curr" style="width:${currPct}%;background:var(--${k})"></div></div>
+      </div>
+      <span class="zdiv-nums">${prevCounts?`<b class="mono">${prev}</b>`:''}<b class="mono">${curr}</b>${deltaHtml}</span>
+    </div>`;
   }).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
-    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#1c2b45" stroke-width="1"/>
-    ${bars}
-  </svg>`;
+
+  return `${headerRow}${rows}`;
+}
+
+// Score histogram (10-point buckets) for the latest test of a subject, so a
+// teacher can see the actual shape of the distribution — where students land
+// within a zone, not just which zone bucket they fall in.
+function histogramSVG(store, subj, testName){
+  const percents = [];
+  store.students.forEach(st=>{
+    const arr = (st.tests||{})[subj] || [];
+    const t = testName ? arr.find(tt=>tt.test===testName) : (arr.length ? arr[arr.length-1] : null);
+    if(t && !t.absent && t.percent!=null) percents.push(t.percent);
+  });
+  if(!percents.length) return '<div class="hint">No graded scores yet for this test.</div>';
+
+  const bins = new Array(10).fill(0); // 0-9,10-19,...,90-100
+  percents.forEach(p=>{
+    let idx = Math.floor(p/10);
+    if(idx > 9) idx = 9;
+    if(idx < 0) idx = 0;
+    bins[idx]++;
+  });
+  const binColor = (idx)=>{
+    if(idx >= 9) return 'var(--green)';
+    if(idx >= 8) return 'var(--blue)';
+    if(idx >= 7) return 'var(--yellow)';
+    if(idx >= 6) return 'var(--pink)';
+    return 'var(--red)';
+  };
+  const w=480, h=190, padL=8, padR=8, padT=18, padB=28;
+  const plotW = w-padL-padR, plotH = h-padT-padB;
+  const gap = 4;
+  const bw = (plotW/bins.length) - gap;
+  const maxBin = Math.max(1, ...bins);
+
+  const bars = bins.map((n,i)=>{
+    const x = padL + i*(bw+gap);
+    const bh = (n/maxBin)*plotH;
+    const y = padT+plotH-bh;
+    const label = i===9 ? '90-100' : `${i*10}-${i*10+9}`;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${binColor(i)}"/>
+      ${n>0 ? `<text x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" font-size="10" fill="var(--ink-soft)" text-anchor="middle" font-family="monospace">${n}</text>` : ''}
+      <text x="${(x+bw/2).toFixed(1)}" y="${h-9}" font-size="8.5" fill="var(--muted)" text-anchor="middle" font-family="sans-serif">${label}</text>`;
+  }).join('');
+
+  // stats
+  const sorted = percents.slice().sort((a,b)=>a-b);
+  const mid = Math.floor(sorted.length/2);
+  const median = sorted.length%2 ? sorted[mid] : Math.round(((sorted[mid-1]+sorted[mid])/2)*10)/10;
+  const mean = Math.round((sorted.reduce((a,b)=>a+b,0)/sorted.length)*10)/10;
+  const variance = sorted.reduce((a,b)=>a+Math.pow(b-mean,2),0)/sorted.length;
+  const std = Math.round(Math.sqrt(variance)*10)/10;
+  const modeIdx = bins.reduce((best,v,i)=> v>bins[best]?i:best, 0);
+  const modeLabel = modeIdx===9 ? '90-100' : `${modeIdx*10}-${modeIdx*10+9}`;
+
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">${bars}</svg>
+    <div class="hist-stats">
+      <div><span>Median</span><b class="mono">${median}%</b></div>
+      <div><span>Mode band</span><b class="mono">${modeLabel}</b></div>
+      <div><span>Std. dev</span><b class="mono">±${std}</b></div>
+    </div>`;
 }
 
 /* ---- 012_hero-metrics.js ---- */
@@ -1629,27 +1731,16 @@ function renderCharts(def, store){
       </div>`;
   }
 
-  // ===== Zone distribution + deltas =====
+  // ===== Zone distribution: mirrored previous vs latest =====
   const zoneCounts = zoneCountsFor(store, subj, latestTestName);
-  document.getElementById('barChartHost').innerHTML = barChartSVG(zoneCounts);
-
-  const zoneOrder = ['green','blue','yellow','pink','red','grey'];
-  const colors = {green:'var(--green)',blue:'var(--blue)',yellow:'var(--yellow)',pink:'var(--pink)',red:'var(--red)',grey:'var(--grey)'};
   let prevZoneCounts = null;
   if(testOrder.length >= 2) prevZoneCounts = zoneCountsFor(store, subj, testOrder[testOrder.length-2]);
-  document.getElementById('zoneListHost').innerHTML = zoneOrder.map(z=>{
-    const v = zoneCounts[z]||0;
-    let delta = '';
-    if(prevZoneCounts){
-      const d = v - (prevZoneCounts[z]||0);
-      if(d > 0) delta = `<span class="delta-tag up">▲+${d}</span>`;
-      else if(d < 0) delta = `<span class="delta-tag down">▼${d}</span>`;
-      else delta = `<span class="delta-tag flat">·0</span>`;
-    }
-    return `<div class="zone-list-row"><span class="zl-dot" style="background:${colors[z]}"></span><span class="zl-label">${ZONE_LABEL[z]}</span><span class="zl-count">${v}</span>${delta}</div>`;
-  }).join('');
+  document.getElementById('zoneDivergingHost').innerHTML = divergingZoneHTML(zoneCounts, prevZoneCounts, testOrder.length>=2 ? testOrder[testOrder.length-2] : null);
   document.getElementById('zoneDeltaHost').innerHTML = prevZoneCounts
     ? `<span class="tooltip-hint" style="display:inline;">vs ${escapeHtml(testOrder[testOrder.length-2])}</span>` : '';
+
+  // ===== Score distribution histogram =====
+  document.getElementById('histogramHost').innerHTML = histogramSVG(store, subj, latestTestName);
 }
 
 /* ---- 015_save-load-workspace.js ---- */

@@ -160,6 +160,8 @@
   .section-title .filters{font-size:0.8rem;font-weight:500;display:flex;gap:8px;align-items:center;color:var(--muted);}
 
   .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;}
+  .charts-grid .chart-card-wide{grid-column:1 / -1;}
+  @media (min-width:900px){ .charts-grid .chart-card-wide{grid-column:span 2;} }
   .chart-card{background:var(--paper-raised);border:1px solid var(--line);border-radius:var(--card-radius);padding:20px 22px;box-shadow:var(--shadow-md);}
   .chart-card h4{margin:0 0 10px;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:700;}
 
@@ -241,6 +243,37 @@
   .zone-list-row .zl-dot{width:10px;height:10px;border-radius:50%;flex:none;}
   .zone-list-row .zl-label{flex:1;color:var(--ink-soft);}
   .zone-list-row .zl-count{font-family:var(--font-mono);font-weight:700;}
+
+  .mono{font-family:var(--font-mono);}
+
+  /* Trend chart legend */
+  .chart-legend{display:flex;gap:16px;margin-bottom:8px;font-size:0.72rem;color:var(--muted);}
+  .chart-legend span{display:flex;align-items:center;gap:6px;}
+  .lg-swatch{display:inline-block;width:13px;border-radius:2px;}
+  .lg-swatch.lg-line{height:3px;}
+  .lg-swatch.lg-band{height:9px;opacity:0.4;}
+
+  /* Diverging (mirrored) zone comparison chart */
+  .zdiv-headers{display:flex;justify-content:space-between;font-size:0.66rem;letter-spacing:0.6px;color:var(--muted);text-transform:uppercase;padding:0 0 6px 90px;}
+  .zdiv-headers span:first-child{flex:1;text-align:right;padding-right:calc(50% - 45px);}
+  .zdiv-headers span:last-child{flex:1;padding-left:calc(50% - 45px);}
+  .zdiv-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+  .zdiv-label{width:70px;flex:none;font-size:0.72rem;color:var(--ink-soft);display:flex;align-items:center;gap:6px;justify-content:flex-end;text-align:right;}
+  .zdiv-label .zl-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .zdiv-bars{flex:1;position:relative;height:20px;display:flex;}
+  .zdiv-axis{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line);}
+  .zdiv-half{width:50%;height:100%;display:flex;align-items:center;}
+  .zdiv-half.left{justify-content:flex-end;}
+  .zdiv-half.right{justify-content:flex-start;}
+  .zdiv-bar{height:13px;border-radius:3px;transition:width .5s cubic-bezier(.22,.9,.3,1);}
+  .zdiv-bar.prev{opacity:0.4;}
+  .zdiv-nums{width:104px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:0.74rem;}
+  .zdiv-nums b{font-weight:700;}
+
+  /* Score distribution histogram */
+  .hist-stats{display:flex;gap:20px;margin-top:12px;}
+  .hist-stats div{font-size:0.64rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);}
+  .hist-stats b{display:block;font-size:0.95rem;color:var(--ink);margin-top:2px;font-weight:700;}
 
   .compare-row{display:flex;gap:10px;align-items:center;font-size:0.8rem;color:var(--ink-soft);margin:10px 0 2px;flex-wrap:wrap;}
   .compare-row .cr-bar{flex:1;min-width:120px;height:8px;background:var(--surface-1);border-radius:5px;overflow:hidden;border:1px solid var(--line);position:relative;}
