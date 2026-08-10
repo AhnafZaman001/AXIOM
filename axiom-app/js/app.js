@@ -1300,7 +1300,7 @@ function renderTransitionCards(def, store){
 /* ---- 011_charts-hand-rolled-svg-offline-safe.js ---- */
 
 /* ===================== CHARTS (hand-rolled SVG, offline-safe) ===================== */
-function lineChartSVG(labels, values, color, stats){
+function lineChartSVG(labels, values, color, stats, compareSeries){
   const w=520, h=200, pad=32;
   const max=100, min=0;
   const stepX = labels.length>1 ? (w-2*pad)/(labels.length-1) : 0;
@@ -1315,6 +1315,31 @@ function lineChartSVG(labels, values, color, stats){
     if(!p) return;
     path += (path==='' ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
   });
+
+  // Optional comparison trend: a second dashed line for whatever the
+  // "compare against" selector is currently set to, so the chart actually
+  // redraws when the selection changes instead of only the average line
+  // ever appearing.
+  let comparePath = '', compareDots = '', compareLegend = '';
+  if(compareSeries && compareSeries.values && compareSeries.values.some(v=>v!=null)){
+    const cColor = compareSeries.color || '#c97b2e';
+    const cPts = compareSeries.values.map((v,i)=>{
+      if(v==null) return null;
+      const x = pad + i*stepX;
+      const y = h-pad - ((v-min)/(max-min))*(h-2*pad);
+      return [x,y];
+    });
+    cPts.forEach((p,i)=>{
+      if(!p) return;
+      comparePath += (comparePath==='' ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
+    });
+    compareDots = cPts.map((p,i)=>{
+      if(!p) return '';
+      const tip = `${escapeHtml(labels[i])}\n${escapeHtml(compareSeries.label||'Comparison')}: ${compareSeries.values[i]}%`;
+      return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${cColor}"><title>${tip}</title></circle>`;
+    }).join('');
+    compareLegend = `<span><i class="lg-swatch" style="background:${cColor}"></i>${escapeHtml(compareSeries.label||'Comparison')}</span>`;
+  }
 
   // Shaded band: the full high-low spread per test, so the chart shows more
   // than a single average line — you can see whether the class is moving
@@ -1355,12 +1380,15 @@ function lineChartSVG(labels, values, color, stats){
     const x = pad+i*stepX;
     return `<text x="${x}" y="${h-8}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="sans-serif">${escapeHtml(l).slice(0,14)}</text>`;
   }).join('');
-  const legend = hasBand
-    ? `<div class="chart-legend"><span><i class="lg-swatch lg-line" style="background:${color}"></i>Class average</span><span><i class="lg-swatch lg-band" style="background:${color}"></i>High–low spread</span></div>`
-    : '';
+  const legendParts = [];
+  if(hasBand) legendParts.push(`<span><i class="lg-swatch lg-line" style="background:${color}"></i>Class average</span>`, `<span><i class="lg-swatch lg-band" style="background:${color}"></i>High–low spread</span>`);
+  if(compareLegend) legendParts.push(compareLegend);
+  const legend = legendParts.length ? `<div class="chart-legend">${legendParts.join('')}</div>` : '';
   return `${legend}<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
     ${bandPath}
     ${gridLines}
+    <path d="${comparePath}" fill="none" stroke="${compareSeries?(compareSeries.color||'#c97b2e'):'none'}" stroke-width="2" stroke-dasharray="5,4"/>
+    ${compareDots}
     <path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>
     ${dots}${xLabels}
   </svg>`;
@@ -1681,14 +1709,9 @@ function renderCharts(def, store){
   const subj = document.getElementById('chartSubjectSelect').value || def.subjects[0];
   const {testOrder, avgs, stats} = subjectTestOrderAndStats(store, subj);
 
-  if(testOrder.length === 0){
-    document.getElementById('lineChartHost').innerHTML = `<div class="hint">No test data yet for ${escapeHtml(subj)}. Import a test to see a trend.</div>`;
-  } else if(testOrder.length === 1){
-    document.getElementById('lineChartHost').innerHTML = `<div class="hint">Only one test available — import another to see a trend.</div>`;
-  } else {
-    document.getElementById('lineChartHost').innerHTML = lineChartSVG(testOrder, avgs, '#4a6fa5', stats);
-  }
-  // ===== Compare against =====
+  // ===== Compare against ===== (computed before the trend line so the line
+  // chart can overlay whatever's selected, instead of only ever showing
+  // this section's own averages)
   const compareMode = document.getElementById('compareAgainstSelect').value;
   const compareSectionSel = document.getElementById('compareSectionSelect');
   compareSectionSel.style.display = compareMode === 'section' ? 'inline-block' : 'none';
@@ -1696,6 +1719,8 @@ function renderCharts(def, store){
   const latestTestName = testOrder.length ? testOrder[testOrder.length-1] : null;
   const classAvgLatest = avgs.length ? avgs[avgs.length-1] : null;
   let compareLabel = '', compareVal = null;
+  let compareOtherStore = null, compareOtherDef = null; // used below for the trend overlay + zone widget
+
   if(compareMode === 'previous' && avgs.length >= 2){
     compareLabel = 'Previous test';
     compareVal = avgs[avgs.length-2];
@@ -1705,6 +1730,8 @@ function renderCharts(def, store){
     if(otherDef.subjects.includes(subj)){
       compareLabel = otherDef.label;
       compareVal = subjectClassAverage(otherStore, subj);
+      compareOtherStore = otherStore;
+      compareOtherDef = otherDef;
     } else {
       compareLabel = otherDef.label + ' (no ' + subj + ')';
     }
@@ -1719,6 +1746,44 @@ function renderCharts(def, store){
     compareLabel = 'All sections average';
     compareVal = vals.length ? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : null;
   }
+
+  // Build the comparison trend series (per test, aligned to this section's
+  // test order by matching test name) so the line chart actually redraws
+  // when the selector changes.
+  let compareSeries = null;
+  if(testOrder.length > 1 && compareMode === 'section' && compareOtherStore){
+    const otherData = subjectTestOrderAndStats(compareOtherStore, subj);
+    const byName = {};
+    otherData.testOrder.forEach((name,i)=>{ byName[name] = otherData.avgs[i]; });
+    const aligned = testOrder.map(name => (name in byName) ? byName[name] : null);
+    if(aligned.some(v=>v!=null)){
+      compareSeries = {values: aligned, label: compareOtherDef.label, color:'#c97b2e'};
+    }
+  } else if(testOrder.length > 1 && compareMode === 'school'){
+    const aligned = testOrder.map(name=>{
+      const vals = [];
+      SECTION_DEFS.forEach(d=>{
+        if(!d.subjects.includes(subj)) return;
+        const s = ensureSection(d.key);
+        const otherData = subjectTestOrderAndStats(s, subj);
+        const idx = otherData.testOrder.indexOf(name);
+        if(idx !== -1 && otherData.avgs[idx] != null) vals.push(otherData.avgs[idx]);
+      });
+      return vals.length ? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : null;
+    });
+    if(aligned.some(v=>v!=null)){
+      compareSeries = {values: aligned, label:'All sections average', color:'#c97b2e'};
+    }
+  }
+
+  if(testOrder.length === 0){
+    document.getElementById('lineChartHost').innerHTML = `<div class="hint">No test data yet for ${escapeHtml(subj)}. Import a test to see a trend.</div>`;
+  } else if(testOrder.length === 1){
+    document.getElementById('lineChartHost').innerHTML = `<div class="hint">Only one test available — import another to see a trend.</div>`;
+  } else {
+    document.getElementById('lineChartHost').innerHTML = lineChartSVG(testOrder, avgs, '#4a6fa5', stats, compareSeries);
+  }
+
   if(classAvgLatest == null || compareVal == null){
     compareRowWrap.innerHTML = compareLabel ? `<div class="hint">Not enough data to compare against ${escapeHtml(compareLabel)} yet.</div>` : '';
   } else {
@@ -1731,13 +1796,54 @@ function renderCharts(def, store){
       </div>`;
   }
 
-  // ===== Zone distribution: mirrored previous vs latest =====
+  // ===== Zone distribution: mirrored comparison vs latest =====
+  // Follows the same "compare against" selector as the trend line above,
+  // instead of always being pinned to "previous test in this section."
   const zoneCounts = zoneCountsFor(store, subj, latestTestName);
   let prevZoneCounts = null;
-  if(testOrder.length >= 2) prevZoneCounts = zoneCountsFor(store, subj, testOrder[testOrder.length-2]);
-  document.getElementById('zoneDivergingHost').innerHTML = divergingZoneHTML(zoneCounts, prevZoneCounts, testOrder.length>=2 ? testOrder[testOrder.length-2] : null);
+  let zoneCompareLabel = null;
+
+  if(compareMode === 'section' && compareOtherStore){
+    // Match by test name; if this section's other section doesn't have a
+    // test with the same name, fall back to that section's own latest test
+    // rather than silently showing all-zero bars.
+    const otherData = subjectTestOrderAndStats(compareOtherStore, subj);
+    const matchedName = latestTestName && otherData.testOrder.includes(latestTestName)
+      ? latestTestName
+      : (otherData.testOrder.length ? otherData.testOrder[otherData.testOrder.length-1] : null);
+    if(matchedName){
+      prevZoneCounts = zoneCountsFor(compareOtherStore, subj, matchedName);
+      zoneCompareLabel = compareOtherDef.label + (matchedName !== latestTestName ? ` (${matchedName})` : '');
+    }
+  } else if(compareMode === 'school'){
+    const combined = {green:0,blue:0,yellow:0,pink:0,red:0,grey:0};
+    let any = false;
+    SECTION_DEFS.forEach(d=>{
+      if(d.key === (def && def.key)) return; // exclude this section from "school average"
+      if(!d.subjects.includes(subj)) return;
+      const s = ensureSection(d.key);
+      const otherData = subjectTestOrderAndStats(s, subj);
+      const matchedName = latestTestName && otherData.testOrder.includes(latestTestName)
+        ? latestTestName
+        : (otherData.testOrder.length ? otherData.testOrder[otherData.testOrder.length-1] : null);
+      if(!matchedName) return;
+      any = true;
+      const zc = zoneCountsFor(s, subj, matchedName);
+      Object.keys(combined).forEach(k=> combined[k] += (zc[k]||0));
+    });
+    if(any){ prevZoneCounts = combined; zoneCompareLabel = 'All other sections'; }
+  } else {
+    // 'previous' mode (or no valid comparison available): fall back to
+    // this section's own previous test, same as before.
+    if(testOrder.length >= 2){
+      prevZoneCounts = zoneCountsFor(store, subj, testOrder[testOrder.length-2]);
+      zoneCompareLabel = testOrder[testOrder.length-2];
+    }
+  }
+
+  document.getElementById('zoneDivergingHost').innerHTML = divergingZoneHTML(zoneCounts, prevZoneCounts, zoneCompareLabel);
   document.getElementById('zoneDeltaHost').innerHTML = prevZoneCounts
-    ? `<span class="tooltip-hint" style="display:inline;">vs ${escapeHtml(testOrder[testOrder.length-2])}</span>` : '';
+    ? `<span class="tooltip-hint" style="display:inline;">vs ${escapeHtml(zoneCompareLabel||'')}</span>` : '';
 
   // ===== Score distribution histogram =====
   document.getElementById('histogramHost').innerHTML = histogramSVG(store, subj, latestTestName);
