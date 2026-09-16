@@ -231,14 +231,21 @@
         More
       </button>
       <div class="menu-dropdown" id="moreMenuDropdown" style="right:0;left:auto;">
+        <div class="menu-section-label">Workspace &amp; Backup</div>
         <button id="connectFileBtn" title="Link a file on a pendrive/USB drive so changes autosave there">Connect Pendrive File</button>
         <button id="saveDownloadBtn" title="Save the full workspace as a .json file you can keep or re-upload later">Download Workspace</button>
         <button id="loadUploadBtn" title="Load a previously downloaded workspace .json file">Upload Workspace</button>
+        <button id="uploadCloudBtn" title="Upload a master Excel file to Supabase so anyone can import it from any computer (principal/coordinator only)">Upload Master File to Cloud</button>
+        <button id="undoImportBtn" disabled title="Restore the workspace to how it was just before the last import was applied">Undo Last Import</button>
+
+        <div class="menu-divider"></div>
+        <div class="menu-section-label">Manage</div>
         <button id="manageTeacherBtn" title="Assign or reassign which teacher teaches a subject in a section">Manage Teacher Assignments</button>
         <button id="manageSubjectsBtn" title="Add or remove a subject for one specific section — e.g. after a year promotion">Manage Subjects</button>
         <button id="fixGroupsBtn" title="Bulk-fix sections that were created with the wrong subject group (e.g. an ICS section set up as Pre-Medical)">Fix Subject Groups</button>
-        <button id="uploadCloudBtn" title="Upload a master Excel file to Supabase so anyone can import it from any computer (principal/coordinator only)">Upload Master File to Cloud</button>
-        <button id="undoImportBtn" disabled title="Restore the workspace to how it was just before the last import was applied">Undo Last Import</button>
+
+        <div class="menu-divider"></div>
+        <div class="menu-section-label">View &amp; Preferences</div>
         <button id="soundToggleBtn" title="Toggle soft confirmation sounds for imports, success and warnings">
           <svg class="icon" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
           <span id="soundToggleLabel">Interface Sounds: Off</span>
