@@ -67,6 +67,12 @@
   // dropdowns/subject filters below get populated from SECTION_DEFS.
   (workspace._cloudSections || []).forEach(registerCloudSectionDef);
   delete workspace._cloudSections;
+  // Must run AFTER section registration above -- applySubjectOverride()
+  // looks the section up by key, so the section has to exist locally first.
+  (workspace._cloudSubjectOverrides || []).forEach(row => {
+    if(row.section_key && Array.isArray(row.subjects)) applySubjectOverride(row.section_key, row.subjects);
+  });
+  delete workspace._cloudSubjectOverrides;
 
   populateSectionSelects();
   populateSubjectFilter();

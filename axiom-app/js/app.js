@@ -151,6 +151,62 @@ function addSectionDef(sheetName, group){
   SHEETNAME_TO_KEY[normalized] = key;
   return def;
 }
+
+/* ------------- Per-section subject overrides -------------
+   Real problem this solves: students promoted from 1st year to 2nd
+   year need a DIFFERENT subject list for the SAME section (Islamiat
+   replaced by Pak Study; I.Com 2nd-year gains 4 new subjects) --
+   without changing the subject GROUP itself, since a future brand
+   new 1st-year section in that same group should still start with
+   the original list.
+
+   Critical thing these functions guard against: def.subjects starts
+   out as a SHARED array reference -- every section in the same
+   group points at the exact same SUBJECT_SETS[group] array object,
+   not a copy of it (see addSectionDef/registerCloudSectionDef
+   above). Naively pushing/splicing that array in place would
+   silently corrupt every OTHER section sharing that same group.
+   applySubjectOverride() always assigns a brand new array, breaking
+   the shared reference for just the one section being changed --
+   every other section in that group keeps using the original
+   shared array, completely unaffected. */
+function applySubjectOverride(sectionKey, subjects){
+  const def = SECTION_BY_KEY[sectionKey];
+  if(!def) return;
+  def.subjects = subjects.slice(); // always a fresh array, never the shared group array
+}
+
+function addSubjectToSection(sectionKey, subjectName){
+  subjectName = String(subjectName||'').trim();
+  if(!subjectName) throw new Error('Enter a subject name.');
+  const def = SECTION_BY_KEY[sectionKey];
+  if(!def) throw new Error('Section not found.');
+  if(def.subjects.includes(subjectName)) throw new Error(`"${subjectName}" is already in this section's subject list.`);
+  const updated = def.subjects.concat([subjectName]); // new array, doesn't touch the old one
+  applySubjectOverride(sectionKey, updated);
+  return updated;
+}
+
+function removeSubjectFromSection(sectionKey, subjectName){
+  const def = SECTION_BY_KEY[sectionKey];
+  if(!def) throw new Error('Section not found.');
+  if(!def.subjects.includes(subjectName)) throw new Error(`"${subjectName}" isn't in this section's subject list.`);
+  if(def.subjects.length <= 1) throw new Error('A section needs at least one subject.');
+  const updated = def.subjects.filter(s => s !== subjectName);
+  applySubjectOverride(sectionKey, updated);
+  return updated;
+}
+
+// Every distinct subject name across every group, for the "pick an
+// existing subject" half of the Manage Subjects dropdown -- so
+// adding e.g. "English" to a section that's missing it doesn't
+// require retyping it from scratch.
+function allKnownSubjects(){
+  const set = new Set();
+  Object.values(SUBJECT_SETS).forEach(list => list.forEach(s => set.add(s)));
+  SECTION_DEFS.forEach(d => d.subjects.forEach(s => set.add(s)));
+  return Array.from(set).sort();
+}
 // Renames an existing section's display/sheet name in place (student and
 // test data are untouched since they're keyed by the stable `key`, not the
 // name). Optionally also changes its subject group — e.g. fixing a section
@@ -239,6 +295,21 @@ const SUBJECT_KEYWORDS = [
   ['Accounting', ['ACCOUNT']],
   ['Commerce', ['COMMERCE']],
 ];
+
+// Returns the keyword list to match a subject's header cell against.
+// Known subjects (Physics, Chemistry, etc.) use the curated synonym
+// list above, which tolerates real-world header variations ("PHYSIC"
+// catches "Physics"/"PHY SICS"/etc.). A subject added to a section
+// via Manage Subjects that isn't in that curated list (e.g. "Pak
+// Study", "Banking", "Business Statistics", "Commercial Geography")
+// falls back to matching its own name directly -- otherwise it
+// would never be detected on import at all, regardless of what the
+// Excel header actually says.
+function keywordsForSubject(subj){
+  const known = SUBJECT_KEYWORDS.find(k=>k[0]===subj);
+  if(known) return known[1];
+  return [String(subj||'').toUpperCase()];
+}
 
 /* ---- 002_teacher-reference-subject-section-teacher.js ---- */
 
@@ -806,8 +877,8 @@ function parseSheetForSection(rows, def){
       if(typeof cell === 'string'){
         const up = cell.toUpperCase();
         for(const subj of subjects){
-          const kws = SUBJECT_KEYWORDS.find(k=>k[0]===subj);
-          if(kws && kws[1].some(kw=>up.includes(kw))){ matches++; break; }
+          const kws = keywordsForSubject(subj);
+          if(kws.some(kw=>up.includes(kw))){ matches++; break; }
         }
       }
     });
@@ -825,8 +896,8 @@ function parseSheetForSection(rows, def){
     if(typeof cell === 'string'){
       const up = cell.toUpperCase();
       for(const subj of subjects){
-        const kws = SUBJECT_KEYWORDS.find(k=>k[0]===subj);
-        if(kws && kws[1].some(kw=>up.includes(kw))){ hits.push({subject:subj, col:c}); break; }
+        const kws = keywordsForSubject(subj);
+        if(kws.some(kw=>up.includes(kw))){ hits.push({subject:subj, col:c}); break; }
       }
     }
   });
@@ -3042,7 +3113,7 @@ document.getElementById('extraDetailsBtn').addEventListener('click', (e)=>{
 });
 
 function togglePanel(id){
-  ['importPanel','addTestPanel','addStudentPanel','addSectionPanel','renameSectionPanel','manageTeacherPanel','fixGroupsPanel'].forEach(p=>{
+  ['importPanel','addTestPanel','addStudentPanel','addSectionPanel','renameSectionPanel','manageTeacherPanel','fixGroupsPanel','manageSubjectsPanel'].forEach(p=>{
     document.getElementById(p).classList.toggle('open', p===id ? !document.getElementById(id).classList.contains('open') : false);
   });
 }
@@ -3704,6 +3775,96 @@ document.getElementById('mtClearBtn').addEventListener('click', async ()=>{
   }
 });
 document.getElementById('mtCancelBtn').addEventListener('click', ()=>document.getElementById('manageTeacherPanel').classList.remove('open'));
+
+/* ---- Manage Subjects (per-section subject list) ---- */
+function populateMsSection(){
+  document.getElementById('msSection').innerHTML = SECTION_DEFS.map(d=>`<option value="${d.key}">${d.label}</option>`).join('');
+}
+function renderMsCurrentSubjects(){
+  const key = document.getElementById('msSection').value;
+  const def = SECTION_BY_KEY[key];
+  const wrap = document.getElementById('msCurrentSubjects');
+  if(!def){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = def.subjects.map(subj => `
+    <span class="chip" data-subject="${escapeHtml(subj)}" title="Click to remove ${escapeHtml(subj)} from this section only">
+      ${escapeHtml(subj)} &times;
+    </span>
+  `).join('');
+  document.getElementById('msSubjectList').innerHTML =
+    allKnownSubjects().map(s=>`<option value="${escapeHtml(s)}"></option>`).join('');
+}
+document.getElementById('manageSubjectsBtn').addEventListener('click', ()=>{
+  togglePanel('manageSubjectsPanel');
+  populateMsSection();
+  document.getElementById('msSection').value = currentSectionKey ? currentSectionKey() : SECTION_DEFS[0].key;
+  renderMsCurrentSubjects();
+  document.getElementById('msNewSubject').value = '';
+  document.getElementById('msFeedback').textContent = '';
+});
+document.getElementById('msSection').addEventListener('change', renderMsCurrentSubjects);
+
+// Click a chip to remove that subject from THIS section only (see
+// removeSubjectFromSection() in app.js — never touches the shared
+// group array or any other section).
+document.getElementById('msCurrentSubjects').addEventListener('click', async (e)=>{
+  const chip = e.target.closest('.chip[data-subject]');
+  if(!chip) return;
+  const sectionKey = document.getElementById('msSection').value;
+  const subj = chip.dataset.subject;
+  const feedback = document.getElementById('msFeedback');
+  try{
+    const updated = removeSubjectFromSection(sectionKey, subj);
+    renderMsCurrentSubjects();
+    markDirty();
+    refreshAllUI();
+    feedback.textContent = `Removing "${subj}"…`;
+    await axSetSectionSubjects(sectionKey, updated);
+    feedback.textContent = `✓ "${subj}" removed from this section and synced to the cloud.`;
+  }catch(err){
+    if(err && err.message && !err.message.includes('fetch')){
+      // Validation error (e.g. "at least one subject") — surfaced before any cloud call happened.
+      feedback.textContent = err.message;
+    } else {
+      console.error('axSetSectionSubjects failed:', err);
+      feedback.textContent = `Removed on this device, but cloud sync failed: ${err.message || err}`;
+    }
+  }
+});
+
+document.getElementById('msAddBtn').addEventListener('click', async ()=>{
+  const sectionKey = document.getElementById('msSection').value;
+  const input = document.getElementById('msNewSubject');
+  const subj = input.value.trim();
+  const feedback = document.getElementById('msFeedback');
+  const btn = document.getElementById('msAddBtn');
+  let updated;
+  try{
+    updated = addSubjectToSection(sectionKey, subj);
+  }catch(err){
+    feedback.textContent = err.message;
+    return;
+  }
+  renderMsCurrentSubjects();
+  input.value = '';
+  markDirty();
+  refreshAllUI();
+
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    await axSetSectionSubjects(sectionKey, updated);
+    feedback.textContent = `✓ "${subj}" added to this section and synced to the cloud. It'll now be detected automatically on the next Excel import.`;
+  }catch(err){
+    console.error('axSetSectionSubjects failed:', err);
+    feedback.textContent = `"${subj}" added on this device, but cloud sync failed: ${err.message || err}`;
+  }finally{
+    btn.disabled = false; btn.textContent = originalLabel;
+  }
+});
+document.getElementById('msNewSubject').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('msAddBtn').click(); }
+});
+document.getElementById('msCancelBtn').addEventListener('click', ()=>document.getElementById('manageSubjectsPanel').classList.remove('open'));
 
 document.getElementById('connectFileBtn').addEventListener('click', connectPendriveFile);
 document.getElementById('saveDownloadBtn').addEventListener('click', downloadWorkspace);

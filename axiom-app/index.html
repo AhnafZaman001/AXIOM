@@ -235,6 +235,7 @@
         <button id="saveDownloadBtn" title="Save the full workspace as a .json file you can keep or re-upload later">Download Workspace</button>
         <button id="loadUploadBtn" title="Load a previously downloaded workspace .json file">Upload Workspace</button>
         <button id="manageTeacherBtn" title="Assign or reassign which teacher teaches a subject in a section">Manage Teacher Assignments</button>
+        <button id="manageSubjectsBtn" title="Add or remove a subject for one specific section — e.g. after a year promotion">Manage Subjects</button>
         <button id="fixGroupsBtn" title="Bulk-fix sections that were created with the wrong subject group (e.g. an ICS section set up as Pre-Medical)">Fix Subject Groups</button>
         <button id="uploadCloudBtn" title="Upload a master Excel file to Supabase so anyone can import it from any computer (principal/coordinator only)">Upload Master File to Cloud</button>
         <button id="undoImportBtn" disabled title="Restore the workspace to how it was just before the last import was applied">Undo Last Import</button>
@@ -466,6 +467,30 @@
       <button class="primary" id="mtSaveBtn">Save Assignment</button>
       <button class="ghost" id="mtClearBtn" title="Remove the custom assignment and fall back to the default roster">Reset to Default</button>
       <button class="ghost" id="mtCancelBtn">Close</button>
+    </div>
+  </div>
+
+  <div class="panel" id="manageSubjectsPanel">
+    <h3>Manage Subjects</h3>
+    <div class="hint">Add or remove a subject for one specific section — e.g. a section promoted from 1st year to 2nd year that needs Pak Study instead of Islamiat, or new I.Com subjects. Only this section changes; the subject group itself, and every other section in it, stay exactly as they were.</div>
+    <div class="panel-row">
+      <div class="field"><label>Section</label><select id="msSection"></select></div>
+    </div>
+    <div class="field" style="margin-top:6px;">
+      <label>Current subjects</label>
+      <div id="msCurrentSubjects" class="chip-row"></div>
+    </div>
+    <div class="panel-row" style="margin-top:10px;">
+      <div class="field" style="flex:1;min-width:220px;">
+        <label>Add a subject</label>
+        <input type="text" id="msNewSubject" placeholder="e.g. Pak Study, or pick an existing one" list="msSubjectList" style="width:100%;">
+        <datalist id="msSubjectList"></datalist>
+      </div>
+    </div>
+    <div class="hint" id="msFeedback" style="margin-top:4px;"></div>
+    <div class="panel-row" style="margin-top:12px;">
+      <button class="primary" id="msAddBtn">Add Subject</button>
+      <button class="ghost" id="msCancelBtn">Close</button>
     </div>
   </div>
 

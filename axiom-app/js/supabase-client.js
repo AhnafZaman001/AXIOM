@@ -48,11 +48,12 @@ async function axRequireAuth() {
 // workspace = { sections: { [sectionKey]: { students: [ {id,name,rollNo,matric,tests:{ [subject]: [ {test,date,obtained,max,percent,absent,position} ] } } ] } }, teacherOverrides: {} }
 
 async function axLoadWorkspaceFromSupabase() {
-  const [{ data: sections }, { data: students }, { data: tests }, { data: assignments }] = await Promise.all([
+  const [{ data: sections }, { data: students }, { data: tests }, { data: assignments }, { data: subjectOverrides }] = await Promise.all([
     supabaseClient.from('sections').select('*'),
     supabaseClient.from('students').select('*'),
     supabaseClient.from('tests').select('*'),
     supabaseClient.from('teacher_assignments').select('*'),
+    supabaseClient.from('section_subject_overrides').select('*'),
   ]);
 
   const workspace = { sections: {}, sectionRenames: {}, teacherOverrides: {} };
@@ -62,6 +63,10 @@ async function axLoadWorkspaceFromSupabase() {
   // by app.js to register any section that exists in the cloud but isn't
   // one of the hardcoded SECTION_DEFS baked into this build yet.
   workspace._cloudSections = sections || [];
+  // Per-section subject-list overrides (see applySubjectOverride() in
+  // app.js) — applied AFTER _cloudSections is registered, since a section
+  // has to exist locally before its subject list can be overridden.
+  workspace._cloudSubjectOverrides = subjectOverrides || [];
 
   const testsByStudent = {};
   (tests || []).forEach(t => {
@@ -125,6 +130,18 @@ async function axAddSection({ key, label, sheetName, group }) {
   const { error } = await supabaseClient
     .from('sections')
     .insert({ key, label, sheet_name: sheetName, subject_group: group });
+  if (error) throw error;
+}
+
+// Persists a section's own subject list, independent of its group's
+// base list -- see applySubjectOverride() in app.js for why this
+// exists (students promoted 1st -> 2nd year need a different
+// subject list for the SAME section, without changing the group
+// itself for future new sections).
+async function axSetSectionSubjects(sectionKey, subjects) {
+  const { error } = await supabaseClient
+    .from('section_subject_overrides')
+    .upsert({ section_key: sectionKey, subjects });
   if (error) throw error;
 }
 
