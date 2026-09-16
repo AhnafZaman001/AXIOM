@@ -99,24 +99,44 @@ create policy "profiles: user can read own row"
   on profiles for select
   using (auth.uid() = id);
 
+-- Role lookup goes through a SECURITY DEFINER function, not a direct
+-- query against profiles from inside a policy ON profiles -- doing
+-- it inline (`exists (select 1 from profiles p where p.id =
+-- auth.uid() and p.role in (...))`) causes Postgres error 42P17
+-- ("infinite recursion detected in policy for relation \"profiles\"")
+-- on every query, including simple own-row lookups, since Postgres
+-- evaluates all applicable SELECT policies together. See
+-- migration_005_fix_profiles_rls_recursion.sql for the incident this
+-- was caught from -- the same inline pattern was repeated across 6
+-- other policies on other tables too, all fixed the same way below.
+create or replace function public.current_profile_role()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select role from profiles where id = auth.uid();
+$$;
+
+grant execute on function public.current_profile_role() to authenticated;
+
 create policy "profiles: privileged roles can read all"
   on profiles for select
-  using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator','hod'))
-  );
+  using (public.current_profile_role() in ('principal','coordinator','hod'));
 
 -- ---- sections ----
 create policy "sections: everyone logged in can read"
   on sections for select using (auth.uid() is not null);
 create policy "sections: principal/coordinator can write"
   on sections for all using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator'))
+    public.current_profile_role() in ('principal','coordinator')
   );
 
 -- ---- students ----
 create policy "students: privileged roles read all"
   on students for select using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator','hod'))
+    public.current_profile_role() in ('principal','coordinator','hod')
   );
 
 create policy "students: teacher reads students in their assigned sections"
@@ -132,7 +152,7 @@ create policy "students: student reads own row only"
 
 create policy "students: principal/coordinator write"
   on students for all using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator'))
+    public.current_profile_role() in ('principal','coordinator')
   );
 
 -- ---- teacher_assignments ----
@@ -141,13 +161,13 @@ create policy "assignments: everyone logged in can read"
 
 create policy "assignments: principal/coordinator write"
   on teacher_assignments for all using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator'))
+    public.current_profile_role() in ('principal','coordinator')
   );
 
 -- ---- tests ----
 create policy "tests: privileged roles read all"
   on tests for select using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator','hod'))
+    public.current_profile_role() in ('principal','coordinator','hod')
   );
 
 create policy "tests: teacher reads tests for their assigned section+subject"
@@ -195,7 +215,7 @@ create policy "tests: teacher deletes only their own assigned section+subject"
 
 create policy "tests: principal/coordinator full write"
   on tests for all using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role in ('principal','coordinator'))
+    public.current_profile_role() in ('principal','coordinator')
   );
 
 -- =========================================================================
