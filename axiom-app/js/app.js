@@ -284,7 +284,7 @@ const SUBJECT_KEYWORDS = [
   ['B.Math', ['B.MATH','B MATH','BUSINESS MATH']],
   ['Physics', ['PHYSIC']],
   ['Chemistry', ['CHEM']],
-  ['Biology', ['BIOLOG']],
+  ['Biology', ['BIOLOG','BIO']],
   ['Computer', ['COMPUTER']],
   ['Math', ['MATH']],
   ['English', ['ENGLISH']],
@@ -308,7 +308,7 @@ const SUBJECT_KEYWORDS = [
 function keywordsForSubject(subj){
   const known = SUBJECT_KEYWORDS.find(k=>k[0]===subj);
   if(known) return known[1];
-  return [String(subj||'').toUpperCase()];
+  return [normalizeHeaderText(subj)];
 }
 
 /* ---- 002_teacher-reference-subject-section-teacher.js ---- */
@@ -865,6 +865,16 @@ let pendingImport = null; // holds parsed-but-unapplied result
 
 function cellIsNumber(v){ return typeof v === 'number' && !Number.isNaN(v); }
 
+// Excel headers sometimes wrap onto two lines inside a single cell (e.g. a
+// merged "PAK \nSTUDIES" cell), which puts a newline where a plain subject
+// name like "PAK STUDIES" has a space. A straight substring check then never
+// matches even though the header is clearly the right column. Collapsing all
+// whitespace (newlines, tabs, repeated spaces) down to single spaces before
+// comparing makes header/subject matching resilient to that line-wrapping.
+function normalizeHeaderText(s){
+  return String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
+}
+
 function parseSheetForSection(rows, def){
   const subjects = def.subjects;
   const warnings = [];
@@ -875,7 +885,7 @@ function parseSheetForSection(rows, def){
     let matches = 0;
     row.forEach(cell=>{
       if(typeof cell === 'string'){
-        const up = cell.toUpperCase();
+        const up = normalizeHeaderText(cell);
         for(const subj of subjects){
           const kws = keywordsForSubject(subj);
           if(kws.some(kw=>up.includes(kw))){ matches++; break; }
@@ -894,7 +904,7 @@ function parseSheetForSection(rows, def){
   const hits = []; // {subject, col}
   headerRow.forEach((cell, c)=>{
     if(typeof cell === 'string'){
-      const up = cell.toUpperCase();
+      const up = normalizeHeaderText(cell);
       for(const subj of subjects){
         const kws = keywordsForSubject(subj);
         if(kws.some(kw=>up.includes(kw))){ hits.push({subject:subj, col:c}); break; }
