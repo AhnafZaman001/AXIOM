@@ -131,23 +131,51 @@ function uniqueSectionKey(baseKey){
 // Creates a new section, adds it to SECTION_DEFS/SECTION_BY_KEY/SHEETNAME_TO_KEY,
 // and returns the new definition. Throws a plain Error with a user-facing
 // message if the name is missing/duplicate or the group is unknown.
-// Registers a section that exists in the cloud `sections` table but isn't
-// in this build's hardcoded SECTION_DEFS yet — i.e. it was added from
-// another device/login. Called once per row right after loading from
-// Supabase, before any UI that reads SECTION_DEFS is populated. Safe to
-// call for a section that's already known (it's a no-op in that case).
+// Registers a section that exists in the cloud `sections` table, called
+// once per row right after loading from Supabase, before any UI that reads
+// SECTION_DEFS is populated.
+//
+// Two cases, both handled here:
+//  1. Key not known locally at all (added from another device/login) --
+//     push a brand new def, same as before.
+//  2. Key IS one of the 23 hardcoded SECTION_DEFS -- reconcile that def's
+//     mutable fields (sheetName/label/group/subjects) to match the cloud
+//     row instead of no-op'ing. This used to just `return` for any known
+//     key, on the assumption a hardcoded section's identity is fully
+//     described in code -- true for key/group at definition time, but NOT
+//     true for sheetName/label once a promotion has renamed it in the
+//     cloud (e.g. "F1A" -> "S1A"). Skipping case 2 meant a rename could be
+//     written to the cloud successfully (axUpdateSectionMeta) and then
+//     silently discarded on the very next fresh load, because nothing ever
+//     read it back for an already-known key -- the rename would only
+//     "stick" for as long as that one browser tab's in-memory state
+//     happened to stay alive.
 function registerCloudSectionDef({ key, sheet_name, subject_group, label }){
-  if(!key || SECTION_BY_KEY[key]) return; // already known locally, nothing to do
+  if(!key) return;
   const group = SUBJECT_SETS[subject_group] ? subject_group : Object.keys(SUBJECT_SETS)[0];
   if(!SUBJECT_SETS[subject_group]){
     console.warn(`Cloud section "${key}" has no recognizable subject group ("${subject_group}") — defaulting to ${group}.`);
   }
   const sheetName = sheet_name || label || key;
-  const def = {
-    key, sheetName, group,
-    label: label || `${sheetName} — ${GROUP_LABELS[group]}`,
-    subjects: SUBJECT_SETS[group]
-  };
+  const resolvedLabel = label || `${sheetName} — ${GROUP_LABELS[group]}`;
+
+  const existing = SECTION_BY_KEY[key];
+  if(existing){
+    // Case 2: reconcile the already-known def to the cloud's current state.
+    if(existing.sheetName !== sheetName) delete SHEETNAME_TO_KEY[normalizeSheetName(existing.sheetName)];
+    existing.sheetName = sheetName;
+    existing.label = resolvedLabel;
+    if(existing.group !== group){
+      existing.group = group;
+      existing.subjects = SUBJECT_SETS[group]; // per-section overrides re-applied separately, after this
+    }
+    SHEETNAME_TO_KEY[normalizeSheetName(sheetName)] = key;
+    if(!(key in DEFAULT_RAW_LABELS)) DEFAULT_RAW_LABELS[key] = rawLabelFromName(sheetName);
+    return;
+  }
+
+  // Case 1: genuinely new section, not known locally at all.
+  const def = { key, sheetName, group, label: resolvedLabel, subjects: SUBJECT_SETS[group] };
   SECTION_DEFS.push(def);
   SECTION_BY_KEY[key] = def;
   SHEETNAME_TO_KEY[normalizeSheetName(sheetName)] = key;
