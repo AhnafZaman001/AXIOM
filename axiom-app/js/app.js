@@ -1296,7 +1296,7 @@ function rollSectionTag(rollNo, sectionLabel){
 /* ---- 009_main-table-render.js ---- */
 
 /* ===================== MAIN TABLE RENDER ===================== */
-let showExtra = false;
+let showExtra = true;
 
 function latestTest(student, subject){
   const arr = (student.tests||{})[subject];
@@ -1452,7 +1452,8 @@ function renderTable(){
         row += `<td class="zone-cell"><span class="zone-pill none">—</span></td>`;
         return;
       }
-      const pillLabel = t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—';
+      const marksPart = (t && t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max} ` : '';
+      const pillLabel = t ? (t.absent ? 'Absent' : `${marksPart}(${t.percent}%)`) : '—';
       let trendTag = '';
       if(arr.length >= 2){
         const prev = arr[arr.length-2];
@@ -2188,7 +2189,8 @@ function openStudentDrawerById(id, sectionKeyHint){
     if(arr.length){
       pillsHtml = arr.map((tt, idx)=>{
         const zz = zoneOf(tt.percent, tt.absent);
-        const label = tt.absent ? 'Absent' : (tt.percent!=null ? `${tt.percent}%` : '—');
+        const marksPart = (tt.obtained!=null && tt.max!=null) ? `${tt.obtained}/${tt.max} ` : '';
+        const label = tt.absent ? 'Absent' : (tt.percent!=null ? `${marksPart}(${tt.percent}%)` : '—');
         const isLatest = idx === arr.length - 1;
         return `<span class="zone-pill ${isLatest ? '' : 'prev-pill '}${zz||'none'}" title="${escapeHtml(tt.test||'')}">${ZONE_EMOJI[zz]||''} ${label}</span>`;
       }).join('');
@@ -3023,7 +3025,8 @@ function renderRosterTable(cfg){
         row += `<td class="zone-cell"><span class="zone-pill none">—</span></td>`;
         return;
       }
-      const pillLabel = t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—';
+      const marksPart = (t && t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max} ` : '';
+      const pillLabel = t ? (t.absent ? 'Absent' : `${marksPart}(${t.percent}%)`) : '—';
       let trendTag = '';
       if(arr.length >= 2){
         const prev = arr[arr.length-2];
@@ -3270,7 +3273,7 @@ document.getElementById('moreMenuDropdown').addEventListener('click', ()=>docume
 
 document.getElementById('extraDetailsBtn').addEventListener('click', (e)=>{
   showExtra = !showExtra;
-  e.target.textContent = showExtra ? 'Hide Extra Details' : 'Show Extra Details';
+  e.target.textContent = showExtra ? 'Hide Details' : 'Show Details';
   renderTable();
 });
 
@@ -4359,7 +4362,7 @@ function generateRosterFilteredPDF(cfg){
         }
       }
       if(zoneMismatch || quickMismatch){ row.push('—'); return; }
-      row.push(t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—');
+      row.push(t ? (t.absent ? 'Absent' : `${(t.obtained!=null && t.max!=null) ? t.obtained+'/'+t.max+' ' : ''}(${t.percent}%)`) : '—');
     });
     return row;
   });
@@ -4395,6 +4398,43 @@ function printTRRosterFiltered(){
     reportTitle: `${teacherName} — ${def ? def.label : 'Section'} Roster`
   });
 }
+
+// Prints a single student's own profile — every subject on record, each test's
+// marks/percentage/absence and its zone — exactly as shown in the student
+// detail popup, using the same report look as the other printed reports.
+function generateStudentDrawerPDF(id, sectionKeyHint){
+  const found = findStudentAnywhere(id, sectionKeyHint);
+  if(!found){ showToast('Could not find this student to print.', 'warning'); return; }
+  const {student, def} = found;
+
+  const metaBits = [];
+  if(student.rollNo) metaBits.push(`Roll ${student.rollNo}`);
+  if(student.matric != null) metaBits.push(`Matric ${student.matric}`);
+  metaBits.push(def.label);
+
+  let body = '';
+  def.subjects.forEach(subj=>{
+    const arr = (student.tests||{})[subj] || [];
+    if(!arr.length) return;
+    const rows = arr.map(tt=>{
+      const marks = (tt.obtained!=null && tt.max!=null) ? `${tt.obtained}/${tt.max}` : '—';
+      const pct = tt.absent ? 'Absent' : (tt.percent!=null ? `${tt.percent}%` : '—');
+      return [tt.test || '—', marks, pct];
+    });
+    body += reportSectionHtml(subj, reportTableHtml(['Test','Marks','Percentage'], rows));
+  });
+
+  if(!body) body = '<div class="hint">No subjects/tests on record for this student.</div>';
+
+  printReport(`${student.name} — Student Report`, metaBits.join(' · '), body);
+}
+
+document.getElementById('drawerPrintBtn').addEventListener('click', ()=>{
+  const nameEl = document.getElementById('drawerStudentName');
+  const sid = nameEl.dataset.sid;
+  const skey = nameEl.dataset.skey;
+  if(sid) generateStudentDrawerPDF(sid, skey);
+});
 
 const ssRPrintBtn = document.getElementById('ssRPrintBtn');
 if(ssRPrintBtn) ssRPrintBtn.addEventListener('click', printSSRosterFiltered);
@@ -4437,7 +4477,7 @@ function generateSectionViewFilteredPDF(){
         }
       }
       if(zoneMismatch || quickMismatch){ row.push('—'); return; }
-      row.push(t ? (t.absent ? 'Absent' : `${t.percent}%`) : '—');
+      row.push(t ? (t.absent ? 'Absent' : `${(t.obtained!=null && t.max!=null) ? t.obtained+'/'+t.max+' ' : ''}(${t.percent}%)`) : '—');
     });
     return row;
   });
