@@ -329,14 +329,16 @@
      translucent overlay looks nearly identical without the repaint cost. */
   .drawer-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.62);display:none;z-index:60;contain:strict;}
   .drawer-overlay.open{display:block;}
-  .drawer{position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--paper-raised);
+  .drawer{position:fixed;top:0;right:0;height:100%;width:460px;max-width:92vw;background:var(--paper-raised);
     box-shadow:-16px 0 40px rgba(2,6,23,0.5);transform:translateX(100%);transition:transform .25s cubic-bezier(.22,.9,.32,1);
     display:flex;flex-direction:column;border-left:1px solid var(--line);will-change:transform;contain:layout style paint;}
   .drawer-overlay.open .drawer{transform:translateX(0);}
   .drawer-head{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 24px;
-    border-bottom:1px solid var(--line);gap:10px;}
+    border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap;}
   .drawer-head h3{margin:0;font-family:var(--font-display);font-weight:800;font-size:1.3rem;}
   .drawer-sub{font-size:0.76rem;color:var(--muted);margin-top:5px;}
+  .drawer-head-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;}
+  .drawer-head-actions button{white-space:nowrap;}
   .drawer-body{padding:10px 24px 24px;overflow:auto;flex:1;contain:content;}
   .drawer-subject-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;margin:8px 0;
     border-top:none;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;gap:8px;flex-wrap:wrap;}
