@@ -155,16 +155,32 @@ async function axDeleteSection(key) {
 
 // Updates an existing section's name/label/subject group in the cloud —
 // used by Rename Section (including fixing a section that was created with
-// the wrong subject group). Throws a clear error if no matching row exists
-// yet (e.g. the original Add Section never made it to the cloud).
+// the wrong subject group).
+//
+// This is an UPSERT, not a plain UPDATE, on purpose. The app ships with 23
+// sections hardcoded directly into SECTION_DEFS (app.js) -- these were never
+// explicitly created via "Add Section", so most of them have NO matching row
+// in the cloud `sections` table at all until something first writes one.
+// A plain UPDATE against a key with zero existing rows silently updates
+// nothing (Postgres doesn't error on that) -- the rename would appear to
+// work in the tab that made it, but with nothing persisted, so it's gone
+// again on next load and never reaches any other device. That's exactly
+// what happened renaming a never-synced default section like "F1A": it
+// "worked" locally and then vanished, because there was nothing in the
+// cloud to update.
+// Upserting on `key` fixes this in general, for every one of the 23
+// defaults, not just the one that happened to get noticed: if the row
+// already exists, this behaves like the old UPDATE; if it doesn't, it
+// creates it -- under the SAME stable key the rest of the app already uses
+// for this section's students/tests/teacher assignments, rather than
+// minting a new one (which is what re-adding via "Add Section" would do,
+// and would leave the local key and a freshly-slugified cloud key
+// pointing at two different rows for what's supposed to be one section).
 async function axUpdateSectionMeta({ key, label, sheetName, group }) {
-  const { data, error } = await supabaseClient
+  const { error } = await supabaseClient
     .from('sections')
-    .update({ label, sheet_name: sheetName, subject_group: group })
-    .eq('key', key)
-    .select();
+    .upsert({ key, label, sheet_name: sheetName, subject_group: group }, { onConflict: 'key' });
   if (error) throw error;
-  if (!data || !data.length) throw new Error('No matching section found in the cloud — try re-adding it with Add Section instead.');
 }
 
 async function axSetTeacherAssignment({ sectionKey, subject, teacherName }) {
