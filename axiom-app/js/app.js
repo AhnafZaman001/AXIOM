@@ -36,6 +36,25 @@ const SECTION_DEFS = [
   {key:'F16ICOM', sheetName:'F16 (i.com)', group:'ICOM'},
 ].map(d => ({...d, label: `${d.sheetName} — ${GROUP_LABELS[d.group]}`, subjects: SUBJECT_SETS[d.group]}));
 
+// Strips a raw display name down to its "F<number><optional letter>" form,
+// e.g. "F16 (PM)" -> "F16", "F1A" -> "F1A". Used only at section-definition
+// time (see DEFAULT_RAW_LABELS below) -- never against a name that may have
+// since been renamed, or a promoted section's raw teacher-roster match
+// breaks (see rawSectionLabel's comment for why that matters).
+function rawLabelFromName(name){
+  const m = String(name||'').match(/^F\d+[A-Za-z]?/);
+  return m ? m[0].toUpperCase() : null;
+}
+// Captures each section's raw label ONCE, at the point it's first defined
+// (from its original/default sheetName), keyed by the stable `key` --
+// never recomputed from the section's current (possibly renamed) sheetName.
+// This is what makes rawSectionLabel() below immune to renames: promoting a
+// section from 1st year to 2nd year (e.g. "F1A" -> "S1A") changes
+// def.sheetName, but DEFAULT_RAW_LABELS[key] keeps returning "F1A" forever,
+// so the section keeps matching its default TEACHER_DATA roster instead of
+// silently vanishing from every teacher's report the moment it's renamed.
+const DEFAULT_RAW_LABELS = Object.fromEntries(SECTION_DEFS.map(d=>[d.key, rawLabelFromName(d.sheetName)]));
+
 const SECTION_BY_KEY = Object.fromEntries(SECTION_DEFS.map(d=>[d.key,d]));
 
 function normalizeSheetName(s){
@@ -132,6 +151,7 @@ function registerCloudSectionDef({ key, sheet_name, subject_group, label }){
   SECTION_DEFS.push(def);
   SECTION_BY_KEY[key] = def;
   SHEETNAME_TO_KEY[normalizeSheetName(sheetName)] = key;
+  if(!(key in DEFAULT_RAW_LABELS)) DEFAULT_RAW_LABELS[key] = rawLabelFromName(sheetName);
 }
 
 function addSectionDef(sheetName, group){
@@ -149,6 +169,7 @@ function addSectionDef(sheetName, group){
   SECTION_DEFS.push(def);
   SECTION_BY_KEY[key] = def;
   SHEETNAME_TO_KEY[normalized] = key;
+  if(!(key in DEFAULT_RAW_LABELS)) DEFAULT_RAW_LABELS[key] = rawLabelFromName(sheetName);
   return def;
 }
 
@@ -369,12 +390,20 @@ const TEACHER_DATA = {
   ],
 };
 
-// Strips a section def's display name down to its "raw" label (F1A, F9, F16…)
-// so it can be matched against TEACHER_DATA regardless of stream suffix.
+// Returns a section's "raw" label (F1A, F9, F16…) for matching against
+// TEACHER_DATA regardless of stream suffix. Reads the stable, rename-proof
+// DEFAULT_RAW_LABELS registry (captured once when the section was first
+// defined) rather than recomputing from def.sheetName -- the sheetName
+// changes on promotion (e.g. "F1A" -> "S1A" for 2nd year), and recomputing
+// from that live name would return null the moment a section is renamed to
+// something that doesn't start with "F", silently dropping it out of every
+// teacher's default roster. Falls back to computing from the current name
+// for the rare case a section predates this registry (e.g. an older saved
+// workspace loaded before this fix existed).
 function rawSectionLabel(def){
   if(!def) return null;
-  const m = String(def.sheetName||'').match(/^F\d+[A-Za-z]?/);
-  return m ? m[0].toUpperCase() : null;
+  if(def.key in DEFAULT_RAW_LABELS && DEFAULT_RAW_LABELS[def.key]) return DEFAULT_RAW_LABELS[def.key];
+  return rawLabelFromName(def.sheetName);
 }
 
 /* ---- Teacher overrides (per exact section, not just raw label) ----
