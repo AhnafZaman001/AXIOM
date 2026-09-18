@@ -2248,7 +2248,8 @@ function openStatListDrawer(title, subtitle, students){
   } else {
     body.innerHTML = students.map(s=>{
       const z = s.overall!=null ? zoneOf(s.overall, false) : null;
-      const pill = s.overall!=null ? `<span class="zone-pill ${z}">${s.overall}%</span>` : '';
+      const marksPart = (s.obtained!=null && s.max!=null) ? `${s.obtained}/${s.max} ` : '';
+      const pill = s.overall!=null ? `<span class="zone-pill ${z}">${marksPart}(${s.overall}%)</span>` : '';
       return `<div class="stat-list-row" data-sid="${s.id}" data-skey="${s.sectionKey}">
         <div><div class="slr-name">${escapeHtml(s.name)}</div><div class="slr-meta">${s.rollNo!=null&&s.rollNo!==''?`Roll ${escapeHtml(s.rollNo)} · `:''}${escapeHtml(s.sectionLabel||'')}</div></div>
         ${pill}
@@ -2904,7 +2905,9 @@ function getTeacherFilteredStudents(teacherName, filterKey){
           rollNo: st.rollNo,
           sectionKey: r.def.key,
           sectionLabel: `${r.def.label} — ${a.subject}`,
-          overall: t.absent ? null : t.percent
+          overall: t.absent ? null : t.percent,
+          obtained: t.obtained,
+          max: t.max
         });
       });
     });
@@ -4412,7 +4415,16 @@ function generateStudentDrawerPDF(id, sectionKeyHint){
   if(student.matric != null) metaBits.push(`Matric ${student.matric}`);
   metaBits.push(def.label);
 
-  let body = '';
+  // Printed as its own table (not just the subtitle line) so Roll No. and
+  // Matric are clearly visible on the page, matching what's shown on-screen
+  // when the roster's "Hide/Show Details" columns are visible.
+  const detailRows = [
+    ['Section', def.label],
+    ['Roll No.', student.rollNo ?? '—'],
+    ['Matric', student.matric != null ? student.matric : '—'],
+  ];
+  let body = reportSectionHtml('Student Details', reportTableHtml(['Field','Value'], detailRows));
+
   def.subjects.forEach(subj=>{
     const arr = (student.tests||{})[subj] || [];
     if(!arr.length) return;
@@ -4423,8 +4435,6 @@ function generateStudentDrawerPDF(id, sectionKeyHint){
     });
     body += reportSectionHtml(subj, reportTableHtml(['Test','Marks','Percentage'], rows));
   });
-
-  if(!body) body = '<div class="hint">No subjects/tests on record for this student.</div>';
 
   printReport(`${student.name} — Student Report`, metaBits.join(' · '), body);
 }
