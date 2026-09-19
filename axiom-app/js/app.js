@@ -1375,6 +1375,7 @@ function subjectClassAverage(store, subj){
   return vals.length ? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : null;
 }
 
+let mainTableSort = { key: null, dir: 'desc' };
 function renderTable(){
   const def = currentSectionDef();
   const store = ensureSection(def.key);
@@ -1387,15 +1388,20 @@ function renderTable(){
   const zoneFilterVal = document.getElementById('zoneFilter').value;
   const subjectsShown = subjFilter ? [subjFilter] : visibleSubjectsFor(def);
 
-  let headHtml = `<th>Student</th>`;
-  if(showExtra) headHtml += `<th>Roll No.</th><th>Matric</th><th>Position</th>`;
+  let headHtml = sortableThHtml('Student', '__name', mainTableSort);
+  if(showExtra){
+    headHtml += sortableThHtml('Roll No.', '__rollNo', mainTableSort);
+    headHtml += sortableThHtml('Matric', '__matric', mainTableSort);
+    headHtml += sortableThHtml('Position', '__position', mainTableSort);
+  }
   subjectsShown.forEach(s=>{
     const avg = subjectClassAverage(store, s);
-    headHtml += `<th>${s}${avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : ''}</th>`;
+    const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
+    headHtml += sortableThHtml(s, s, mainTableSort, extra);
   });
   head.innerHTML = headHtml;
 
-  const students = store.students.filter(s=>studentPassesFilters(s, def));
+  const students = sortStudentsBy(store.students.filter(s=>studentPassesFilters(s, def)), def, mainTableSort);
 
   renderHeroMetrics(def, store);
 
@@ -1481,6 +1487,9 @@ function renderTable(){
   renderMovers(def, store);
   renderInsights(def, store);
 }
+document.getElementById('tableHeadRow').addEventListener('click', (e)=>{
+  handleSortHeaderClick(e, mainTableSort, renderTable);
+});
 
 /* ---- 010_zone-transition-report.js ---- */
 
@@ -2387,6 +2396,76 @@ function classPositionFor(studentId, def){
   const rankMap = rankByOverall(list);
   return rankMap.get(studentId) || null;
 }
+
+// ---- Sortable table columns ----
+// Every table has exactly one active sort column at a time. When "All
+// Subjects" is shown there's no single order that could satisfy every
+// subject at once (a student can be #1 in Physics and #20 in Chemistry),
+// so clicking one subject's header sorts by that subject alone; clicking a
+// different header just switches which single column is driving the order.
+function studentSortValue(st, def, key){
+  if(key === '__name') return (st.name||'').toLowerCase();
+  if(key === '__rollNo'){
+    if(st.rollNo==null || st.rollNo==='') return null;
+    const n = Number(st.rollNo);
+    return Number.isNaN(n) ? String(st.rollNo).toLowerCase() : n;
+  }
+  if(key === '__matric'){
+    if(st.matric==null || st.matric==='') return null;
+    const n = Number(st.matric);
+    return Number.isNaN(n) ? String(st.matric).toLowerCase() : n;
+  }
+  if(key === '__position'){
+    for(const subj of def.subjects){ const t=latestTest(st,subj); if(t && t.position!=null) return t.position; }
+    return null;
+  }
+  // Anything else is a subject name — sort by that subject's latest test.
+  const arr = (st.tests||{})[key] || [];
+  const t = arr.length ? arr[arr.length-1] : null;
+  if(!t || t.absent || t.percent==null) return null;
+  return t.percent;
+}
+function sortStudentsBy(students, def, sortState){
+  if(!sortState || !sortState.key) return students;
+  const {key, dir} = sortState;
+  return students.slice().sort((a,b)=>{
+    const va = studentSortValue(a, def, key);
+    const vb = studentSortValue(b, def, key);
+    // Students with nothing on record for the active column always sink to
+    // the bottom, regardless of ascending/descending.
+    if(va==null && vb==null) return 0;
+    if(va==null) return 1;
+    if(vb==null) return -1;
+    if(typeof va === 'string' || typeof vb === 'string'){
+      return dir==='asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    }
+    return dir==='asc' ? va-vb : vb-va;
+  });
+}
+function sortableThHtml(label, key, sortState, extraHtml){
+  const active = sortState && sortState.key===key;
+  const arrow = active
+    ? `<span class="sort-arrow">${sortState.dir==='asc' ? '▲' : '▼'}</span>`
+    : `<span class="sort-arrow">↕</span>`;
+  return `<th class="sortable-th${active?' active-sort':''}" data-sort-key="${escapeHtml(key)}">${escapeHtml(label)}${extraHtml||''}${arrow}</th>`;
+}
+// Shared click handler wired once (delegated) onto each table's header row.
+// Clicking a column that's already active flips its direction; clicking a
+// new column switches to it — names default to A→Z, everything else
+// (marks, roll no., matric, position) defaults to highest-first, since
+// that's what's usually wanted when scanning for top/bottom performers.
+function handleSortHeaderClick(e, sortState, rerenderFn){
+  const th = e.target.closest('th.sortable-th');
+  if(!th) return;
+  const key = th.getAttribute('data-sort-key');
+  if(sortState.key === key){
+    sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.key = key;
+    sortState.dir = (key === '__name') ? 'asc' : 'desc';
+  }
+  rerenderFn();
+}
 function studentOverallTrend(st, def){
   let delta = null, n = 0;
   def.subjects.forEach(subj=>{
@@ -3020,20 +3099,24 @@ function rosterStudentPassesFilters(student, def, f){
 // instances can share this without stepping on each other.
 function renderRosterTable(cfg){
   const {sectionKey, subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal,
-         restrictToTeacher, headEl, bodyEl, wrapEl, emptyEl, emptyHtmlNoStudents, emptyHtmlNoMatches} = cfg;
+         restrictToTeacher, headEl, bodyEl, wrapEl, emptyEl, emptyHtmlNoStudents, emptyHtmlNoMatches, sortState} = cfg;
   const def = SECTION_BY_KEY[sectionKey];
   if(!def){ wrapEl.style.display='none'; emptyEl.style.display='none'; return; }
   const store = ensureSection(def.key);
   const subjectsShown = subjectsForRoster(def, subjFilterVal, restrictToTeacher);
 
-  let headHtml = `<th>Student</th>`;
+  let headHtml = sortableThHtml('Student', '__name', sortState);
   subjectsShown.forEach(s=>{
     const avg = subjectClassAverage(store, s);
-    headHtml += `<th>${s}${avg!=null?`<span class="subject-th-avg">avg ${avg}%</span>`:''}</th>`;
+    const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
+    headHtml += sortableThHtml(s, s, sortState, extra);
   });
   headEl.innerHTML = headHtml;
 
-  const students = store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal}));
+  const students = sortStudentsBy(
+    store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal})),
+    def, sortState
+  );
 
   if(store.students.length === 0){
     wrapEl.style.display='none'; emptyEl.style.display='block';
@@ -3097,7 +3180,7 @@ const ROSTER_EMPTY_NO_STUDENTS = `<h3>No students in this section yet</h3><div>I
 const ROSTER_EMPTY_NO_MATCHES = `<h3>No students match the current filters</h3><div>Try clearing the zone filter or quick filter chips above.</div>`;
 
 /* ---- Section Summary's independent roster ---- */
-let ssRosterState = { sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'' };
+let ssRosterState = { sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'', sort:{key:null,dir:'desc'} };
 
 function renderSSRoster(){
   if(!ssRosterState.sectionKey || !SECTION_BY_KEY[ssRosterState.sectionKey]) ssRosterState.sectionKey = currentSectionKey();
@@ -3131,11 +3214,15 @@ function renderSSRoster(){
     wrapEl: document.getElementById('ssRTableWrap'),
     emptyEl: document.getElementById('ssREmptyState'),
     emptyHtmlNoStudents: ROSTER_EMPTY_NO_STUDENTS,
-    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES
+    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES,
+    sortState: ssRosterState.sort
   });
 }
+document.getElementById('ssRTableHead').addEventListener('click', (e)=>{
+  handleSortHeaderClick(e, ssRosterState.sort, renderSSRoster);
+});
 
-document.getElementById('ssRSection').addEventListener('change', (e)=>{ ssRosterState.sectionKey = e.target.value; ssRosterState.subjFilter=''; renderSSRoster(); });
+document.getElementById('ssRSection').addEventListener('change', (e)=>{ ssRosterState.sectionKey = e.target.value; ssRosterState.subjFilter=''; ssRosterState.sort={key:null,dir:'desc'}; renderSSRoster(); });
 document.getElementById('ssRSubject').addEventListener('change', (e)=>{ ssRosterState.subjFilter = e.target.value; renderSSRoster(); });
 document.getElementById('ssRZone').addEventListener('change', (e)=>{ ssRosterState.zoneFilter = e.target.value; renderSSRoster(); });
 document.getElementById('ssRSearch').addEventListener('input', (e)=>{ ssRosterState.searchQuery = e.target.value.trim().toLowerCase(); renderSSRoster(); });
@@ -3150,7 +3237,7 @@ document.querySelectorAll('#ssRChipRow .chip').forEach(chip=>{
 });
 
 /* ---- Teacher Report's independent roster (scoped to the selected teacher's own sections/subjects) ---- */
-let trRosterState = { teacherName:null, sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'' };
+let trRosterState = { teacherName:null, sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'', sort:{key:null,dir:'desc'} };
 
 function trRosterSectionsForTeacher(teacherName){
   if(!teacherName) return [];
@@ -3174,6 +3261,7 @@ function renderTRRoster(){
     trRosterState.teacherName = teacherName;
     trRosterState.sectionKey = sections.length ? sections[0].key : null;
     trRosterState.subjFilter = '';
+    trRosterState.sort = {key:null,dir:'desc'};
   }
   if(!trRosterState.sectionKey || !sections.some(d=>d.key===trRosterState.sectionKey)){
     trRosterState.sectionKey = sections.length ? sections[0].key : null;
@@ -3218,11 +3306,15 @@ function renderTRRoster(){
     wrapEl: document.getElementById('trRTableWrap'),
     emptyEl: document.getElementById('trREmptyState'),
     emptyHtmlNoStudents: ROSTER_EMPTY_NO_STUDENTS,
-    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES
+    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES,
+    sortState: trRosterState.sort
   });
 }
+document.getElementById('trRTableHead').addEventListener('click', (e)=>{
+  handleSortHeaderClick(e, trRosterState.sort, renderTRRoster);
+});
 
-document.getElementById('trRSection').addEventListener('change', (e)=>{ trRosterState.sectionKey = e.target.value; trRosterState.subjFilter=''; renderTRRoster(); });
+document.getElementById('trRSection').addEventListener('change', (e)=>{ trRosterState.sectionKey = e.target.value; trRosterState.subjFilter=''; trRosterState.sort={key:null,dir:'desc'}; renderTRRoster(); });
 document.getElementById('trRSubject').addEventListener('change', (e)=>{ trRosterState.subjFilter = e.target.value; renderTRRoster(); });
 document.getElementById('trRZone').addEventListener('change', (e)=>{ trRosterState.zoneFilter = e.target.value; renderTRRoster(); });
 document.getElementById('trRSearch').addEventListener('input', (e)=>{ trRosterState.searchQuery = e.target.value.trim().toLowerCase(); renderTRRoster(); });

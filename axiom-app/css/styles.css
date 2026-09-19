@@ -129,6 +129,11 @@
   table.main-table{width:100%;border-collapse:collapse;min-width:600px;}
   table.main-table thead th{position:sticky;top:0;background:linear-gradient(180deg,var(--surface-2),var(--surface-1));text-align:left;font-size:0.67rem;
     text-transform:uppercase;letter-spacing:0.9px;color:var(--muted);font-weight:700;padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2;}
+  th.sortable-th{cursor:pointer;user-select:none;}
+  th.sortable-th:hover{color:var(--ink);}
+  th.sortable-th .sort-arrow{margin-left:5px;font-size:0.85em;opacity:0.4;}
+  th.sortable-th.active-sort{color:var(--ink);}
+  th.sortable-th.active-sort .sort-arrow{opacity:1;color:var(--accent);}
   table.main-table tbody tr{border-bottom:1px solid var(--line);transition:background .15s ease;}
   table.main-table tbody tr:nth-child(even){background:rgba(255,255,255,0.012);}
   table.main-table tbody tr:hover{background:rgba(79,140,255,0.08);}
