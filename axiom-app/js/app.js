@@ -4111,11 +4111,48 @@ function escapeHtml(s){
 }
 function reportTableHtml(headers, rows){
   const thead = '<tr>' + headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('') + '</tr>';
-  const tbody = rows.map(r=>'<tr>' + r.map(c=>`<td>${escapeHtml(c)}</td>`).join('') + '</tr>').join('');
+  const tbody = rows.map(r=>'<tr>' + r.map(c=>{
+    if(c && typeof c === 'object' && 'html' in c) return `<td>${c.html}</td>`;
+    return `<td>${escapeHtml(c)}</td>`;
+  }).join('') + '</tr>').join('');
   return `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
 }
 function reportSectionHtml(label, innerHtml){
   return `<h3 class="rpt-section">${escapeHtml(label)}</h3>${innerHtml}`;
+}
+// A row of headline stat cards (label + big value) used as a report's
+// "at a glance" summary — replaces a bare key/value table so the top of
+// every printed report reads like an actual cover, not a data dump.
+function reportStatsGridHtml(items){
+  return `<div class="rpt-stats-grid">${items.map(it=>
+    `<div class="rpt-stat-card"><div class="rpt-stat-label">${escapeHtml(it.label)}</div><div class="rpt-stat-value">${escapeHtml(it.value)}</div></div>`
+  ).join('')}</div>`;
+}
+// A free-standing row of colour-coded badges (used for zone-count summaries
+// where a table of six single-number columns would be harder to scan).
+function reportBadgeRowHtml(items){
+  return `<div class="rpt-badge-row">${items.map(it=>
+    `<span class="rpt-badge rpt-badge-${it.zone}">${escapeHtml(it.label)}: ${it.count}</span>`
+  ).join('')}</div>`;
+}
+// A colour-coded percentage cell for report tables — same red/pink/yellow/
+// blue/green zone colours used throughout the app, so a printed table can
+// be scanned for at-risk results just as quickly as the on-screen one.
+// marksPrefix (optional), e.g. "38/50", is shown before the "(76%)".
+function pctBadgeCell(percent, absent, marksPrefix){
+  if(absent) return {html:`<span class="rpt-badge rpt-badge-grey">Absent</span>`};
+  if(percent==null) return '—';
+  const z = zoneOf(percent, false) || 'grey';
+  const text = marksPrefix ? `${escapeHtml(marksPrefix)} (${percent}%)` : `${percent}%`;
+  return {html:`<span class="rpt-badge rpt-badge-${z}">${text}</span>`};
+}
+// A grade badge coloured to match the same percentage's zone, so Grade and
+// Overall % columns read as one consistent colour rather than two separate
+// visual systems.
+function gradeBadgeCell(percent){
+  if(percent==null) return '—';
+  const z = zoneOf(percent, false) || 'grey';
+  return {html:`<span class="rpt-badge rpt-badge-${z}">${escapeHtml(gradeFor(percent))}</span>`};
 }
 /* Opens a hidden print-only iframe (avoids popup blockers), writes the report into it, then triggers the
    browser's native print dialog — the user can choose "Save as PDF" as the destination. No external
@@ -4142,12 +4179,32 @@ function ensurePrintInfrastructure(){
       #ledgerPrintArea .rpt-generated{font-size:9px;color:#999;text-align:right;}
       #ledgerPrintArea .rpt-title{font-size:15px;font-weight:700;margin:6px 0 2px;}
       #ledgerPrintArea .rpt-sub{font-size:10.5px;color:#666;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #ddd;}
-      #ledgerPrintArea h3.rpt-section{font-size:11.5px;font-weight:700;color:#1c2b45;margin:16px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}
+      #ledgerPrintArea h3.rpt-section{font-family:Arial,Helvetica,sans-serif;font-size:9.5px;font-weight:700;color:#1c2b45;
+        margin:20px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;text-transform:uppercase;letter-spacing:.07em;}
+      #ledgerPrintArea h3.rpt-section:first-of-type{margin-top:2px;}
       #ledgerPrintArea table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px;}
       #ledgerPrintArea th{background:#1c2b45;color:#fff;text-align:left;padding:5px 8px;font-weight:700;}
       #ledgerPrintArea td{padding:5px 8px;border-bottom:1px solid #ddd;}
       #ledgerPrintArea tbody tr:nth-child(even) td{background:#f7f6f2;}
+      #ledgerPrintArea tr{break-inside:avoid;}
       #ledgerPrintArea .rpt-footer{margin-top:20px;padding-top:6px;border-top:1px solid #ddd;font-size:8px;color:#999;display:flex;justify-content:space-between;}
+      /* Key-stats cards: a proper report cover strip instead of a bare key/value table */
+      #ledgerPrintArea .rpt-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px;margin:2px 0 18px;break-inside:avoid;}
+      #ledgerPrintArea .rpt-stat-card{border:1px solid #ddd;border-left:3px solid #1c2b45;border-radius:3px;padding:8px 10px;background:#fafaf8;break-inside:avoid;}
+      #ledgerPrintArea .rpt-stat-label{font-family:Arial,Helvetica,sans-serif;font-size:7.5px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:3px;}
+      #ledgerPrintArea .rpt-stat-value{font-size:15px;font-weight:700;color:#1c2b45;}
+      /* Colour-coded badges — same zone colours used on screen, so a printed
+         page can be scanned for red/green results just as fast as the app. */
+      #ledgerPrintArea .rpt-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:700;font-size:9.5px;white-space:nowrap;}
+      #ledgerPrintArea .rpt-badge-green{background:#DCFCE7;color:#15803D;}
+      #ledgerPrintArea .rpt-badge-blue{background:#DBEAFE;color:#1D4ED8;}
+      #ledgerPrintArea .rpt-badge-yellow{background:#FEF3C7;color:#92400E;}
+      #ledgerPrintArea .rpt-badge-pink{background:#FCE7F3;color:#BE185D;}
+      #ledgerPrintArea .rpt-badge-red{background:#FEE2E2;color:#B91C1C;}
+      #ledgerPrintArea .rpt-badge-grey{background:#F1F5F9;color:#475569;}
+      #ledgerPrintArea .rpt-badge-neutral{background:#E2E8F0;color:#1c2b45;}
+      #ledgerPrintArea .rpt-badge-row{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 18px;}
+      #ledgerPrintArea, #ledgerPrintArea *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     `;
     document.head.appendChild(style);
   }
@@ -4201,22 +4258,22 @@ function generateOverallSummaryPDF(){
   const ranked = students.slice().sort((a,b)=>b.overall-a.overall).slice(0,10);
 
   let body = '';
-  body += reportSectionHtml('Key Statistics', reportTableHtml(['Metric','Value'], [
-    ['Total Students', String(totalStudents)],
-    ['Overall Average', overallAvgAll!=null?overallAvgAll+'%':'—'],
-    ['Pass Rate', passRateAll!=null?passRateAll+'%':'—'],
-    ['Critical Students (below 50%)', String(critical.length)],
-    ['Exceptional Students (90%+)', String(exceptional.length)],
-  ]));
+  body += reportStatsGridHtml([
+    {label:'Total Students', value:String(totalStudents)},
+    {label:'Overall Average', value:overallAvgAll!=null?overallAvgAll+'%':'—'},
+    {label:'Pass Rate', value:passRateAll!=null?passRateAll+'%':'—'},
+    {label:'Critical (below 50%)', value:String(critical.length)},
+    {label:'Exceptional (90%+)', value:String(exceptional.length)},
+  ]);
 
   if(rankedSections.length){
     body += reportSectionHtml('Section Ranking', reportTableHtml(['#','Section','Average %','Pass Rate','Students'],
-      rankedSections.map((s,i)=>[i+1, s.def.label, s.avg+'%', s.passRate!=null?s.passRate+'%':'—', s.studentCount])));
+      rankedSections.map((s,i)=>[i+1, s.def.label, pctBadgeCell(s.avg), s.passRate!=null?s.passRate+'%':'—', s.studentCount])));
   }
 
   if(ranked.length){
-    body += reportSectionHtml('Top 10 Students Overall', reportTableHtml(['#','Name','Section','Overall %','Grade'],
-      ranked.map((s,i)=>[i+1, s.name, s.sectionLabel, s.overall+'%', gradeFor(s.overall)])));
+    body += reportSectionHtml('Top 10 Students Overall', reportTableHtml(['#','Name','Roll No.','Matric','Section','Overall %','Grade'],
+      ranked.map((s,i)=>[i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', (s.st&&s.st.matric!=null)?s.st.matric:'—', s.sectionLabel, pctBadgeCell(s.overall), gradeBadgeCell(s.overall)])));
   }
 
   printReport('Overall Summary Report', `${totalStudents} student${totalStudents===1?'':'s'} across ${sections.length} section${sections.length===1?'':'s'} — all subjects`, body);
@@ -4239,14 +4296,14 @@ function generateSectionSummaryPDF(){
   const rank = rankIdx>=0 ? rankIdx+1 : null;
 
   let body = '';
-  body += reportSectionHtml('Key Statistics', reportTableHtml(['Metric','Value'], [
-    ['Students', String(sectionStudents.length)],
-    ['Section Average', avg!=null?avg+'%':'—'],
-    ['Rank', rank!=null?`#${rank} of ${rankedSections.length}`:'—'],
-    ['Pass Rate', passRate!=null?passRate+'%':'—'],
-    ['Red Zone (below 60%)', String(redStudents.length)],
-    ['Green Zone (90%+)', String(greenStudents.length)],
-  ]));
+  body += reportStatsGridHtml([
+    {label:'Students', value:String(sectionStudents.length)},
+    {label:'Section Average', value:avg!=null?avg+'%':'—'},
+    {label:'Rank', value:rank!=null?`#${rank} of ${rankedSections.length}`:'—'},
+    {label:'Pass Rate', value:passRate!=null?passRate+'%':'—'},
+    {label:'Red Zone (below 60%)', value:String(redStudents.length)},
+    {label:'Green Zone (90%+)', value:String(greenStudents.length)},
+  ]);
 
   const subjAvgs = def.subjects.map(subj=>{
     const vals = [];
@@ -4257,12 +4314,18 @@ function generateSectionSummaryPDF(){
     return {subject:subj, avg: vals.length?Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10:null};
   }).filter(x=>x.avg!=null);
   if(subjAvgs.length){
-    body += reportSectionHtml('Subject Breakdown', reportTableHtml(['Subject','Average %'], subjAvgs.map(sa=>[sa.subject, sa.avg+'%'])));
+    body += reportSectionHtml('Subject Breakdown', reportTableHtml(['Subject','Average %'], subjAvgs.map(sa=>[sa.subject, pctBadgeCell(sa.avg)])));
   }
 
   if(sectionStudents.length){
-    body += reportSectionHtml('All Students', reportTableHtml(['Name','Roll No.','Overall %','Grade'],
-      sectionStudents.slice().sort((a,b)=>(b.overall??-1)-(a.overall??-1)).map(s=>[s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', s.overall!=null?s.overall+'%':'—', s.overall!=null?gradeFor(s.overall):'—'])));
+    body += reportSectionHtml('All Students', reportTableHtml(['Name','Roll No.','Matric','Overall %','Grade'],
+      sectionStudents.slice().sort((a,b)=>(b.overall??-1)-(a.overall??-1)).map(s=>[
+        s.name,
+        (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—',
+        (s.st&&s.st.matric!=null)?s.st.matric:'—',
+        pctBadgeCell(s.overall),
+        gradeBadgeCell(s.overall)
+      ])));
   }
 
   printReport(`${def.label} — Section Summary Report`, `${sectionStudents.length} student${sectionStudents.length===1?'':'s'} in this section`, body);
@@ -4286,17 +4349,19 @@ function generateTeacherReportPDF(){
   const totalGrey = allRows.reduce((s,r)=>s+r.greyCount,0);
 
   let body = '';
-  body += reportSectionHtml('Summary', reportTableHtml(['Metric','Value'], [
-    ['Subjects Taught', String(assignments.length)],
-    ['Sections Covered', String(allRows.length)],
-    ['Total Students', String(totalStudents)],
-    ['Overall Average', overallAvg!=null?overallAvg+'%':'—'],
-    ['Green Zone', String(totalGreen)],
-    ['Blue Zone', String(totalBlue)],
-    ['Yellow Zone', String(totalYellow)],
-    ['Pink Zone', String(totalPink)],
-    ['Red Zone', String(totalRed)],
-    ['Absent', String(totalGrey)],
+  body += reportStatsGridHtml([
+    {label:'Subjects Taught', value:String(assignments.length)},
+    {label:'Sections Covered', value:String(allRows.length)},
+    {label:'Total Students', value:String(totalStudents)},
+    {label:'Overall Average', value:overallAvg!=null?overallAvg+'%':'—'},
+  ]);
+  body += reportSectionHtml('Zone Breakdown', reportBadgeRowHtml([
+    {label:'Green', count:totalGreen, zone:'green'},
+    {label:'Blue', count:totalBlue, zone:'blue'},
+    {label:'Yellow', count:totalYellow, zone:'yellow'},
+    {label:'Pink', count:totalPink, zone:'pink'},
+    {label:'Red', count:totalRed, zone:'red'},
+    {label:'Absent', count:totalGrey, zone:'grey'},
   ]));
 
   assignments.forEach(a=>{
@@ -4307,7 +4372,7 @@ function generateTeacherReportPDF(){
       return y2.avg-x.avg;
     });
     body += reportSectionHtml(a.subject, reportTableHtml(['Section','Average %','Students','Green','Blue','Yellow','Pink','Red','Absent'],
-      rows.map(r=>[r.def.label, r.avg!=null?r.avg+'%':'—', r.studentCount, r.greenCount, r.blueCount, r.yellowCount, r.pinkCount, r.redCount, r.greyCount])));
+      rows.map(r=>[r.def.label, pctBadgeCell(r.avg), r.studentCount, r.greenCount, r.blueCount, r.yellowCount, r.pinkCount, r.redCount, r.greyCount])));
   });
 
   printReport(`${teacherName} — Teacher Performance Report`, `${assignments.length} subject${assignments.length===1?'':'s'} · ${allRows.length} section${allRows.length===1?'':'s'} · ${totalStudents} student${totalStudents===1?'':'s'}`, body);
@@ -4365,7 +4430,8 @@ function generateRosterFilteredPDF(cfg){
         }
       }
       if(zoneMismatch || quickMismatch){ row.push('—'); return; }
-      row.push(t ? (t.absent ? 'Absent' : `${(t.obtained!=null && t.max!=null) ? t.obtained+'/'+t.max+' ' : ''}(${t.percent}%)`) : '—');
+      if(!t){ row.push('—'); return; }
+      row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
     });
     return row;
   });
@@ -4415,23 +4481,21 @@ function generateStudentDrawerPDF(id, sectionKeyHint){
   if(student.matric != null) metaBits.push(`Matric ${student.matric}`);
   metaBits.push(def.label);
 
-  // Printed as its own table (not just the subtitle line) so Roll No. and
-  // Matric are clearly visible on the page, matching what's shown on-screen
-  // when the roster's "Hide/Show Details" columns are visible.
-  const detailRows = [
-    ['Section', def.label],
-    ['Roll No.', student.rollNo ?? '—'],
-    ['Matric', student.matric != null ? student.matric : '—'],
-  ];
-  let body = reportSectionHtml('Student Details', reportTableHtml(['Field','Value'], detailRows));
+  // Printed as headline stat cards (not a plain table) so Section/Roll
+  // No./Matric are the first thing seen on the page, matching what's shown
+  // on-screen when the roster's "Hide/Show Details" columns are visible.
+  let body = reportStatsGridHtml([
+    {label:'Section', value:def.label},
+    {label:'Roll No.', value:student.rollNo!=null && student.rollNo!=='' ? String(student.rollNo) : '—'},
+    {label:'Matric', value:student.matric != null ? String(student.matric) : '—'},
+  ]);
 
   def.subjects.forEach(subj=>{
     const arr = (student.tests||{})[subj] || [];
     if(!arr.length) return;
     const rows = arr.map(tt=>{
       const marks = (tt.obtained!=null && tt.max!=null) ? `${tt.obtained}/${tt.max}` : '—';
-      const pct = tt.absent ? 'Absent' : (tt.percent!=null ? `${tt.percent}%` : '—');
-      return [tt.test || '—', marks, pct];
+      return [tt.test || '—', marks, pctBadgeCell(tt.percent, tt.absent)];
     });
     body += reportSectionHtml(subj, reportTableHtml(['Test','Marks','Percentage'], rows));
   });
@@ -4487,7 +4551,8 @@ function generateSectionViewFilteredPDF(){
         }
       }
       if(zoneMismatch || quickMismatch){ row.push('—'); return; }
-      row.push(t ? (t.absent ? 'Absent' : `${(t.obtained!=null && t.max!=null) ? t.obtained+'/'+t.max+' ' : ''}(${t.percent}%)`) : '—');
+      if(!t){ row.push('—'); return; }
+      row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
     });
     return row;
   });
@@ -4503,7 +4568,8 @@ function generateStatListPDF(){
   const { title, subtitle, students } = lastStatListData;
   const cleanTitle = stripEmoji(title) || 'Student List';
   const body = reportTableHtml(['#','Name','Roll No.','Section','Overall %'],
-    students.map((s,i)=>[i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', s.sectionLabel||'—', s.overall!=null?s.overall+'%':'—']));
+    students.map((s,i)=>[i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', s.sectionLabel||'—',
+      pctBadgeCell(s.overall, false, (s.obtained!=null && s.max!=null) ? `${s.obtained}/${s.max}` : null)]));
   printReport(cleanTitle + ' — Report', subtitle || `${students.length} student${students.length===1?'':'s'}`, body);
 }
 
