@@ -2176,6 +2176,8 @@ function openStudentDrawerById(id, sectionKeyHint){
   if(student.rollNo) metaBits.push(`Roll ${student.rollNo}`);
   if(student.matric != null) metaBits.push(`Matric ${student.matric}`);
   metaBits.push(def.label);
+  const drawerPos = classPositionFor(student.id, def);
+  if(drawerPos) metaBits.push(`Position ${drawerPos.rank} of ${drawerPos.total}`);
   document.getElementById('drawerStudentMeta').textContent = metaBits.join(' · ');
 
   let bodyHtml = '';
@@ -2346,6 +2348,44 @@ function gradeFor(pct){
   if(pct==null) return '—';
   if(pct>=90) return 'A+'; if(pct>=80) return 'A'; if(pct>=70) return 'B';
   if(pct>=60) return 'C'; if(pct>=50) return 'D'; return 'F';
+}
+// Ranks a list of {id, overall} items by overall average, highest first,
+// with standard competition ranking (equal averages share the same rank,
+// and the next distinct average skips ahead accordingly — e.g. two
+// students tied for 2nd means the next student is ranked 4th, not 3rd).
+// Returns a Map of id -> {rank, total}.
+function rankByOverall(list){
+  const scored = list.filter(s=>s.overall!=null).slice().sort((a,b)=>b.overall-a.overall);
+  const rankMap = new Map();
+  let rank = 0, prevOverall = null, seen = 0;
+  scored.forEach(s=>{
+    seen++;
+    if(s.overall !== prevOverall){ rank = seen; prevOverall = s.overall; }
+    rankMap.set(s.id, {rank, total: scored.length});
+  });
+  return rankMap;
+}
+// Same as rankByOverall, but ranks students within their own section only
+// (a "class position" is meaningless compared across different sections).
+// students: array with {id, overall, sectionKey}. Returns Map of id -> {rank, total}.
+function rankWithinSections(students){
+  const bySection = {};
+  students.forEach(s=>{ (bySection[s.sectionKey] = bySection[s.sectionKey] || []).push(s); });
+  const rankMap = new Map();
+  Object.values(bySection).forEach(list=>{
+    rankByOverall(list).forEach((v,k)=>rankMap.set(k,v));
+  });
+  return rankMap;
+}
+// A single student's class position (rank by overall average among their
+// own section-mates), computed fresh from the workspace — used by the
+// per-student printed report.
+function classPositionFor(studentId, def){
+  const store = workspace.sections[def.key];
+  if(!store) return null;
+  const list = store.students.map(st=>({id: st.id, overall: studentOverallAverage(st, def)}));
+  const rankMap = rankByOverall(list);
+  return rankMap.get(studentId) || null;
 }
 function studentOverallTrend(st, def){
   let delta = null, n = 0;
@@ -4272,8 +4312,12 @@ function generateOverallSummaryPDF(){
   }
 
   if(ranked.length){
-    body += reportSectionHtml('Top 10 Students Overall', reportTableHtml(['#','Name','Roll No.','Matric','Section','Overall %','Grade'],
-      ranked.map((s,i)=>[i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', (s.st&&s.st.matric!=null)?s.st.matric:'—', s.sectionLabel, pctBadgeCell(s.overall), gradeBadgeCell(s.overall)])));
+    const posMap = rankWithinSections(students);
+    body += reportSectionHtml('Top 10 Students Overall', reportTableHtml(['#','Name','Roll No.','Matric','Section','Class Position','Overall %','Grade'],
+      ranked.map((s,i)=>{
+        const pos = posMap.get(s.id);
+        return [i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', (s.st&&s.st.matric!=null)?s.st.matric:'—', s.sectionLabel, pos?`${pos.rank} of ${pos.total}`:'—', pctBadgeCell(s.overall), gradeBadgeCell(s.overall)];
+      })));
   }
 
   printReport('Overall Summary Report', `${totalStudents} student${totalStudents===1?'':'s'} across ${sections.length} section${sections.length===1?'':'s'} — all subjects`, body);
@@ -4318,14 +4362,19 @@ function generateSectionSummaryPDF(){
   }
 
   if(sectionStudents.length){
-    body += reportSectionHtml('All Students', reportTableHtml(['Name','Roll No.','Matric','Overall %','Grade'],
-      sectionStudents.slice().sort((a,b)=>(b.overall??-1)-(a.overall??-1)).map(s=>[
-        s.name,
-        (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—',
-        (s.st&&s.st.matric!=null)?s.st.matric:'—',
-        pctBadgeCell(s.overall),
-        gradeBadgeCell(s.overall)
-      ])));
+    const posMap = rankByOverall(sectionStudents);
+    body += reportSectionHtml('All Students', reportTableHtml(['Position','Name','Roll No.','Matric','Overall %','Grade'],
+      sectionStudents.slice().sort((a,b)=>(b.overall??-1)-(a.overall??-1)).map(s=>{
+        const pos = posMap.get(s.id);
+        return [
+          pos?`${pos.rank} of ${pos.total}`:'—',
+          s.name,
+          (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—',
+          (s.st&&s.st.matric!=null)?s.st.matric:'—',
+          pctBadgeCell(s.overall),
+          gradeBadgeCell(s.overall)
+        ];
+      })));
   }
 
   printReport(`${def.label} — Section Summary Report`, `${sectionStudents.length} student${sectionStudents.length===1?'':'s'} in this section`, body);
@@ -4484,10 +4533,12 @@ function generateStudentDrawerPDF(id, sectionKeyHint){
   // Printed as headline stat cards (not a plain table) so Section/Roll
   // No./Matric are the first thing seen on the page, matching what's shown
   // on-screen when the roster's "Hide/Show Details" columns are visible.
+  const pos = classPositionFor(student.id, def);
   let body = reportStatsGridHtml([
     {label:'Section', value:def.label},
     {label:'Roll No.', value:student.rollNo!=null && student.rollNo!=='' ? String(student.rollNo) : '—'},
     {label:'Matric', value:student.matric != null ? String(student.matric) : '—'},
+    {label:'Class Position', value:pos ? `${pos.rank} of ${pos.total}` : '—'},
   ]);
 
   def.subjects.forEach(subj=>{
