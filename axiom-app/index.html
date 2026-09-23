@@ -285,7 +285,7 @@
       </div>
       <button class="ghost small" id="cloudImportBtn" title="Download the selected file(s) from Supabase Storage and load them below">Load from Cloud</button>
       <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
-      <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone">🗑 Delete</button>
+      <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg> Delete</button>
     </div>
     <div class="hint" id="cloudImportHint" style="display:none;"></div>
     <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>If everything matches the expected format it's imported right away; if anything looks off, you'll see the detected mapping below and can choose whether to import anyway.</b></div>
@@ -332,12 +332,12 @@
       <label>Zone Filter</label>
       <select id="zoneFilter">
         <option value="">All Zones</option>
-        <option value="green">🟢 Green (90%+)</option>
-        <option value="blue">🔵 Blue (80-89%)</option>
-        <option value="yellow">🟡 Yellow (70-79%)</option>
-        <option value="pink">🩷 Pink (60-69%)</option>
-        <option value="red">🔴 Red (below 60%)</option>
-        <option value="grey">⚪ Absent</option>
+        <option value="green">Green (90%+)</option>
+        <option value="blue">Blue (80-89%)</option>
+        <option value="yellow">Yellow (70-79%)</option>
+        <option value="pink">Pink (60-69%)</option>
+        <option value="red">Red (below 60%)</option>
+        <option value="grey">Absent</option>
       </select>
     </div>
     <div class="field" style="flex:1;min-width:200px;">
@@ -346,10 +346,10 @@
     </div>
 
   <div class="chip-row" id="quickChipRow" role="group" aria-label="Quick filters">
-    <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">🔴</span>At Risk</span>
-    <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📈</span>Improving</span>
-    <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">📉</span>Declining</span>
-    <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="chip-emoji">⚪</span>Absent</span>
+    <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>At Risk</span>
+    <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="dot green"></span>Improving</span>
+    <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>Declining</span>
+    <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="dot grey"></span>Absent</span>
   </div>
 
   <!-- Pinned favourite students panel -->

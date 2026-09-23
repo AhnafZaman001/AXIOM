@@ -582,7 +582,10 @@ function zoneOf(percent, absent){
 }
 const ZONE_RANK = {red:0, pink:1, yellow:2, blue:3, green:4};
 const ZONE_LABEL = {green:'Green',blue:'Blue',yellow:'Yellow',pink:'Pink',red:'Red',grey:'Absent'};
-const ZONE_EMOJI = {green:'🟢',blue:'🔵',yellow:'🟡',pink:'🩷',red:'🔴',grey:'⚪'};
+// A small solid-colour swatch (no emoji) used everywhere a zone needs a
+// quick visual marker — table cells, cards, popups. Cross-platform
+// consistent, unlike relying on the OS's own emoji glyphs.
+function zoneDotHtml(z){ return z ? `<span class="dot ${z}"></span>` : ''; }
 
 /* ---- 004_ui-polish-avatars-toasts-counters-theme-confetti.js ---- */
 
@@ -698,7 +701,7 @@ function triggerEntranceAnimations(){
   els.forEach((el,i)=>{
     el.classList.remove('enter-anim');
     void el.offsetWidth; // restart animation
-    el.style.animationDelay = Math.min(i*45, 400) + 'ms';
+    el.style.animationDelay = Math.min(i*24, 220) + 'ms';
     el.classList.add('enter-anim');
   });
 }
@@ -757,9 +760,9 @@ function uid(){ return 's'+Math.random().toString(36).slice(2,10); }
 // Old workspace files simply lack this field; every reader below falls back
 // to an empty array so nothing crashes and nothing is overwritten.
 const PRIORITY_META = {
-  high:{emoji:'🔴', label:'High'},
-  medium:{emoji:'🟠', label:'Medium'},
-  low:{emoji:'🟢', label:'Low'}
+  high:{dot:'red', label:'High'},
+  medium:{dot:'orange', label:'Medium'},
+  low:{dot:'green', label:'Low'}
 };
 const SUPPORT_STATUS_META = {
   active:'Active', improving:'Improving', resolved:'Resolved',
@@ -938,7 +941,7 @@ function renderSupportSectionHtml(student, def){
     const fu = followUpStatus(active.nextReviewAt);
     html += `<div class="support-status-card">
       <div class="ssc-top">
-        <span class="priority-badge ${active.priority}">${pm.emoji||''} ${pm.label||active.priority} Priority</span>
+        <span class="priority-badge ${active.priority}">${pm.dot?`<span class="dot ${pm.dot}"></span>`:''}${pm.label||active.priority} Priority</span>
         <span class="support-status-tag ${active.status}">${SUPPORT_STATUS_META[active.status]||active.status}</span>
       </div>
       <div class="ssc-problem">${escapeHtml(active.problem)}</div>
@@ -957,7 +960,7 @@ function renderSupportSectionHtml(student, def){
       const pm = PRIORITY_META[plan.priority] || {};
       html += `<div class="support-plan-item">
         <div class="spi-head">
-          <span class="priority-badge ${plan.priority}">${pm.emoji||''} ${pm.label||plan.priority}</span>
+          <span class="priority-badge ${plan.priority}">${pm.dot?`<span class="dot ${pm.dot}"></span>`:''}${pm.label||plan.priority}</span>
           <span class="support-status-tag ${plan.status}">${SUPPORT_STATUS_META[plan.status]||plan.status}</span>
           <span class="hint">Created ${escapeHtml(plan.createdAt||'—')}</span>
         </div>
@@ -985,8 +988,8 @@ function supportIndicatorHtml(student){
   const fu = followUpStatus(active.nextReviewAt);
   let title = `${pm.label||active.priority} priority support plan — ${SUPPORT_STATUS_META[active.status]||active.status}`;
   if(fu) title += ` · ${fu.label}`;
-  const overdueMark = fu && fu.cls === 'overdue' ? ' ⏰' : '';
-  return `<span class="support-indicator" title="${escapeHtml(title)}">${pm.emoji||''}${overdueMark}</span>`;
+  const overdueMark = fu && fu.cls === 'overdue' ? '<span class="overdue-mark" title="Follow-up overdue">!</span>' : '';
+  return `<span class="support-indicator" title="${escapeHtml(title)}">${pm.dot?`<span class="dot ${pm.dot}"></span>`:''}${overdueMark}</span>`;
 }
 
 function ensureSection(key){
@@ -1256,7 +1259,7 @@ function updateSubjectTeacherHint(){
   const subj = document.getElementById('subjectFilter').value;
   if(!subj){ hintEl.textContent = ''; return; }
   const teacher = lookupTeacher(subj, currentSectionDef());
-  hintEl.textContent = teacher ? `👩‍🏫 Teacher: ${teacher}` : `No teacher on record for ${subj} in this section.`;
+  hintEl.textContent = teacher ? `Teacher: ${teacher}` : `No teacher on record for ${subj} in this section.`;
 }
 
 function populateAddTestSubject(){
@@ -1274,7 +1277,7 @@ function updateAtSubjectTeacherHint(){
   const subj = document.getElementById('atSubject').value;
   if(!subj || !def){ hintEl.textContent = ''; return; }
   const teacher = lookupTeacher(subj, def);
-  hintEl.textContent = teacher ? `👩‍🏫 Teacher: ${teacher}` : `No teacher on record for ${subj} in this section.`;
+  hintEl.textContent = teacher ? `Teacher: ${teacher}` : `No teacher on record for ${subj} in this section.`;
 }
 function populateAddTestStudents(){
   const store = ensureSection(document.getElementById('atSection').value);
@@ -1475,7 +1478,7 @@ function renderTable(){
         return `<span class="d ${zz||'none'}" title="${escapeHtml(tt.test)}: ${tt.absent?'Absent':(tt.percent+'%')}"></span>`;
       }).join('');
       row += `<td class="zone-cell">
-        <span class="zone-pill ${z||'none'}">${ZONE_EMOJI[z]||''} ${pillLabel}</span>${trendTag}
+        <span class="zone-pill ${z||'none'}">${zoneDotHtml(z)}${pillLabel}</span>${trendTag}
         <div class="trend-dots">${dots}</div>
       </td>`;
     });
@@ -2203,7 +2206,7 @@ function openStudentDrawerById(id, sectionKeyHint){
         const marksPart = (tt.obtained!=null && tt.max!=null) ? `${tt.obtained}/${tt.max} ` : '';
         const label = tt.absent ? 'Absent' : (tt.percent!=null ? `${marksPart}(${tt.percent}%)` : '—');
         const isLatest = idx === arr.length - 1;
-        return `<span class="zone-pill ${isLatest ? '' : 'prev-pill '}${zz||'none'}" title="${escapeHtml(tt.test||'')}">${ZONE_EMOJI[zz]||''} ${label}</span>`;
+        return `<span class="zone-pill ${isLatest ? '' : 'prev-pill '}${zz||'none'}" title="${escapeHtml(tt.test||'')}">${zoneDotHtml(zz)}${label}</span>`;
       }).join('');
     } else {
       pillsHtml = `<span class="zone-pill none">—</span>`;
@@ -2590,7 +2593,7 @@ function renderOverallSummary(){
   document.getElementById('osZoneCardsWrap').innerHTML = zoneOrder.map(z=>{
     const count = students.filter(s=>s.overall!=null && s.overall>=z.min && s.overall<z.max).length;
     const pct = totalStudents ? Math.round((count/totalStudents)*1000)/10 : 0;
-    return `<div class="card clickable" data-filter="zone:${z.key}"><h4>${ZONE_EMOJI[z.key]} ${z.label}</h4>
+    return `<div class="card clickable" data-filter="zone:${z.key}"><h4>${zoneDotHtml(z.key)}${z.label}</h4>
       <div class="count">${count}</div>
       <ul><li>${z.range}</li><li class="extra-detail">${pct}% of all students</li></ul>
     </div>`;
@@ -2670,7 +2673,7 @@ document.getElementById('osZoneCardsWrap').addEventListener('click', (e)=>{
   const zk = key.slice(5);
   const z = OVERALL_ZONE_ORDER.find(x=>x.key===zk);
   const list = getOverallFilteredStudents(key);
-  openStatListDrawer(`${ZONE_EMOJI[zk]} ${z.label} (${z.range})`, `${list.length} student${list.length===1?'':'s'} across all sections`, list);
+  openStatListDrawer(`${z.label} (${z.range})`, `${list.length} student${list.length===1?'':'s'} across all sections`, list);
 });
 
 function setActivePage(page){
@@ -2784,7 +2787,7 @@ function renderSectionSummary(){
   document.getElementById('ssZoneCardsWrap').innerHTML = OVERALL_ZONE_ORDER.map(z=>{
     const count = scored.filter(s=>s.overall>=z.min && s.overall<z.max).length;
     const pct = scored.length ? Math.round((count/scored.length)*1000)/10 : 0;
-    return `<div class="card clickable" data-sszone="${z.key}"><h4>${ZONE_EMOJI[z.key]} ${z.label}</h4>
+    return `<div class="card clickable" data-sszone="${z.key}"><h4>${zoneDotHtml(z.key)}${z.label}</h4>
       <div class="count">${count}</div>
       <ul><li>${z.range}</li><li class="extra-detail">${pct}% of this section</li></ul>
     </div>`;
@@ -2833,7 +2836,7 @@ document.getElementById('ssZoneCardsWrap').addEventListener('click', (e)=>{
   const zk = el.getAttribute('data-sszone');
   const z = OVERALL_ZONE_ORDER.find(x=>x.key===zk);
   const list = getSectionFilteredStudents(currentSectionKey(), `zone:${zk}`);
-  openStatListDrawer(`${ZONE_EMOJI[zk]} ${z.label} (${z.range})`, `${list.length} student${list.length===1?'':'s'} in ${currentSectionDef().label}`, list);
+  openStatListDrawer(`${z.label} (${z.range})`, `${list.length} student${list.length===1?'':'s'} in ${currentSectionDef().label}`, list);
 });
 document.getElementById('ssCompareBody').addEventListener('click', (e)=>{
   const tr = e.target.closest('tr[data-jump-section]');
@@ -3168,7 +3171,7 @@ function renderRosterTable(cfg){
         return `<span class="d ${zz||'none'}" title="${escapeHtml(tt.test)}: ${tt.absent?'Absent':(tt.percent+'%')}"></span>`;
       }).join('');
       row += `<td class="zone-cell">
-        <span class="zone-pill ${z||'none'}">${ZONE_EMOJI[z]||''} ${pillLabel}</span>${trendTag}
+        <span class="zone-pill ${z||'none'}">${zoneDotHtml(z)}${pillLabel}</span>${trendTag}
         <div class="trend-dots">${dots}</div>
       </td>`;
     });
@@ -4215,15 +4218,15 @@ renderPinnedPanel();
     if(i >= steps.length){
       setTimeout(()=>{
         screen.classList.add('hide');
-        setTimeout(()=>{ if(screen.parentNode) screen.parentNode.removeChild(screen); }, 550);
+        setTimeout(()=>{ if(screen.parentNode) screen.parentNode.removeChild(screen); }, 260);
         triggerEntranceAnimations();
-      }, 200);
+      }, 70);
       return;
     }
     const [pct, label] = steps[i++];
     if(fill) fill.style.width = pct + '%';
     if(status) status.textContent = label;
-    setTimeout(next, 240);
+    setTimeout(next, 70);
   }
   next();
 })();
