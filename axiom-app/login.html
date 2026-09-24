@@ -19,18 +19,23 @@
   .login-field input:focus{outline:none;border-color:var(--accent);}
   .login-error{background:var(--red-bg);color:#F87171;border:1px solid rgba(239,68,68,0.35);border-radius:10px;
     padding:10px 13px;font-size:0.8rem;margin-bottom:16px;display:none;}
-  .login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#3B82F6,#2563EB);
-    color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer;font-family:var(--font-body);}
+  .login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#2FD675,#178A4C);
+    color:#0B0C0E;font-weight:700;font-size:0.9rem;cursor:pointer;font-family:var(--font-body);}
   .login-btn:disabled{opacity:0.6;cursor:default;}
-  .login-btn:hover:not(:disabled){background:linear-gradient(135deg,#4F8CFF,#3B82F6);}
+  .login-btn:hover:not(:disabled){background:linear-gradient(135deg,#4ADE80,#2FD675);}
 </style>
 </head>
 <body>
+<div class="bg-orbit-field" aria-hidden="true"></div>
 <div class="bg-animated" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
 <div class="login-shell">
+  <div class="orbit-rings-bg" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span></div>
   <div class="login-card">
     <div class="login-brand">
-      <div class="brand-mark"><span>L</span></div>
+      <div class="brand-orbit">
+        <div class="orbit-ring"><span class="orbit-dot"></span></div>
+        <div class="brand-mark"><span>L</span></div>
+      </div>
       <div>
         <div class="login-title">AXIOM</div>
         <div class="login-sub">Sign in to continue</div>
