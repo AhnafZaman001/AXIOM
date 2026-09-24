@@ -114,44 +114,6 @@
         <tbody id="ssCompareBody"></tbody>
       </table>
     </div>
-
-    <div class="section-title">Student Roster <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— independent of the Section View table; browse any section</span><span style="flex:1;"></span><button class="ghost small" id="ssRPrintBtn" title="Print only the students currently shown below, with the active filters applied"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Filtered List</button></div>
-    <div class="toolbar" id="ssRFiltersToolbar">
-      <select id="ssRSection"></select>
-    </div>
-    <div class="field">
-      <label>Subject Filter</label>
-      <select id="ssRSubject"></select>
-    </div>
-    <div class="field">
-      <label>Zone Filter</label>
-      <select id="ssRZone">
-        <option value="">All Zones</option>
-        <option value="green">Green (90%+)</option>
-        <option value="blue">Blue (80-89%)</option>
-        <option value="yellow">Yellow (70-79%)</option>
-        <option value="pink">Pink (60-69%)</option>
-        <option value="red">Red (below 60%)</option>
-        <option value="grey">Absent</option>
-      </select>
-    </div>
-    <div class="field" style="flex:1;min-width:200px;">
-      <label>Search Student</label>
-      <input type="text" id="ssRSearch" placeholder="Type a name…" style="width:100%;">
-    </div>
-    <div class="chip-row" id="ssRChipRow" role="group" aria-label="Quick filters">
-      <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>At Risk</span>
-      <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="dot green"></span>Improving</span>
-      <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>Declining</span>
-      <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="dot grey"></span>Absent</span>
-    </div>
-    <div id="ssRTableWrap" class="table-wrap">
-      <table class="main-table">
-        <thead><tr id="ssRTableHead"></tr></thead>
-        <tbody id="ssRTableBody"></tbody>
-      </table>
-    </div>
-    <div class="empty-state" id="ssREmptyState" style="display:none;"></div>
   </div>
 
   <div id="teacherReportPage" style="display:none;">

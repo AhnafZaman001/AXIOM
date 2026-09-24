@@ -2116,7 +2116,6 @@ function togglePinStudent(id, sectionKeyHint){
   found.student.pinned = !found.student.pinned;
   markDirty();
   renderTable();
-  if(typeof renderSSRoster === 'function') renderSSRoster();
   if(typeof renderTRRoster === 'function') renderTRRoster();
   renderPinnedPanel();
   const overlay = document.getElementById('studentDrawerOverlay');
@@ -2819,7 +2818,6 @@ function renderSectionSummary(){
     <td><span class="zone-pill ${zoneOf(s.avg,false)}">${s.avg}%</span></td><td>${s.studentCount}</td></tr>
   `).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No section data yet.</td></tr>`;
 
-  renderSSRoster();
   triggerEntranceAnimations();
 }
 document.getElementById('ssQuickStats').addEventListener('click', (e)=>{
@@ -3182,63 +3180,6 @@ function renderRosterTable(cfg){
 const ROSTER_EMPTY_NO_STUDENTS = `<h3>No students in this section yet</h3><div>Import an Excel file, or add a student manually to get started.</div>`;
 const ROSTER_EMPTY_NO_MATCHES = `<h3>No students match the current filters</h3><div>Try clearing the zone filter or quick filter chips above.</div>`;
 
-/* ---- Section Summary's independent roster ---- */
-let ssRosterState = { sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'', sort:{key:null,dir:'desc'} };
-
-function renderSSRoster(){
-  if(!ssRosterState.sectionKey || !SECTION_BY_KEY[ssRosterState.sectionKey]) ssRosterState.sectionKey = currentSectionKey();
-  const sel = document.getElementById('ssRSection');
-  sel.innerHTML = SECTION_DEFS.map(d=>`<option value="${d.key}">${d.label}</option>`).join('');
-  sel.value = ssRosterState.sectionKey;
-
-  const def = SECTION_BY_KEY[ssRosterState.sectionKey];
-  const subjSel = document.getElementById('ssRSubject');
-  subjSel.innerHTML = `<option value="">All Subjects</option>` + def.subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
-  if(!def.subjects.includes(ssRosterState.subjFilter)) ssRosterState.subjFilter = '';
-  subjSel.value = ssRosterState.subjFilter;
-
-  document.getElementById('ssRZone').value = ssRosterState.zoneFilter;
-  document.getElementById('ssRSearch').value = ssRosterState.searchQuery;
-  document.querySelectorAll('#ssRChipRow .chip').forEach(c=>{
-    const pressed = c.getAttribute('data-quick') === ssRosterState.quickFilter;
-    c.classList.toggle('active', pressed);
-    c.setAttribute('aria-pressed', String(pressed));
-  });
-
-  renderRosterTable({
-    sectionKey: ssRosterState.sectionKey,
-    subjFilterVal: ssRosterState.subjFilter,
-    zoneFilterVal: ssRosterState.zoneFilter,
-    searchQueryVal: ssRosterState.searchQuery,
-    quickFilterVal: ssRosterState.quickFilter,
-    restrictToTeacher: null,
-    headEl: document.getElementById('ssRTableHead'),
-    bodyEl: document.getElementById('ssRTableBody'),
-    wrapEl: document.getElementById('ssRTableWrap'),
-    emptyEl: document.getElementById('ssREmptyState'),
-    emptyHtmlNoStudents: ROSTER_EMPTY_NO_STUDENTS,
-    emptyHtmlNoMatches: ROSTER_EMPTY_NO_MATCHES,
-    sortState: ssRosterState.sort
-  });
-}
-document.getElementById('ssRTableHead').addEventListener('click', (e)=>{
-  handleSortHeaderClick(e, ssRosterState.sort, renderSSRoster);
-});
-
-document.getElementById('ssRSection').addEventListener('change', (e)=>{ ssRosterState.sectionKey = e.target.value; ssRosterState.subjFilter=''; ssRosterState.sort={key:null,dir:'desc'}; renderSSRoster(); });
-document.getElementById('ssRSubject').addEventListener('change', (e)=>{ ssRosterState.subjFilter = e.target.value; renderSSRoster(); });
-document.getElementById('ssRZone').addEventListener('change', (e)=>{ ssRosterState.zoneFilter = e.target.value; renderSSRoster(); });
-document.getElementById('ssRSearch').addEventListener('input', (e)=>{ ssRosterState.searchQuery = e.target.value.trim().toLowerCase(); renderSSRoster(); });
-document.querySelectorAll('#ssRChipRow .chip').forEach(chip=>{
-  const activate = ()=>{
-    const key = chip.getAttribute('data-quick');
-    ssRosterState.quickFilter = (ssRosterState.quickFilter === key) ? null : key;
-    renderSSRoster();
-  };
-  chip.addEventListener('click', activate);
-  chip.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(); } });
-});
-
 /* ---- Teacher Report's independent roster (scoped to the selected teacher's own sections/subjects) ---- */
 let trRosterState = { teacherName:null, sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'', sort:{key:null,dir:'desc'} };
 
@@ -3331,10 +3272,11 @@ document.querySelectorAll('#trRChipRow .chip').forEach(chip=>{
   chip.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(); } });
 });
 
-// Pin-star / row-click handling for both independent tables (mirrors the
-// main #tableBody listener, but resolves the section from data-skey on the
-// row itself rather than the main Section View's current selection).
-['ssRTableBody','trRTableBody'].forEach(id=>{
+// Pin-star / row-click handling for the Teacher Report's independent
+// roster table (mirrors the main #tableBody listener, but resolves the
+// section from data-skey on the row itself rather than the main Section
+// View's current selection).
+['trRTableBody'].forEach(id=>{
   document.getElementById(id).addEventListener('click', (e)=>{
     const star = e.target.closest('.pin-star[data-pin-sid]');
     if(star){
@@ -4194,7 +4136,6 @@ populateSubjectFilter();
 updateStatusLine();
 updateLastUpdatedNow();
 renderTable();
-renderSSRoster();
 renderTRRoster();
 renderPinnedPanel();
 
@@ -4640,19 +4581,6 @@ function generateRosterFilteredPDF(cfg){
   printReport(reportTitle, subtitle, reportTableHtml(headers, rows));
 }
 
-function printSSRosterFiltered(){
-  const def = SECTION_BY_KEY[ssRosterState.sectionKey];
-  generateRosterFilteredPDF({
-    sectionKey: ssRosterState.sectionKey,
-    subjFilterVal: ssRosterState.subjFilter,
-    zoneFilterVal: ssRosterState.zoneFilter,
-    searchQueryVal: ssRosterState.searchQuery,
-    quickFilterVal: ssRosterState.quickFilter,
-    restrictToTeacher: null,
-    reportTitle: `${def ? def.label : 'Section'} — Student Roster`
-  });
-}
-
 function printTRRosterFiltered(){
   const teacherName = document.getElementById('teacherSelect').value;
   if(!teacherName){ showToast('Select a teacher first.', 'warn'); return; }
@@ -4712,8 +4640,6 @@ document.getElementById('drawerPrintBtn').addEventListener('click', ()=>{
   if(sid) generateStudentDrawerPDF(sid, skey);
 });
 
-const ssRPrintBtn = document.getElementById('ssRPrintBtn');
-if(ssRPrintBtn) ssRPrintBtn.addEventListener('click', printSSRosterFiltered);
 const trRPrintBtn = document.getElementById('trRPrintBtn');
 if(trRPrintBtn) trRPrintBtn.addEventListener('click', printTRRosterFiltered);
 
