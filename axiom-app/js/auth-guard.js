@@ -10,6 +10,12 @@
   if (!result) return;
   const { session, profile } = result;
 
+  // ---- 0. Personalize the welcome hero greeting, if it's still on screen ----
+  const heroGreeting = document.getElementById('welcomeHeroGreeting');
+  if (heroGreeting && profile.full_name) {
+    heroGreeting.textContent = 'Welcome back, ' + profile.full_name.split(' ')[0];
+  }
+
   // ---- 1. Show identity + logout in the masthead ----
   const actionsWrap = document.querySelector('.masthead-actions');
   if (actionsWrap) {

@@ -7,6 +7,49 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+<div id="welcomeHero" class="welcome-hero" aria-hidden="true">
+  <div class="wh-decor" aria-hidden="true">
+    <span class="wh-shard violet wh-s1"></span>
+    <span class="wh-shard violet-dark wh-s2"></span>
+    <span class="wh-s3"></span>
+    <span class="wh-shard violet wh-s4"></span>
+    <span class="wh-shard violet-dark wh-s5"></span>
+    <span class="wh-shard lime wh-s6"></span>
+  </div>
+  <div class="wh-orb" aria-hidden="true"></div>
+  <div class="wh-vignette" aria-hidden="true"></div>
+  <nav class="wh-nav">
+    <div class="wh-brand">
+      <div class="brand-mark"><span>L</span></div>
+      <div class="wh-wordmark">AXIOM<small>Student Performance Tracker</small></div>
+    </div>
+    <div class="wh-greeting" id="welcomeHeroGreeting">Welcome back</div>
+  </nav>
+  <main class="wh-main">
+    <h1 class="wh-title">Know Every Student.<br>Track Every Trend.<br>Secure Their Future.</h1>
+    <button type="button" class="wh-cta" id="welcomeHeroEnter">
+      <span>Launch Dashboard</span>
+      <span class="wh-cta-arrow">→</span>
+    </button>
+    <div class="wh-credit">An idea by Muhammad Zaman Khan</div>
+  </main>
+</div>
+<script>
+  // Welcome hero: shown fresh on every load of this already-authenticated
+  // page (first sign-in or a plain refresh). Dismiss reveals the dashboard
+  // underneath, whatever state it's in (still loading or already ready).
+  (function(){
+    var hero = document.getElementById('welcomeHero');
+    var btn = document.getElementById('welcomeHeroEnter');
+    if (!hero || !btn) return;
+    function dismiss(){
+      hero.classList.add('wh-hide');
+      hero.setAttribute('aria-hidden', 'true');
+      setTimeout(function(){ if (hero.parentNode) hero.parentNode.removeChild(hero); }, 340);
+    }
+    btn.addEventListener('click', dismiss);
+  })();
+</script>
 <div class="bg-animated" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
 <div id="loadingScreen" class="loading-screen">
   <div class="loading-inner">
