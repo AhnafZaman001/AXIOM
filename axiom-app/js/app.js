@@ -4475,6 +4475,62 @@ function generateSectionSummaryPDF(){
   printReport(`${def.label} — Section Summary Report`, `${sectionStudents.length} student${sectionStudents.length===1?'':'s'} in this section`, body);
 }
 
+// Prints just the on-screen Subject Breakdown table (subject, average, full
+// zone split, vs.-school delta) — a standalone report for someone who wants
+// this one table on paper without the rest of the Section Summary page,
+// same pattern as the dedicated "Print Filtered List" button on the roster
+// below it.
+function printSubjectBreakdown(){
+  const def = currentSectionDef();
+  const key = currentSectionKey();
+  const store = workspace.sections[key];
+  if(!def){ showToast('Select a section first.', 'warn'); return; }
+
+  const subjAvgs = def.subjects.map(subj=>{
+    const vals = [];
+    (store?store.students:[]).forEach(st=>{
+      const t = latestTest(st, subj);
+      if(t && !t.absent && t.percent!=null) vals.push(t.percent);
+    });
+    return {subject:subj, avg: vals.length?Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10:null};
+  }).filter(x=>x.avg!=null);
+
+  if(!subjAvgs.length){ showToast('No scored subjects to print for this section yet.', 'warn'); return; }
+
+  const rows = subjAvgs.map(sa=>{
+    const zoneCounts = {red:0, pink:0, yellow:0, blue:0, green:0, grey:0};
+    (store.students||[]).forEach(st=>{
+      const t = latestTest(st, sa.subject);
+      if(!t) return;
+      const zk = zoneOf(t.percent, t.absent);
+      if(zk && zoneCounts.hasOwnProperty(zk)) zoneCounts[zk]++;
+    });
+    const schoolVals = [];
+    SECTION_DEFS.forEach(d2=>{
+      if(!d2.subjects.includes(sa.subject)) return;
+      const st2 = workspace.sections[d2.key];
+      if(!st2) return;
+      st2.students.forEach(s2=>{ const t=latestTest(s2,sa.subject); if(t && !t.absent && t.percent!=null) schoolVals.push(t.percent); });
+    });
+    const schoolSubjAvg = schoolVals.length ? Math.round((schoolVals.reduce((a,b)=>a+b,0)/schoolVals.length)*10)/10 : null;
+    const delta = schoolSubjAvg!=null ? Math.round((sa.avg-schoolSubjAvg)*10)/10 : null;
+    const deltaText = delta==null ? '—' : delta>0?`+${delta}`:delta<0?`${delta}`:'0';
+    return [
+      sa.subject, pctBadgeCell(sa.avg),
+      String(zoneCounts.green), String(zoneCounts.blue), String(zoneCounts.yellow),
+      String(zoneCounts.pink), String(zoneCounts.red), String(zoneCounts.grey),
+      deltaText
+    ];
+  });
+
+  const body = reportSectionHtml('Subject Breakdown', reportTableHtml(
+    ['Subject','Average %','Green (90–100%)','Blue (80–89%)','Yellow (70–79%)','Pink (60–69%)','Red (Below 60%)','Absent','vs. School Average'],
+    rows
+  ));
+
+  printReport(`${def.label} — Subject Breakdown`, `${subjAvgs.length} subject${subjAvgs.length===1?'':'s'} scored`, body);
+}
+
 function generateTeacherReportPDF(){
   const teacherName = document.getElementById('teacherSelect').value;
   if(!teacherName){ showToast('Select a teacher first.', 'warn'); return; }
@@ -4723,6 +4779,8 @@ const printOverallBtn = document.getElementById('printOverallBtn');
 if(printOverallBtn) printOverallBtn.addEventListener('click', generateOverallSummaryPDF);
 const printSectionBtn = document.getElementById('printSectionBtn');
 if(printSectionBtn) printSectionBtn.addEventListener('click', generateSectionSummaryPDF);
+const ssSubjectPrintBtn = document.getElementById('ssSubjectPrintBtn');
+if(ssSubjectPrintBtn) ssSubjectPrintBtn.addEventListener('click', printSubjectBreakdown);
 const printTeacherBtn = document.getElementById('printTeacherBtn');
 if(printTeacherBtn) printTeacherBtn.addEventListener('click', generateTeacherReportPDF);
 const statListPrintBtn = document.getElementById('statListPrintBtn');

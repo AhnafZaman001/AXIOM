@@ -130,6 +130,7 @@
   table.main-table{width:100%;border-collapse:collapse;min-width:600px;}
   table.main-table thead th{position:sticky;top:0;background:linear-gradient(180deg,var(--surface-2),var(--surface-1));text-align:left;font-size:0.67rem;
     text-transform:uppercase;letter-spacing:0.9px;color:var(--muted);font-weight:700;padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2;}
+  th .th-sub{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:0.62rem;color:var(--muted);opacity:.72;margin-top:2px;font-family:var(--font-mono);}
   th.sortable-th{cursor:pointer;user-select:none;}
   th.sortable-th:hover{color:var(--ink);}
   th.sortable-th .sort-arrow{margin-left:5px;font-size:0.85em;opacity:0.4;}

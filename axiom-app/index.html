@@ -88,11 +88,18 @@
     <div class="section-title">Performance Zones — This Section</div>
     <div class="cards" id="ssZoneCardsWrap"></div>
 
-    <div class="section-title">Subject Breakdown</div>
+    <div class="section-title">Subject Breakdown<span style="flex:1;"></span><button class="ghost small" id="ssSubjectPrintBtn" title="Download a PDF of this Subject Breakdown table"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button></div>
     <div class="table-wrap" style="max-height:360px;">
       <table class="main-table">
         <thead><tr>
-          <th>Subject</th><th>Average %</th><th><span class="dot green"></span>Green</th><th><span class="dot blue"></span>Blue</th><th><span class="dot yellow"></span>Yellow</th><th><span class="dot pink"></span>Pink</th><th><span class="dot red"></span>Red</th><th><span class="dot grey"></span>Absent</th><th>vs. School Average</th>
+          <th>Subject</th><th>Average %</th>
+          <th><span class="dot green"></span>Green<span class="th-sub">90–100%</span></th>
+          <th><span class="dot blue"></span>Blue<span class="th-sub">80–89%</span></th>
+          <th><span class="dot yellow"></span>Yellow<span class="th-sub">70–79%</span></th>
+          <th><span class="dot pink"></span>Pink<span class="th-sub">60–69%</span></th>
+          <th><span class="dot red"></span>Red<span class="th-sub">Below 60%</span></th>
+          <th><span class="dot grey"></span>Absent</th>
+          <th>vs. School Average</th>
         </tr></thead>
         <tbody id="ssSubjectBody"></tbody>
       </table>
