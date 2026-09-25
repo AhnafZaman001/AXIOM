@@ -4244,23 +4244,29 @@ function ensurePrintInfrastructure(){
         body.ledger-printing #ledgerPrintArea{
           display:block !important; position:static; inset:auto; margin:0; padding:0;
         }
-        @page{ size:A4; margin:32px; }
+        @page{ size:A4; margin:30px 32px 42px; }
       }
       #ledgerPrintArea{
         font-family: Georgia, 'Times New Roman', serif; color:#1c2b45;
       }
       #ledgerPrintArea .rpt-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2b45;padding-bottom:8px;margin-bottom:14px;}
+      #ledgerPrintArea .rpt-brand-row{display:flex;align-items:center;gap:8px;}
+      #ledgerPrintArea .rpt-mark{width:20px;height:20px;border-radius:5px;background:#1c2b45;color:#fff;font-family:Arial,Helvetica,sans-serif;
+        font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;flex:none;}
       #ledgerPrintArea .rpt-brand{font-size:16px;font-weight:700;}
       #ledgerPrintArea .rpt-brand-sub{font-size:9px;color:#777;text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
-      #ledgerPrintArea .rpt-generated{font-size:9px;color:#999;text-align:right;}
+      #ledgerPrintArea .rpt-generated{font-size:9px;color:#999;text-align:right;line-height:1.5;}
       #ledgerPrintArea .rpt-title{font-size:15px;font-weight:700;margin:6px 0 2px;}
       #ledgerPrintArea .rpt-sub{font-size:10.5px;color:#666;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #ddd;}
       #ledgerPrintArea h3.rpt-section{font-family:Arial,Helvetica,sans-serif;font-size:9.5px;font-weight:700;color:#1c2b45;
         margin:20px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;text-transform:uppercase;letter-spacing:.07em;}
       #ledgerPrintArea h3.rpt-section:first-of-type{margin-top:2px;}
-      #ledgerPrintArea table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px;}
+      #ledgerPrintArea .rpt-note{font-family:Arial,Helvetica,sans-serif;font-size:8.5px;color:#888;margin:-4px 0 10px;font-style:italic;}
+      #ledgerPrintArea table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px;table-layout:auto;}
       #ledgerPrintArea th{background:#1c2b45;color:#fff;text-align:left;padding:5px 8px;font-weight:700;}
+      #ledgerPrintArea thead{display:table-header-group;} /* repeat header on every printed page */
       #ledgerPrintArea td{padding:5px 8px;border-bottom:1px solid #ddd;}
+      #ledgerPrintArea td.num,#ledgerPrintArea th.num{text-align:right;font-variant-numeric:tabular-nums;}
       #ledgerPrintArea tbody tr:nth-child(even) td{background:#f7f6f2;}
       #ledgerPrintArea tr{break-inside:avoid;}
       #ledgerPrintArea .rpt-footer{margin-top:20px;padding-top:6px;border-top:1px solid #ddd;font-size:8px;color:#999;display:flex;justify-content:space-between;}
@@ -4280,6 +4286,12 @@ function ensurePrintInfrastructure(){
       #ledgerPrintArea .rpt-badge-grey{background:#F1F5F9;color:#475569;}
       #ledgerPrintArea .rpt-badge-neutral{background:#E2E8F0;color:#1c2b45;}
       #ledgerPrintArea .rpt-badge-row{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 18px;}
+      /* Applied automatically when a table has many columns (e.g. every subject
+         shown at once) so a wide roster shrinks to fit A4 instead of clipping
+         or spilling off the printed page. */
+      #ledgerPrintArea.rpt-compact table{font-size:8.3px;}
+      #ledgerPrintArea.rpt-compact th,#ledgerPrintArea.rpt-compact td{padding:3px 5px;}
+      #ledgerPrintArea.rpt-compact .rpt-badge{font-size:8px;padding:1px 5px;}
       #ledgerPrintArea, #ledgerPrintArea *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     `;
     document.head.appendChild(style);
@@ -4292,17 +4304,28 @@ function ensurePrintInfrastructure(){
   }
   return area;
 }
-function printReport(title, subtitle, bodyHtml){
+// context: optional trailing line under the title (e.g. "St. Xavier's High School · Academic Year 2025–26")
+// compact: shrink table font/padding — used automatically by reports with many columns so a wide
+//          roster (e.g. every subject shown) still fits A4 instead of clipping or spilling over
+// note: small italic note shown under the header (e.g. "— indicates no test recorded for that subject")
+function printReport(title, subtitle, bodyHtml, opts){
+  opts = opts || {};
   const area = ensurePrintInfrastructure();
+  const schoolName = (workspace && workspace.schoolName) ? workspace.schoolName : '';
+  area.className = opts.compact ? 'rpt-compact' : '';
   area.innerHTML = `
     <div class="rpt-header">
-      <div><div class="rpt-brand">AXIOM</div><div class="rpt-brand-sub">Student Performance Tracker</div></div>
-      <div class="rpt-generated">Generated ${escapeHtml(new Date().toLocaleString())}</div>
+      <div class="rpt-brand-row">
+        <div class="rpt-mark">A</div>
+        <div><div class="rpt-brand">AXIOM</div><div class="rpt-brand-sub">Student Performance Tracker</div></div>
+      </div>
+      <div class="rpt-generated">${schoolName ? escapeHtml(schoolName)+'<br>' : ''}Generated ${escapeHtml(new Date().toLocaleString())}</div>
     </div>
     <div class="rpt-title">${escapeHtml(title)}</div>
     ${subtitle ? `<div class="rpt-sub">${escapeHtml(subtitle)}</div>` : ''}
+    ${opts.note ? `<div class="rpt-note">${escapeHtml(opts.note)}</div>` : ''}
     ${bodyHtml}
-    <div class="rpt-footer"><span>AXIOM — Student Performance Tracker</span><span>${escapeHtml(new Date().toLocaleDateString())}</span></div>
+    <div class="rpt-footer"><span>AXIOM — Student Performance Tracker · Confidential</span><span>${escapeHtml(new Date().toLocaleDateString())}</span></div>
   `;
   document.body.classList.add('ledger-printing');
   const cleanup = ()=>{
@@ -4320,6 +4343,23 @@ function printReport(title, subtitle, bodyHtml){
       cleanup();
     }
   }, 50);
+}
+// A student's identity block used consistently across every printed report
+// that lists students by row: Roll No. always shown ('—' if unset), Matric
+// only added when at least one student in the list actually has one (so a
+// school that doesn't track matric numbers doesn't get an empty column).
+function studentIdentityHeaders(students){
+  const anyMatric = (students||[]).some(s=>{
+    const m = s.matric!=null ? s.matric : (s.st && s.st.matric!=null ? s.st.matric : null);
+    return m!=null && m!=='';
+  });
+  return anyMatric ? ['Roll No.','Matric'] : ['Roll No.'];
+}
+function studentIdentityCells(s, anyMatric){
+  const rollCell = (s.rollNo!=null && s.rollNo!=='') ? s.rollNo : '—';
+  if(!anyMatric) return [rollCell];
+  const m = s.matric!=null ? s.matric : (s.st && s.st.matric!=null ? s.st.matric : null);
+  return [rollCell, (m!=null && m!=='') ? m : '—'];
 }
 
 function generateOverallSummaryPDF(){
@@ -4552,9 +4592,21 @@ function generateRosterFilteredPDF(cfg){
     return;
   }
 
-  const headers = ['Student', ...subjectsShown];
+  const anyMatric = studentIdentityHeaders(students).length > 1;
+  const scored = students.filter(s=>studentOverallAverage(s, def)!=null);
+  const avg = scored.length ? Math.round((scored.reduce((a,s)=>a+studentOverallAverage(s, def),0)/scored.length)*10)/10 : null;
+
+  let body = reportStatsGridHtml([
+    {label:'Students Shown', value:String(students.length)},
+    {label:'Subjects Shown', value:String(subjectsShown.length)},
+    {label:'Average of List', value:avg!=null?avg+'%':'—'},
+  ]);
+
+  const headers = ['Student', ...studentIdentityHeaders(students), ...subjectsShown, 'Overall %', 'Grade', 'Class Position'];
   const rows = students.map(st=>{
-    const row = [st.name];
+    const overall = studentOverallAverage(st, def);
+    const pos = classPositionFor(st.id, def);
+    const row = [st.name, ...studentIdentityCells(st, anyMatric)];
     subjectsShown.forEach(subj=>{
       const arr = (st.tests||{})[subj] || [];
       const t = arr.length ? arr[arr.length-1] : null;
@@ -4574,11 +4626,18 @@ function generateRosterFilteredPDF(cfg){
       if(!t){ row.push('—'); return; }
       row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
     });
+    row.push(pctBadgeCell(overall));
+    row.push(gradeBadgeCell(overall));
+    row.push(pos ? `${pos.rank} of ${pos.total}` : '—');
     return row;
   });
 
+  body += reportTableHtml(headers, rows);
   const subtitle = `${describeRosterFilters(subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal)} — ${students.length} student${students.length===1?'':'s'}`;
-  printReport(reportTitle, subtitle, reportTableHtml(headers, rows));
+  printReport(reportTitle, subtitle, body, {
+    compact: headers.length > 8,
+    note: 'Overall % and Class Position reflect the student\'s full record across all subjects, not just those shown above. "—" means no test is recorded for that column.'
+  });
 }
 
 function printTRRosterFiltered(){
@@ -4660,9 +4719,21 @@ function generateSectionViewFilteredPDF(){
     return;
   }
 
-  const headers = ['Student', ...subjectsShown];
+  const anyMatric = studentIdentityHeaders(students).length > 1;
+  const scored = students.filter(s=>studentOverallAverage(s, def)!=null);
+  const avg = scored.length ? Math.round((scored.reduce((a,s)=>a+studentOverallAverage(s, def),0)/scored.length)*10)/10 : null;
+
+  let body = reportStatsGridHtml([
+    {label:'Students Shown', value:String(students.length)},
+    {label:'Subjects Shown', value:String(subjectsShown.length)},
+    {label:'Average of List', value:avg!=null?avg+'%':'—'},
+  ]);
+
+  const headers = ['Student', ...studentIdentityHeaders(students), ...subjectsShown, 'Overall %', 'Grade', 'Class Position'];
   const rows = students.map(st=>{
-    const row = [st.name];
+    const overall = studentOverallAverage(st, def);
+    const pos = classPositionFor(st.id, def);
+    const row = [st.name, ...studentIdentityCells(st, anyMatric)];
     subjectsShown.forEach(subj=>{
       const arr = (st.tests||{})[subj] || [];
       const t = arr.length ? arr[arr.length-1] : null;
@@ -4682,11 +4753,18 @@ function generateSectionViewFilteredPDF(){
       if(!t){ row.push('—'); return; }
       row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
     });
+    row.push(pctBadgeCell(overall));
+    row.push(gradeBadgeCell(overall));
+    row.push(pos ? `${pos.rank} of ${pos.total}` : '—');
     return row;
   });
 
+  body += reportTableHtml(headers, rows);
   const subtitle = `${describeRosterFilters(subjFilter, zoneFilterVal, searchQuery, quickFilter)} — ${students.length} student${students.length===1?'':'s'}`;
-  printReport(`${def.label} — Student List`, subtitle, reportTableHtml(headers, rows));
+  printReport(`${def.label} — Student List`, subtitle, body, {
+    compact: headers.length > 8,
+    note: 'Overall % and Class Position reflect the student\'s full record across all subjects, not just those shown above. "—" means no test is recorded for that column.'
+  });
 }
 const svPrintBtn = document.getElementById('svPrintBtn');
 if(svPrintBtn) svPrintBtn.addEventListener('click', generateSectionViewFilteredPDF);
@@ -4695,9 +4773,18 @@ function generateStatListPDF(){
   if(!lastStatListData || !lastStatListData.students.length){ showToast('No student list to print.', 'warn'); return; }
   const { title, subtitle, students } = lastStatListData;
   const cleanTitle = stripEmoji(title) || 'Student List';
-  const body = reportTableHtml(['#','Name','Roll No.','Section','Overall %'],
-    students.map((s,i)=>[i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', s.sectionLabel||'—',
-      pctBadgeCell(s.overall, false, (s.obtained!=null && s.max!=null) ? `${s.obtained}/${s.max}` : null)]));
+  const anyMatric = studentIdentityHeaders(students).length > 1;
+  const scored = students.filter(s=>s.overall!=null);
+  const avg = scored.length ? Math.round((scored.reduce((a,s)=>a+s.overall,0)/scored.length)*10)/10 : null;
+
+  let body = reportStatsGridHtml([
+    {label:'Students', value:String(students.length)},
+    {label:'Average', value:avg!=null?avg+'%':'—'},
+  ]);
+  body += reportTableHtml(['#','Name', ...studentIdentityHeaders(students), 'Section','Overall %','Grade'],
+    students.map((s,i)=>[i+1, s.name, ...studentIdentityCells(s, anyMatric), s.sectionLabel||'—',
+      pctBadgeCell(s.overall, false, (s.obtained!=null && s.max!=null) ? `${s.obtained}/${s.max}` : null),
+      gradeBadgeCell(s.overall)]));
   printReport(cleanTitle + ' — Report', subtitle || `${students.length} student${students.length===1?'':'s'}`, body);
 }
 
