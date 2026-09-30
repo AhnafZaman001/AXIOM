@@ -2332,6 +2332,7 @@ document.addEventListener('click', (e)=>{
 
 /* ===================== UI WIRING ===================== */
 function refreshAllUI(){
+  if(typeof renderLoadedTests==='function') renderLoadedTests();
   populateSubjectFilter();
   renderTable();
   renderPinnedPanel();
@@ -3364,6 +3365,7 @@ function togglePanel(id){
 }
 document.getElementById('importBtn').addEventListener('click', ()=>{
   togglePanel('importPanel');
+  renderLoadedTests();
   refreshCloudFileList();
 });
 
@@ -3662,6 +3664,65 @@ document.getElementById('applyImportBtn').addEventListener('click', ()=>{
   const list = Array.isArray(pendingImport) ? pendingImport : [pendingImport];
   applyPendingImportList(list, false);
 });
+
+// ---------- Loaded tests: list + remove a single one ----------
+// Every imported file becomes a named test stored on each student, so
+// "removing a file" means removing that test from every student/subject
+// across all sections. Other loaded tests are left untouched.
+function getLoadedTestNames(){
+  const counts = {};
+  Object.values(workspace.sections || {}).forEach(sec=>{
+    (sec.students || []).forEach(st=>{
+      Object.values(st.tests || {}).forEach(arr=>{
+        (arr || []).forEach(t=>{ counts[t.test] = (counts[t.test] || 0) + 1; });
+      });
+    });
+  });
+  return Object.keys(counts).map(name=>({name, entries: counts[name]}));
+}
+
+function renderLoadedTests(){
+  const box = document.getElementById('loadedTestsBox');
+  const list = document.getElementById('loadedTestsList');
+  if(!box || !list) return;
+  const tests = getLoadedTestNames();
+  box.style.display = tests.length ? '' : 'none';
+  list.innerHTML = '';
+  tests.forEach(t=>{
+    const chip = document.createElement('div');
+    chip.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 6px 5px 12px;border:1px solid var(--line);border-radius:999px;font-size:0.8rem;background:var(--surface-1);';
+    const label = document.createElement('span');
+    label.textContent = t.name;
+    const btn = document.createElement('button');
+    btn.className = 'ghost small';
+    btn.textContent = '✕ Remove';
+    btn.title = `Remove "${t.name}" from the dashboard (other loaded tests are kept)`;
+    btn.addEventListener('click', ()=> removeLoadedTest(t.name));
+    chip.appendChild(label); chip.appendChild(btn);
+    list.appendChild(chip);
+  });
+}
+
+function removeLoadedTest(testName){
+  if(!confirm(`Remove "${testName}" from the dashboard? All other loaded tests stay as they are.`)) return;
+  // Snapshot first so the existing "Undo Last Import" button can restore it.
+  lastImportSnapshot = JSON.stringify(workspace);
+  lastImportLabel = `removal of "${testName}"`;
+  const undoBtn = document.getElementById('undoImportBtn');
+  undoBtn.disabled = false;
+  undoBtn.title = `Undo ${lastImportLabel} and restore the workspace to how it was before`;
+  Object.values(workspace.sections || {}).forEach(sec=>{
+    (sec.students || []).forEach(st=>{
+      Object.keys(st.tests || {}).forEach(subj=>{
+        st.tests[subj] = (st.tests[subj] || []).filter(t=>t.test !== testName);
+      });
+    });
+  });
+  markDirty();
+  refreshAllUI();
+  renderLoadedTests();
+  showToast(`Removed "${testName}" — undo anytime from the ⋯ More menu.`, 'success');
+}
 
 document.getElementById('undoImportBtn').addEventListener('click', ()=>{
   if(!lastImportSnapshot) return;
