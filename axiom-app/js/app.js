@@ -2196,16 +2196,16 @@ function openStudentDrawerById(id, sectionKeyHint){
     const arr = (student.tests||{})[subj] || [];
     const t = arr.length ? arr[arr.length-1] : null;
 
-    // Build one pill per test on record (not just the latest two), each
-    // labelled with its zone colour, in chronological order.
+    // One compact pill per test on record, chronological, zone-coloured.
     let pillsHtml = '';
     if(arr.length){
       pillsHtml = arr.map((tt, idx)=>{
         const zz = zoneOf(tt.percent, tt.absent);
-        const marksPart = (tt.obtained!=null && tt.max!=null) ? `${tt.obtained}/${tt.max} ` : '';
-        const label = tt.absent ? 'Absent' : (tt.percent!=null ? `${marksPart}(${tt.percent}%)` : '—');
+        const marksPart = (tt.obtained!=null && tt.max!=null) ? `${tt.obtained}/${tt.max} · ` : '';
+        const pct = tt.percent!=null ? `${tt.percent}%` : '—';
+        const label = tt.absent ? 'Absent' : `${marksPart}${pct}`;
         const isLatest = idx === arr.length - 1;
-        return `<span class="zone-pill ${isLatest ? '' : 'prev-pill '}${zz||'none'}" title="${escapeHtml(tt.test||'')}">${zoneDotHtml(zz)}${label}</span>`;
+        return `<span class="zone-pill ${isLatest ? '' : 'prev-pill '}${zz||'none'}" title="${escapeHtml(tt.test||'')}">${label}</span>`;
       }).join('');
     } else {
       pillsHtml = `<span class="zone-pill none">—</span>`;
@@ -2216,25 +2216,18 @@ function openStudentDrawerById(id, sectionKeyHint){
       const prev = arr[arr.length-2];
       if(t && !t.absent && prev && !prev.absent && t.percent!=null && prev.percent!=null){
         const d = Math.round((t.percent - prev.percent)*10)/10;
-        if(d > 0) trendTag = `<span class="delta-tag up">▲+${d}</span>`;
-        else if(d < 0) trendTag = `<span class="delta-tag down">▼${d}</span>`;
-        else trendTag = `<span class="delta-tag flat">·0</span>`;
+        if(d > 0) trendTag = `<span class="delta-tag up">▲ +${d}</span>`;
+        else if(d < 0) trendTag = `<span class="delta-tag down">▼ ${d}</span>`;
+        else trendTag = `<span class="delta-tag flat">· 0</span>`;
       }
     }
     const absentCount = arr.filter(tt=>tt.absent).length;
-    const dots = arr.map(tt=>{
-      const zz = zoneOf(tt.percent, tt.absent);
-      return `<span class="d ${zz||'none'}" title="${escapeHtml(tt.test)}: ${tt.absent?'Absent':(tt.percent+'%')}"></span>`;
-    }).join('');
     bodyHtml += `<div class="drawer-subject-row">
-      <div>
-        <div class="drawer-subject-name">${escapeHtml(subj)}</div>
-        <div class="trend-dots" style="margin-top:5px;">${dots}</div>
+      <div class="dsr-head">
+        <span class="drawer-subject-name">${escapeHtml(subj)}</span>
+        <span class="dsr-meta">${absentCount ? `<span class="dsr-absent">${absentCount} absent</span>` : ''}${trendTag}</span>
       </div>
-      <div style="text-align:right;">
-        <div class="pill-row" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;align-items:center;">${pillsHtml}${trendTag}</div>
-        ${absentCount ? `<div class="hint" style="margin-top:3px;">${absentCount} absence${absentCount>1?'s':''} recorded</div>` : ''}
-      </div>
+      <div class="dsr-pills">${pillsHtml}</div>
     </div>`;
   });
   document.getElementById('drawerBody').innerHTML = renderSupportSectionHtml(student, def) + (bodyHtml || `<div class="hint">No subjects configured for this section.</div>`);
