@@ -3448,7 +3448,7 @@ document.getElementById('cloudImportBtn').addEventListener('click', async ()=>{
       // Single file: unchanged behavior — respects the Test / Exam Name field.
       const fileName = selectedNames[0];
       const testName = document.getElementById('importTestName').value.trim() || generateDefaultTestName();
-      const testDate = document.getElementById('importTestDate').value || null;
+      const testDate = null;
       btn.disabled = true; btn.textContent = 'Downloading…';
       const buf = await axDownloadCloudFile(fileName);
       const wb = XLSX.read(buf, {type:'array', cellDates:false});
@@ -3459,7 +3459,7 @@ document.getElementById('cloudImportBtn').addEventListener('click', async ()=>{
       // Batch: several different files almost certainly represent several
       // different tests, so each gets its own name derived from its
       // filename rather than sharing the single Test / Exam Name field.
-      const testDate = document.getElementById('importTestDate').value || null;
+      const testDate = null;
       const results = [];
       const failed = [];
       for(let i=0;i<selectedNames.length;i++){
@@ -3537,7 +3537,7 @@ document.getElementById('importFileInput').addEventListener('change', async (e)=
   const file = e.target.files[0];
   if(!file) return;
   const testName = document.getElementById('importTestName').value.trim() || generateDefaultTestName();
-  const testDate = document.getElementById('importTestDate').value || null;
+  const testDate = null;
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array', cellDates:false});
   pendingImport = runImport(wb, testName, testDate);
