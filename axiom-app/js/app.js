@@ -1009,7 +1009,7 @@ function updateStatusLine(){
     el.innerHTML = `<span class="dot"></span>${dirty ? 'Saving to pendrive file…' : 'Synced to pendrive file'}`;
   } else {
     el.className = dirty ? 'status-line unsaved' : 'status-line';
-    el.innerHTML = `<span class="dot"></span>${dirty ? 'Unsaved changes — download workspace to keep them' : 'No changes yet'}`;
+    el.innerHTML = `<span class="dot"></span>${dirty ? 'Unsaved changes' : 'No changes yet'}`;
   }
 }
 

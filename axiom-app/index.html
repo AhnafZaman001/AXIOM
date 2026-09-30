@@ -295,7 +295,7 @@
         <label>Or import from Cloud (no file needed on this computer)</label>
         <select id="cloudFileSelect" multiple size="3"><option value="">— Loading cloud files… —</option></select>
       </div>
-      <button class="ghost small" id="cloudImportBtn" title="Download the selected file(s) from Supabase Storage and load them below">Load from Cloud</button>
+      <button class="ghost small" id="cloudImportBtn" title="Import the selected workbooks from cloud storage">Load from Cloud</button>
       <button class="ghost small" id="cloudRefreshBtn" title="Refresh the list of files available in the cloud">↻</button>
       <button class="ghost small" id="cloudDeleteBtn" title="Delete the selected file from the cloud (principal/coordinator only) — removes it for everyone"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg> Delete</button>
     </div>
@@ -304,7 +304,6 @@
       <label style="font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">Loaded on dashboard — remove one without touching the rest</label>
       <div id="loadedTestsList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
     </div>
-    <div class="hint">The workbook can contain any number of section sheets — each sheet is matched to a known section by name automatically. Every subject's marks columns are detected by header keyword and combined (e.g. two pre-board columns become one combined percentage for this test). <b>If everything matches the expected format it's imported right away; if anything looks off, you'll see the detected mapping below and can choose whether to import anyway.</b></div>
     <div id="importPreviewArea"></div>
     <div class="panel-row" id="acceptMappingRow" style="display:none;margin-top:4px;align-items:center;">
       <label style="display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--ink-soft);cursor:pointer;">
