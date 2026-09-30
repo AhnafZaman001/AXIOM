@@ -92,9 +92,9 @@
     background:linear-gradient(135deg,#130B24,#1E1436,#341F5C);
     border-radius:14px;padding:26px 30px;margin-bottom:26px;
     display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
-    box-shadow:var(--shadow-lg);position:relative;overflow:hidden;border-bottom:2px solid rgba(139,92,246,0.4);
+    box-shadow:var(--shadow-lg);position:relative;z-index:55;overflow:visible;border-bottom:2px solid rgba(139,92,246,0.4);
   }
-  .masthead::after{content:'';position:absolute;inset:0;pointer-events:none;
+  .masthead::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;overflow:hidden;
     background:radial-gradient(600px 240px at 100% -20%, rgba(255,255,255,0.06), transparent 60%);}
   .masthead h1{font-family:var(--font-display);font-weight:800;font-size:1.7rem;margin:0;color:#fff;letter-spacing:-0.02em;}
   .masthead .sub{font-family:var(--font-body);font-style:normal;font-size:0.82rem;color:rgba(255,255,255,0.72);text-transform:none;letter-spacing:0.1px;margin-top:5px;}
