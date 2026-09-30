@@ -61,6 +61,15 @@
 <script>
   // If already signed in, skip straight to the app.
   (async () => {
+    const adding = new URLSearchParams(location.search).get('add') === '1';
+    if (adding) {
+      document.querySelector('.login-sub').textContent = 'Add another account';
+      const back = document.createElement('a');
+      back.href = 'index.html'; back.textContent = '← Back to dashboard';
+      back.style.cssText = 'display:block;text-align:center;margin-top:14px;font-size:0.8rem;color:var(--muted);text-decoration:none;';
+      document.querySelector('.login-card').appendChild(back);
+      return;
+    }
     const existing = await axGetSessionAndProfile();
     if (existing) window.location.href = 'index.html';
   })();

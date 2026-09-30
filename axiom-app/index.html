@@ -48,6 +48,13 @@
       setTimeout(function(){ if (hero.parentNode) hero.parentNode.removeChild(hero); }, 340);
     }
     btn.addEventListener('click', dismiss);
+    try {
+      if (sessionStorage.getItem('axiom.switching')) {
+        sessionStorage.removeItem('axiom.switching');
+        hero.style.display = 'none';
+        if (hero.parentNode) hero.parentNode.removeChild(hero);
+      }
+    } catch (e) {}
   })();
 </script>
 <div class="bg-animated" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>

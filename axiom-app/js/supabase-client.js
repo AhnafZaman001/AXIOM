@@ -16,10 +16,90 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 async function axSignIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
+  // Remember this login so it can be switched back to later without a password.
+  try {
+    const { data: profile } = await supabaseClient.from('profiles').select('full_name, role').eq('id', data.user.id).single();
+    axRememberAccount(data.session, profile);
+  } catch (e) { axRememberAccount(data.session, null); }
   return data;
 }
 
+// ---------- Multi-account switcher ----------
+// Every account signed in on this browser is kept in a saved list so the user
+// can flip between campuses without logging out and re-entering passwords.
+const AX_ACCOUNTS_KEY = 'axiom.savedAccounts';
+
+function axGetSavedAccounts() {
+  try { return JSON.parse(localStorage.getItem(AX_ACCOUNTS_KEY) || '[]'); } catch (e) { return []; }
+}
+function axStoreAccounts(list) {
+  try { localStorage.setItem(AX_ACCOUNTS_KEY, JSON.stringify(list)); } catch (e) { /* storage unavailable */ }
+}
+function axRememberAccount(session, profile) {
+  if (!session || !session.user) return;
+  const list = axGetSavedAccounts();
+  const entry = {
+    id: session.user.id,
+    email: session.user.email,
+    name: (profile && profile.full_name) || session.user.email,
+    role: (profile && profile.role) || '',
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+  };
+  const i = list.findIndex(a => a.id === entry.id);
+  if (i >= 0) list[i] = Object.assign({}, list[i], entry, {
+    name: entry.name || list[i].name, role: entry.role || list[i].role,
+  });
+  else list.push(entry);
+  axStoreAccounts(list);
+}
+function axForgetAccount(id) {
+  axStoreAccounts(axGetSavedAccounts().filter(a => a.id !== id));
+}
+
+// Supabase rotates tokens; keep the saved copy of the active account fresh.
+// (Synchronous work only inside this callback.)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (!session || !session.user) return;
+  if (event !== 'SIGNED_IN' && event !== 'TOKEN_REFRESHED') return;
+  const list = axGetSavedAccounts();
+  const a = list.find(x => x.id === session.user.id);
+  if (!a) return;
+  a.access_token = session.access_token;
+  a.refresh_token = session.refresh_token;
+  axStoreAccounts(list);
+});
+
+async function axSwitchAccount(id) {
+  const acct = axGetSavedAccounts().find(a => a.id === id);
+  if (!acct) throw new Error('That account is no longer saved.');
+  const { data, error } = await supabaseClient.auth.setSession({
+    access_token: acct.access_token, refresh_token: acct.refresh_token,
+  });
+  if (error || !data || !data.session) {
+    axForgetAccount(id);
+    throw new Error('Session for ' + acct.name + ' has expired — please sign in to that account again.');
+  }
+  axRememberAccount(data.session, null);
+  try { sessionStorage.setItem('axiom.switching', '1'); } catch (e) {}
+  window.location.href = 'index.html';
+}
+
+// Logs out of the CURRENT account only; if other accounts are saved, jumps to
+// the next one instead of the login screen.
 async function axSignOut() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session && session.user) axForgetAccount(session.user.id);
+  await supabaseClient.auth.signOut();
+  const next = axGetSavedAccounts()[0];
+  if (next) {
+    try { await axSwitchAccount(next.id); return; } catch (e) { /* fall through to login */ }
+  }
+  window.location.href = 'login.html';
+}
+
+async function axSignOutAll() {
+  axStoreAccounts([]);
   await supabaseClient.auth.signOut();
   window.location.href = 'login.html';
 }
