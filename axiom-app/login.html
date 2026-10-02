@@ -23,6 +23,15 @@
     color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer;font-family:var(--font-body);}
   .login-btn:disabled{opacity:0.6;cursor:default;}
   .login-btn:hover:not(:disabled){background:linear-gradient(135deg,#A78BFA,#8B5CF6);}
+  .pw-wrap{position:relative;}
+  .pw-wrap input{padding-right:44px;}
+  .pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;
+    color:var(--muted);padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px;}
+  .pw-toggle:hover{color:var(--ink);}
+  .pw-toggle svg{width:18px;height:18px;}
+  .pw-toggle .eye-off{display:none;}
+  .pw-toggle.shown .eye{display:none;}
+  .pw-toggle.shown .eye-off{display:block;}
 </style>
 </head>
 <body>
@@ -49,7 +58,13 @@
       </div>
       <div class="login-field">
         <label>Password</label>
-        <input type="password" id="loginPassword" autocomplete="current-password" required>
+        <div class="pw-wrap">
+          <input type="password" id="loginPassword" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password" title="Show password">
+            <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
       </div>
       <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
     </form>
@@ -91,6 +106,19 @@
       btn.disabled = false; btn.textContent = 'Sign In';
     }
   });
+</script>
+<script>
+  (function(){
+    var btn=document.getElementById('pwToggle'), inp=document.getElementById('loginPassword');
+    btn.addEventListener('click',function(){
+      var show=inp.type==='password';
+      inp.type=show?'text':'password';
+      btn.classList.toggle('shown',show);
+      btn.setAttribute('aria-label',show?'Hide password':'Show password');
+      btn.title=show?'Hide password':'Show password';
+      inp.focus();
+    });
+  })();
 </script>
 </body>
 </html>
