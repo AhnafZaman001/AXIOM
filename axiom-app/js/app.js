@@ -1307,6 +1307,112 @@ function latestTest(student, subject){
   return arr[arr.length-1];
 }
 
+/* ===================== SHARED ROSTER COLUMN LOGIC =====================
+   Used by BOTH on-screen rosters (Section View + Teacher Report) and BOTH
+   printed rosters, so screen and print can never drift apart.
+   - With a Subject filter selected, every test of that subject is shown as
+     its own column (T1, T2, T3 ...) instead of only the latest test.
+   - "Position" is the position recorded on the sheet; with a Subject filter
+     it is that subject's position, otherwise the first subject that has one. */
+function rosterTestNames(store, subj){
+  const names = [];
+  (store.students||[]).forEach(st=>{
+    ((st.tests||{})[subj]||[]).forEach(t=>{ if(t && t.test!=null && !names.includes(t.test)) names.push(t.test); });
+  });
+  return names;
+}
+function rosterTestAverage(store, subj, testName){
+  const vals = [];
+  (store.students||[]).forEach(st=>{
+    const t = ((st.tests||{})[subj]||[]).find(x=>x.test===testName);
+    if(t && !t.absent && t.percent!=null) vals.push(t.percent);
+  });
+  return vals.length ? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : null;
+}
+function rosterPositionFor(st, def, subjFilterVal){
+  if(subjFilterVal){
+    const t = latestTest(st, subjFilterVal);
+    return (t && t.position!=null) ? t.position : null;
+  }
+  for(const subj of def.subjects){ const t=latestTest(st,subj); if(t && t.position!=null) return t.position; }
+  return null;
+}
+function rosterExtraHeadHtml(sortState){
+  if(!showExtra) return '';
+  return sortableThHtml('Roll No.', '__rollNo', sortState)
+       + sortableThHtml('Matric', '__matric', sortState)
+       + sortableThHtml('Position', '__position', sortState);
+}
+function rosterExtraCellsHtml(st, def, subjFilterVal){
+  if(!showExtra) return '';
+  const pos = rosterPositionFor(st, def, subjFilterVal);
+  return `<td class="extra-detail">${escapeHtml(st.rollNo ?? '—')}</td><td class="extra-detail">${escapeHtml(st.matric ?? '—')}</td><td class="extra-detail">${pos ?? '—'}</td>`;
+}
+function rosterTestHeadHtml(store, subj, testNames, sortState){
+  return testNames.map(tn=>{
+    const avg = rosterTestAverage(store, subj, tn);
+    const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
+    return sortableThHtml(tn, `__test|${subj}|${tn}`, sortState, extra);
+  }).join('');
+}
+function rosterTestCellsHtml(st, subj, testNames){
+  const arr = (st.tests||{})[subj] || [];
+  return testNames.map(tn=>{
+    const t = arr.find(x=>x.test===tn) || null;
+    const z = t ? zoneOf(t.percent, t.absent) : null;
+    const marks = (t && t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max} ` : '';
+    const label = t ? (t.absent ? 'Absent' : `${marks}(${t.percent}%)`) : '—';
+    return `<td class="zone-cell"><span class="zone-pill ${z||'none'}">${zoneDotHtml(z)}${label}</span></td>`;
+  }).join('');
+}
+// Printed-roster table (headers + rows) that mirrors the on-screen roster exactly.
+function rosterPrintTable(def, store, students, subjFilterVal, subjectsShown, zoneFilterVal, quickFilterVal){
+  const testNames = subjFilterVal ? rosterTestNames(store, subjFilterVal) : [];
+  const perTest = !!subjFilterVal && testNames.length>0;
+  const headers = ['Student'];
+  if(showExtra) headers.push('Roll No.','Matric','Position');
+  if(perTest) headers.push(...testNames); else headers.push(...subjectsShown);
+  const rows = students.map(st=>{
+    const row = [st.name];
+    if(showExtra){
+      const pos = rosterPositionFor(st, def, subjFilterVal);
+      row.push((st.rollNo!=null && st.rollNo!=='') ? st.rollNo : '—',
+               (st.matric!=null && st.matric!=='') ? st.matric : '—',
+               pos!=null ? pos : '—');
+    }
+    if(perTest){
+      const arr = (st.tests||{})[subjFilterVal] || [];
+      testNames.forEach(tn=>{
+        const t = arr.find(x=>x.test===tn);
+        if(!t){ row.push('—'); return; }
+        row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
+      });
+      return row;
+    }
+    subjectsShown.forEach(subj=>{
+      const arr = (st.tests||{})[subj] || [];
+      const t = arr.length ? arr[arr.length-1] : null;
+      const z = t ? zoneOf(t.percent, t.absent) : null;
+      const zoneMismatch = zoneFilterVal && (!subjFilterVal) && z !== zoneFilterVal;
+      let quickMismatch = false;
+      if(quickFilterVal && !subjFilterVal){
+        if(quickFilterVal === 'atrisk'){
+          quickMismatch = !(t && z === 'red');
+        } else if(quickFilterVal === 'improving' || quickFilterVal === 'declining'){
+          const c = classifyTransition(arr);
+          const wantKey = quickFilterVal === 'improving' ? 'improved' : 'declined';
+          quickMismatch = !(c && c.key === wantKey);
+        }
+      }
+      if(zoneMismatch || quickMismatch){ row.push('—'); return; }
+      if(!t){ row.push('—'); return; }
+      row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
+    });
+    return row;
+  });
+  return {headers, rows};
+}
+
 let quickFilter = null; // 'atrisk' | 'improving' | 'declining' | 'absent' | null
 let searchQuery = '';
 
@@ -1392,19 +1498,21 @@ function renderTable(){
   const subjectsShown = subjFilter ? [subjFilter] : visibleSubjectsFor(def);
 
   let headHtml = sortableThHtml('Student', '__name', mainTableSort);
-  if(showExtra){
-    headHtml += sortableThHtml('Roll No.', '__rollNo', mainTableSort);
-    headHtml += sortableThHtml('Matric', '__matric', mainTableSort);
-    headHtml += sortableThHtml('Position', '__position', mainTableSort);
+  headHtml += rosterExtraHeadHtml(mainTableSort);
+  const testNames = subjFilter ? rosterTestNames(store, subjFilter) : [];
+  const perTest = !!subjFilter && testNames.length > 0;
+  if(perTest){
+    headHtml += rosterTestHeadHtml(store, subjFilter, testNames, mainTableSort);
+  } else {
+    subjectsShown.forEach(s=>{
+      const avg = subjectClassAverage(store, s);
+      const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
+      headHtml += sortableThHtml(s, s, mainTableSort, extra);
+    });
   }
-  subjectsShown.forEach(s=>{
-    const avg = subjectClassAverage(store, s);
-    const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
-    headHtml += sortableThHtml(s, s, mainTableSort, extra);
-  });
   head.innerHTML = headHtml;
 
-  const students = sortStudentsBy(store.students.filter(s=>studentPassesFilters(s, def)), def, mainTableSort);
+  const students = sortStudentsBy(store.students.filter(s=>studentPassesFilters(s, def)), def, mainTableSort, {positionSubject: subjFilter});
 
   renderHeroMetrics(def, store);
 
@@ -1427,14 +1535,9 @@ function renderTable(){
 
   body.innerHTML = students.map(st=>{
     let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}${escapeHtml(st.name)}</td>`;
-    if(showExtra){
-      const latestPos = (()=>{
-        for(const subj of def.subjects){ const t=latestTest(st,subj); if(t && t.position!=null) return t.position; }
-        return null;
-      })();
-      row += `<td class="extra-detail">${escapeHtml(st.rollNo ?? '—')}</td><td class="extra-detail">${st.matric ?? '—'}</td><td class="extra-detail">${latestPos ?? '—'}</td>`;
-    }
-    subjectsShown.forEach(subj=>{
+    row += rosterExtraCellsHtml(st, def, subjFilter);
+    if(perTest) row += rosterTestCellsHtml(st, subjFilter, testNames);
+    (perTest ? [] : subjectsShown).forEach(subj=>{
       const arr = (st.tests||{})[subj] || [];
       const t = arr.length ? arr[arr.length-1] : null;
       const z = t ? zoneOf(t.percent, t.absent) : null;
@@ -2399,7 +2502,7 @@ function classPositionFor(studentId, def){
 // subject at once (a student can be #1 in Physics and #20 in Chemistry),
 // so clicking one subject's header sorts by that subject alone; clicking a
 // different header just switches which single column is driving the order.
-function studentSortValue(st, def, key){
+function studentSortValue(st, def, key, opts){
   if(key === '__name') return (st.name||'').toLowerCase();
   if(key === '__rollNo'){
     if(st.rollNo==null || st.rollNo==='') return null;
@@ -2412,8 +2515,14 @@ function studentSortValue(st, def, key){
     return Number.isNaN(n) ? String(st.matric).toLowerCase() : n;
   }
   if(key === '__position'){
-    for(const subj of def.subjects){ const t=latestTest(st,subj); if(t && t.position!=null) return t.position; }
-    return null;
+    return rosterPositionFor(st, def, opts && opts.positionSubject);
+  }
+  if(key.startsWith('__test|')){
+    const parts = key.split('|');
+    const subj = parts[1], tn = parts.slice(2).join('|');
+    const t = ((st.tests||{})[subj]||[]).find(x=>x.test===tn);
+    if(!t || t.absent || t.percent==null) return null;
+    return t.percent;
   }
   // Anything else is a subject name — sort by that subject's latest test.
   const arr = (st.tests||{})[key] || [];
@@ -2421,12 +2530,12 @@ function studentSortValue(st, def, key){
   if(!t || t.absent || t.percent==null) return null;
   return t.percent;
 }
-function sortStudentsBy(students, def, sortState){
+function sortStudentsBy(students, def, sortState, opts){
   if(!sortState || !sortState.key) return students;
   const {key, dir} = sortState;
   return students.slice().sort((a,b)=>{
-    const va = studentSortValue(a, def, key);
-    const vb = studentSortValue(b, def, key);
+    const va = studentSortValue(a, def, key, opts);
+    const vb = studentSortValue(b, def, key, opts);
     // Students with nothing on record for the active column always sink to
     // the bottom, regardless of ascending/descending.
     if(va==null && vb==null) return 0;
@@ -3101,16 +3210,23 @@ function renderRosterTable(cfg){
   const subjectsShown = subjectsForRoster(def, subjFilterVal, restrictToTeacher);
 
   let headHtml = sortableThHtml('Student', '__name', sortState);
-  subjectsShown.forEach(s=>{
-    const avg = subjectClassAverage(store, s);
-    const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
-    headHtml += sortableThHtml(s, s, sortState, extra);
-  });
+  headHtml += rosterExtraHeadHtml(sortState);
+  const testNames = subjFilterVal ? rosterTestNames(store, subjFilterVal) : [];
+  const perTest = !!subjFilterVal && testNames.length > 0;
+  if(perTest){
+    headHtml += rosterTestHeadHtml(store, subjFilterVal, testNames, sortState);
+  } else {
+    subjectsShown.forEach(s=>{
+      const avg = subjectClassAverage(store, s);
+      const extra = avg!=null ? `<span class="subject-th-avg">avg ${avg}%</span>` : '';
+      headHtml += sortableThHtml(s, s, sortState, extra);
+    });
+  }
   headEl.innerHTML = headHtml;
 
   const students = sortStudentsBy(
     store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal})),
-    def, sortState
+    def, sortState, {positionSubject: subjFilterVal}
   );
 
   if(store.students.length === 0){
@@ -3127,7 +3243,9 @@ function renderRosterTable(cfg){
 
   bodyEl.innerHTML = students.map(st=>{
     let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" data-pin-skey="${def.key}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}${escapeHtml(st.name)}</td>`;
-    subjectsShown.forEach(subj=>{
+    row += rosterExtraCellsHtml(st, def, subjFilterVal);
+    if(perTest) row += rosterTestCellsHtml(st, subjFilterVal, testNames);
+    (perTest ? [] : subjectsShown).forEach(subj=>{
       const arr = (st.tests||{})[subj] || [];
       const t = arr.length ? arr[arr.length-1] : null;
       const z = t ? zoneOf(t.percent, t.absent) : null;
@@ -3349,6 +3467,7 @@ document.getElementById('extraDetailsBtn').addEventListener('click', (e)=>{
   showExtra = !showExtra;
   e.target.textContent = showExtra ? 'Hide Details' : 'Show Details';
   renderTable();
+  if(typeof renderTRRoster === 'function') renderTRRoster();
 });
 
 function togglePanel(id){
@@ -4634,63 +4753,36 @@ function describeRosterFilters(subjFilterVal, zoneFilterVal, searchQueryVal, qui
 // shows "—" on the printed page, and nothing is ever printed that wasn't
 // actually visible in the table.
 function generateRosterFilteredPDF(cfg){
-  const {sectionKey, subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal, restrictToTeacher, reportTitle} = cfg;
+  const {sectionKey, subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal, restrictToTeacher, reportTitle, sortState} = cfg;
   const def = SECTION_BY_KEY[sectionKey];
   if(!def){ showToast('Select a section first.', 'warn'); return; }
   const store = ensureSection(def.key);
   const subjectsShown = subjectsForRoster(def, subjFilterVal, restrictToTeacher);
-  const students = store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal}));
+  // Same filter + same sort as the on-screen roster, so rows print in the order they are seen.
+  const students = sortStudentsBy(
+    store.students.filter(s=>rosterStudentPassesFilters(s, def, {subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal})),
+    def, sortState, {positionSubject: subjFilterVal}
+  );
 
   if(!students.length){
     showToast('No students match the current filters — nothing to print.', 'warning');
     return;
   }
 
-  const anyMatric = studentIdentityHeaders(students).length > 1;
   const scored = students.filter(s=>studentOverallAverage(s, def)!=null);
   const avg = scored.length ? Math.round((scored.reduce((a,s)=>a+studentOverallAverage(s, def),0)/scored.length)*10)/10 : null;
+  const {headers, rows} = rosterPrintTable(def, store, students, subjFilterVal, subjectsShown, zoneFilterVal, quickFilterVal);
 
   let body = reportStatsGridHtml([
     {label:'Students Shown', value:String(students.length)},
     {label:'Subjects Shown', value:String(subjectsShown.length)},
     {label:'Average of List', value:avg!=null?avg+'%':'—'},
   ]);
-
-  const headers = ['Student', ...studentIdentityHeaders(students), ...subjectsShown, 'Overall %', 'Grade', 'Class Position'];
-  const rows = students.map(st=>{
-    const overall = studentOverallAverage(st, def);
-    const pos = classPositionFor(st.id, def);
-    const row = [st.name, ...studentIdentityCells(st, anyMatric)];
-    subjectsShown.forEach(subj=>{
-      const arr = (st.tests||{})[subj] || [];
-      const t = arr.length ? arr[arr.length-1] : null;
-      const z = t ? zoneOf(t.percent, t.absent) : null;
-      const zoneMismatch = zoneFilterVal && (!subjFilterVal) && z !== zoneFilterVal;
-      let quickMismatch = false;
-      if(quickFilterVal && !subjFilterVal){
-        if(quickFilterVal === 'atrisk'){
-          quickMismatch = !(t && z === 'red');
-        } else if(quickFilterVal === 'improving' || quickFilterVal === 'declining'){
-          const c = classifyTransition(arr);
-          const wantKey = quickFilterVal === 'improving' ? 'improved' : 'declined';
-          quickMismatch = !(c && c.key === wantKey);
-        }
-      }
-      if(zoneMismatch || quickMismatch){ row.push('—'); return; }
-      if(!t){ row.push('—'); return; }
-      row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
-    });
-    row.push(pctBadgeCell(overall));
-    row.push(gradeBadgeCell(overall));
-    row.push(pos ? `${pos.rank} of ${pos.total}` : '—');
-    return row;
-  });
-
   body += reportTableHtml(headers, rows);
   const subtitle = `${describeRosterFilters(subjFilterVal, zoneFilterVal, searchQueryVal, quickFilterVal)} — ${students.length} student${students.length===1?'':'s'}`;
   printReport(reportTitle, subtitle, body, {
     compact: headers.length > 8,
-    note: 'Overall % and Class Position reflect the student\'s full record across all subjects, not just those shown above. "—" means no test is recorded for that column.'
+    note: 'Columns, order and filters match the on-screen roster. "—" means no test is recorded for that column.'
   });
 }
 
@@ -4705,7 +4797,8 @@ function printTRRosterFiltered(){
     searchQueryVal: trRosterState.searchQuery,
     quickFilterVal: trRosterState.quickFilter,
     restrictToTeacher: teacherName,
-    reportTitle: `${teacherName} — ${def ? def.label : 'Section'} Roster`
+    reportTitle: `${teacherName} — ${def ? def.label : 'Section'} Roster`,
+    sortState: trRosterState.sort
   });
 }
 
@@ -4767,57 +4860,27 @@ function generateSectionViewFilteredPDF(){
   const zoneFilterVal = document.getElementById('zoneFilter').value;
   const subjectsShown = subjFilter ? [subjFilter] : visibleSubjectsFor(def);
 
-  const students = store.students.filter(s=>studentPassesFilters(s, def));
+  // Same filter + same sort as the on-screen roster, so rows print in the order they are seen.
+  const students = sortStudentsBy(store.students.filter(s=>studentPassesFilters(s, def)), def, mainTableSort, {positionSubject: subjFilter});
   if(!students.length){
     showToast('No students match the current filters — nothing to print.', 'warning');
     return;
   }
 
-  const anyMatric = studentIdentityHeaders(students).length > 1;
   const scored = students.filter(s=>studentOverallAverage(s, def)!=null);
   const avg = scored.length ? Math.round((scored.reduce((a,s)=>a+studentOverallAverage(s, def),0)/scored.length)*10)/10 : null;
+  const {headers, rows} = rosterPrintTable(def, store, students, subjFilter, subjectsShown, zoneFilterVal, quickFilter);
 
   let body = reportStatsGridHtml([
     {label:'Students Shown', value:String(students.length)},
     {label:'Subjects Shown', value:String(subjectsShown.length)},
     {label:'Average of List', value:avg!=null?avg+'%':'—'},
   ]);
-
-  const headers = ['Student', ...studentIdentityHeaders(students), ...subjectsShown, 'Overall %', 'Grade', 'Class Position'];
-  const rows = students.map(st=>{
-    const overall = studentOverallAverage(st, def);
-    const pos = classPositionFor(st.id, def);
-    const row = [st.name, ...studentIdentityCells(st, anyMatric)];
-    subjectsShown.forEach(subj=>{
-      const arr = (st.tests||{})[subj] || [];
-      const t = arr.length ? arr[arr.length-1] : null;
-      const z = t ? zoneOf(t.percent, t.absent) : null;
-      const zoneMismatch = zoneFilterVal && (!subjFilter) && z !== zoneFilterVal;
-      let quickMismatch = false;
-      if(quickFilter && !subjFilter){
-        if(quickFilter === 'atrisk'){
-          quickMismatch = !(t && z === 'red');
-        } else if(quickFilter === 'improving' || quickFilter === 'declining'){
-          const c = classifyTransition(arr);
-          const wantKey = quickFilter === 'improving' ? 'improved' : 'declined';
-          quickMismatch = !(c && c.key === wantKey);
-        }
-      }
-      if(zoneMismatch || quickMismatch){ row.push('—'); return; }
-      if(!t){ row.push('—'); return; }
-      row.push(pctBadgeCell(t.percent, t.absent, (t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max}` : null));
-    });
-    row.push(pctBadgeCell(overall));
-    row.push(gradeBadgeCell(overall));
-    row.push(pos ? `${pos.rank} of ${pos.total}` : '—');
-    return row;
-  });
-
   body += reportTableHtml(headers, rows);
   const subtitle = `${describeRosterFilters(subjFilter, zoneFilterVal, searchQuery, quickFilter)} — ${students.length} student${students.length===1?'':'s'}`;
   printReport(`${def.label} — Student List`, subtitle, body, {
     compact: headers.length > 8,
-    note: 'Overall % and Class Position reflect the student\'s full record across all subjects, not just those shown above. "—" means no test is recorded for that column.'
+    note: 'Columns, order and filters match the on-screen roster. "—" means no test is recorded for that column.'
   });
 }
 const svPrintBtn = document.getElementById('svPrintBtn');
