@@ -1226,7 +1226,28 @@ function applyImport(parsed){
 /* ---- 008_render-toolbar-selects.js ---- */
 
 /* ===================== RENDER: TOOLBAR SELECTS ===================== */
+/* ---- Custom section order (persisted per browser) ---- */
+const SECTION_ORDER_KEY = 'axiom-section-order';
+const DEFAULT_SECTION_ORDER = SECTION_DEFS.map(d=>d.key);
+function loadSavedSectionOrder(){
+  try{ const v = JSON.parse(localStorage.getItem(SECTION_ORDER_KEY)||'null'); return Array.isArray(v) ? v : null; }
+  catch(e){ return null; }
+}
+// Sorts SECTION_DEFS in place (same array reference, as the rest of the app expects).
+// Sections missing from the saved order (e.g. newly added) keep their relative order at the end.
+function applySectionOrder(order){
+  const base = order || DEFAULT_SECTION_ORDER;
+  const rank = k => { const i = base.indexOf(k); return i === -1 ? Infinity : i; };
+  const sorted = SECTION_DEFS.map((d,i)=>({d,i})).sort((a,b)=>{
+    const ra = rank(a.d.key), rb = rank(b.d.key);
+    if(ra === rb) return a.i - b.i;
+    return ra < rb ? -1 : 1;
+  }).map(x=>x.d);
+  SECTION_DEFS.splice(0, SECTION_DEFS.length, ...sorted);
+}
+
 function populateSectionSelects(){
+  applySectionOrder(loadSavedSectionOrder());
   const opts = SECTION_DEFS.map(d=>`<option value="${d.key}">${d.label}</option>`).join('');
   ['sectionSelect','atSection','asSection'].forEach(id=>{
     document.getElementById(id).innerHTML = opts;
@@ -3991,6 +4012,79 @@ document.getElementById('deleteSectionBtn').addEventListener('click', ()=>{
     }
   );
 });
+
+/* ---- Reorder Sections ---- */
+(function(){
+  const overlay = document.getElementById('reorderSectionsOverlay');
+  const list = document.getElementById('rosList');
+  let dragEl = null;
+  function esc(s){ return String(s).replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+  function buildList(keys){
+    list.innerHTML = keys.map(k=>{
+      const d = SECTION_BY_KEY[k];
+      return `<li draggable="true" data-key="${esc(k)}"><span class="ros-handle" aria-hidden="true">⋮⋮</span><span class="ros-label">${esc(d.label)}</span><button type="button" class="ghost small" data-move="-1" aria-label="Move up">↑</button><button type="button" class="ghost small" data-move="1" aria-label="Move down">↓</button></li>`;
+    }).join('');
+  }
+  function currentOrder(){ return [...list.querySelectorAll('li')].map(li=>li.dataset.key); }
+  list.addEventListener('click', e=>{
+    const b = e.target.closest('button[data-move]'); if(!b) return;
+    const li = b.closest('li'), dir = +b.dataset.move;
+    if(dir < 0 && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+    if(dir > 0 && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
+    li.scrollIntoView({block:'nearest'});
+  });
+  list.addEventListener('dragstart', e=>{
+    dragEl = e.target.closest('li'); if(!dragEl) return;
+    dragEl.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', dragEl.dataset.key); }catch(_){}
+  });
+  list.addEventListener('dragover', e=>{
+    if(!dragEl) return;
+    e.preventDefault();
+    const over = e.target.closest('li');
+    list.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+    if(over && over !== dragEl) over.classList.add('drag-over');
+  });
+  list.addEventListener('drop', e=>{
+    e.preventDefault();
+    const over = e.target.closest('li');
+    if(dragEl && over && over !== dragEl){
+      const items = [...list.children];
+      if(items.indexOf(dragEl) < items.indexOf(over)) list.insertBefore(dragEl, over.nextSibling);
+      else list.insertBefore(dragEl, over);
+    }
+  });
+  list.addEventListener('dragend', ()=>{
+    if(dragEl) dragEl.classList.remove('dragging');
+    list.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+    dragEl = null;
+  });
+  function applyAndRefresh(order){
+    const keep = currentSectionKey();
+    try{
+      if(order) localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(order));
+      else localStorage.removeItem(SECTION_ORDER_KEY);
+    }catch(e){ /* storage unavailable: order applies for this session only */ }
+    applySectionOrder(order);
+    populateSectionSelects();
+    document.getElementById('sectionSelect').value = keep;
+    populateSubjectFilter();
+    refreshAllUI();
+  }
+  document.getElementById('reorderSectionsBtn').addEventListener('click', ()=>{
+    buildList(SECTION_DEFS.map(d=>d.key));
+    overlay.classList.add('open');
+  });
+  document.getElementById('rosCancelBtn').addEventListener('click', ()=>overlay.classList.remove('open'));
+  overlay.addEventListener('click', e=>{ if(e.target === overlay) overlay.classList.remove('open'); });
+  document.getElementById('rosResetBtn').addEventListener('click', ()=>buildList(DEFAULT_SECTION_ORDER.concat(SECTION_DEFS.map(d=>d.key).filter(k=>!DEFAULT_SECTION_ORDER.includes(k)))));
+  document.getElementById('rosSaveBtn').addEventListener('click', ()=>{
+    applyAndRefresh(currentOrder());
+    overlay.classList.remove('open');
+    showToast('Section order saved.', 'success');
+  });
+})();
 
 /* ---- Rename Section ---- */
 document.getElementById('renameSectionBtn').addEventListener('click', ()=>{

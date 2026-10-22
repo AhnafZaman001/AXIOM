@@ -654,3 +654,13 @@
   .support-plan-item{border-top:1px solid var(--line);padding:10px 2px;font-size:0.8rem;}
   .spi-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;}
   .followup-entry{padding:6px 0 6px 10px;border-left:2px solid var(--line);margin:4px 0 4px 4px;font-size:0.78rem;color:var(--ink-soft);}
+
+  /* ===== Reorder Sections ===== */
+  .ros-list{list-style:none;margin:0;padding:0;max-height:55vh;overflow-y:auto;border:1px solid var(--line);border-radius:12px;}
+  .ros-list li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--line);background:var(--paper-raised);cursor:grab;font-size:0.85rem;}
+  .ros-list li:first-child{border-top:none;}
+  .ros-list li.dragging{opacity:0.45;}
+  .ros-list li.drag-over{box-shadow:inset 0 2px 0 var(--accent);}
+  .ros-list .ros-handle{color:var(--muted);user-select:none;}
+  .ros-list .ros-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ros-list button{padding:2px 8px;line-height:1.2;}
