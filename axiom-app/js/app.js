@@ -1901,7 +1901,8 @@ function getHeroFilteredStudents(def, store, filterKey){
       rollNo: st.rollNo,
       sectionKey: def.key,
       sectionLabel: def.label,
-      overall: studentOverallAverage(st, def)
+      overall: studentOverallAverage(st, def),
+      ...(()=>{ const tm = studentTotalMarks(st, def); return {obtained:tm.obtained, max:tm.max}; })()
     });
   });
   return out.sort((a,b)=> (b.overall||0) - (a.overall||0));
@@ -2473,6 +2474,22 @@ function studentOverallAverage(st, def){
   if(!pcts.length) return null;
   return Math.round((pcts.reduce((a,b)=>a+b,0)/pcts.length)*10)/10;
 }
+// Total marks across EVERY attempted test in all of the section's subjects:
+// obtained = sum of obtained marks, max = sum of each test's total marks.
+// Absent / blank tests are skipped. Returns {obtained, max} or nulls if none.
+function studentTotalMarks(st, def){
+  let obtained = 0, max = 0, n = 0;
+  def.subjects.forEach(subj=>{
+    ((st.tests||{})[subj] || []).forEach(t=>{
+      if(t && !t.absent && t.obtained!=null && t.max!=null && !Number.isNaN(+t.obtained) && !Number.isNaN(+t.max)){
+        obtained += +t.obtained; max += +t.max; n++;
+      }
+    });
+  });
+  if(!n) return {obtained:null, max:null};
+  const r = v=>Math.round(v*100)/100;
+  return {obtained:r(obtained), max:r(max)};
+}
 function gradeFor(pct){
   if(pct==null) return '—';
   if(pct>=90) return 'A+'; if(pct>=80) return 'A'; if(pct>=70) return 'B';
@@ -2618,7 +2635,8 @@ function collectOverallRoster(){
     store.students.forEach(st=>{
       const overall = studentOverallAverage(st, def);
       if(overall!=null){
-        students.push({name:st.name, rollNo:st.rollNo, id:st.id, sectionKey:def.key, sectionLabel:def.label, def, st, overall, trend: studentOverallTrend(st, def)});
+        const tm = studentTotalMarks(st, def);
+        students.push({name:st.name, rollNo:st.rollNo, id:st.id, sectionKey:def.key, sectionLabel:def.label, def, st, overall, obtained:tm.obtained, max:tm.max, trend: studentOverallTrend(st, def)});
         sumAvg += overall; cntAvg++;
         if(!top || overall > top.overall) top = {name:st.name, rollNo:st.rollNo, overall};
       }
@@ -2688,8 +2706,8 @@ function renderOverallSummary(){
       s.trend>0 ? `<span class="delta-tag up">▲+${s.trend}</span>` :
       s.trend<0 ? `<span class="delta-tag down">▼${s.trend}</span>` : `<span class="delta-tag flat">·0</span>`;
     return `<tr data-sid="${s.id}" data-skey="${s.sectionKey}"><td>${i+1}</td><td class="name-cell">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` <span class="extra-detail">(Roll ${escapeHtml(s.rollNo)})</span>`:''}</td><td>${escapeHtml(s.sectionLabel)}</td>
-      <td><span class="zone-pill ${zoneOf(s.overall,false)}">${s.overall}%</span></td><td>${gradeFor(s.overall)}</td><td>${trendTag}</td></tr>`;
-  }).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">No data yet — import results to see the overall dashboard.</td></tr>`;
+      <td><span class="zone-pill ${zoneOf(s.overall,false)}">${s.overall}%</span></td><td>${s.obtained!=null&&s.max!=null?`${s.obtained} / ${s.max}`:'—'}</td><td>${gradeFor(s.overall)}</td><td>${trendTag}</td></tr>`;
+  }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">No data yet — import results to see the overall dashboard.</td></tr>`;
 
   // Subject-wise toppers
   const toppers = subjectWiseToppers();
@@ -4656,10 +4674,10 @@ function generateOverallSummaryPDF(){
 
   if(ranked.length){
     const posMap = rankWithinSections(students);
-    body += reportSectionHtml('Top 10 Students Overall', reportTableHtml(['#','Name','Roll No.','Matric','Section','Class Position','Overall %','Grade'],
+    body += reportSectionHtml('Top 10 Students Overall', reportTableHtml(['#','Name','Roll No.','Matric','Section','Class Position','Overall %','Total Marks','Grade'],
       ranked.map((s,i)=>{
         const pos = posMap.get(s.id);
-        return [i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', (s.st&&s.st.matric!=null)?s.st.matric:'—', s.sectionLabel, pos?`${pos.rank} of ${pos.total}`:'—', pctBadgeCell(s.overall), gradeBadgeCell(s.overall)];
+        return [i+1, s.name, (s.rollNo!=null&&s.rollNo!=='')?s.rollNo:'—', (s.st&&s.st.matric!=null)?s.st.matric:'—', s.sectionLabel, pos?`${pos.rank} of ${pos.total}`:'—', pctBadgeCell(s.overall), (s.obtained!=null&&s.max!=null)?`${s.obtained} / ${s.max}`:'—', gradeBadgeCell(s.overall)];
       })));
   }
 
