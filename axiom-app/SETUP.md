@@ -86,3 +86,39 @@ functions to do this (`axSaveTestScore`, `axAddStudent`, `axAddSection`,
 called from inside those forms' existing submit handlers in `js/app.js`.
 That's a good next step once you've confirmed the login/roles feel right —
 happy to wire that in next.
+
+## Email alerts (login, critical changes, files)
+
+Alerts go to `ahnaf7624@gmail.com` and `zamankips@gmail.com` (change them with the
+optional `ALERT_RECIPIENTS` secret, comma-separated).
+
+| Event | Email |
+|---|---|
+| Any user logs in | login email used, name, role, time, IP, device |
+| Section added / renamed / removed | immediately, one email per action (removing a section = one email, not one per student) |
+| Student removed, teacher assignment changed, section subject list changed, user role changed / profile removed, bulk delete of 10+ test scores | immediately |
+| File added / replaced / deleted in cloud storage | immediately |
+| Adding a student, entering or editing marks | **no email** |
+
+### One-time setup
+1. **Gmail app password** (the mailbox that *sends* the alerts, e.g. one of the two above):
+   Google Account → Security → turn on 2-Step Verification → search "App passwords" →
+   create one called `AXIOM` → copy the 16 characters.
+2. **Deploy the function** (needs the [Supabase CLI](https://supabase.com/docs/guides/cli)):
+   ```bash
+   supabase login
+   supabase secrets set --project-ref adqvtmnvyzkusswbwqdr \
+     GMAIL_USER=you@gmail.com \
+     GMAIL_APP_PASSWORD=abcdefghijklmnop \
+     ALERT_WEBHOOK_SECRET=$(openssl rand -hex 32)
+   supabase functions deploy send-alert --project-ref adqvtmnvyzkusswbwqdr --no-verify-jwt
+   ```
+   Keep the `ALERT_WEBHOOK_SECRET` value — step 3 needs the same one.
+3. **Database triggers:** SQL Editor → run all of `supabase/migration_007_email_alerts.sql`,
+   then run the commented `insert into public.alert_config ...` block at the bottom of that
+   file with your real secret filled in.
+4. **Test:** log in → an email should arrive within seconds. Rename a section → second email.
+
+Notes: login and file alerts are sent by the app after a successful action; the critical-change
+alerts come from database triggers, so they fire even if someone changes data outside the app.
+If Gmail/the function is down the app keeps working normally — alerts are best-effort.

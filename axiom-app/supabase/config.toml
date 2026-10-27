@@ -1,0 +1,6 @@
+# Only the settings the CLI needs for this function.
+# verify_jwt is off because the function authenticates callers itself:
+#   - browser calls (login / file events) -> verified with the user's Supabase JWT
+#   - database triggers                   -> verified with the shared x-alert-secret
+[functions.send-alert]
+verify_jwt = false

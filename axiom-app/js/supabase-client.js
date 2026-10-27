@@ -12,10 +12,32 @@ const SUPABASE_ANON_KEY = 'sb_publishable_dah_Nl6Jpf69RuaDYWhoNA_AL6bzpaj';
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ---------- Security email alerts ----------
+// Sends an event to the `send-alert` Edge Function (supabase/functions/send-alert),
+// which emails the admins. Fire-and-forget: an alert problem must never break
+// login or uploads. `keepalive` lets the request finish even when the page
+// redirects right after login. The function re-checks who the user is from the
+// JWT, so the email address in an alert can't be faked from the browser.
+function axNotify(payload, accessToken) {
+  try {
+    const go = (token) => fetch(SUPABASE_URL + '/functions/v1/send-alert', {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+    if (accessToken) return go(accessToken);
+    return supabaseClient.auth.getSession().then(({ data }) => {
+      if (data && data.session) go(data.session.access_token);
+    }).catch(() => {});
+  } catch (e) { /* alerts are best-effort */ }
+}
+
 // ---------- Auth helpers ----------
 async function axSignIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
+  axNotify({ type: 'login' }, data.session.access_token);   // email the admins: this account just logged in
   // Remember this login so it can be switched back to later without a password.
   try {
     const { data: profile } = await supabaseClient.from('profiles').select('full_name, role').eq('id', data.user.id).single();
@@ -312,9 +334,11 @@ async function axUploadCloudFile(file) {
     .storage.from(ROSTER_BUCKET)
     .upload(file.name, file, { upsert: true, cacheControl: '3600' });
   if (error) throw error;
+  axNotify({ type: 'file_upload', fileName: file.name, size: file.size });
 }
 
 async function axDeleteCloudFile(fileName) {
   const { error } = await supabaseClient.storage.from(ROSTER_BUCKET).remove([fileName]);
   if (error) throw error;
+  axNotify({ type: 'file_delete', fileName });
 }
