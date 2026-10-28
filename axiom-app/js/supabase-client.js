@@ -228,6 +228,22 @@ async function axAddStudent({ sectionKey, name, rollNo, matric }) {
   return data;
 }
 
+// ---------- Parent contacts (report cards / Message Parent) ----------
+// Table: parent_contacts (migration_008). Keyed by (section_key, student_key)
+// where student_key = roll no, or the lower-cased name when there is none.
+async function axLoadParentContacts() {
+  const { data, error } = await supabaseClient.from('parent_contacts').select('*');
+  if (error) throw error;
+  return data || [];
+}
+async function axSaveParentContacts(rows) {
+  if (!rows || !rows.length) return;
+  const stamped = rows.map(r => ({ ...r, updated_at: new Date().toISOString() }));
+  const { error } = await supabaseClient.from('parent_contacts')
+    .upsert(stamped, { onConflict: 'section_key,student_key' });
+  if (error) throw error;
+}
+
 async function axAddSection({ key, label, sheetName, group }) {
   const { error } = await supabaseClient
     .from('sections')

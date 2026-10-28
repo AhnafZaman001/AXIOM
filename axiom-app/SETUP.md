@@ -122,3 +122,34 @@ optional `ALERT_RECIPIENTS` secret, comma-separated).
 Notes: login and file alerts are sent by the app after a successful action; the critical-change
 alerts come from database triggers, so they fire even if someone changes data outside the app.
 If Gmail/the function is down the app keeps working normally — alerts are best-effort.
+
+## Parents & communication (report cards, Message Parent)
+
+**One-time:** SQL Editor → run `supabase/migration_008_parent_contacts.sql`
+(creates the `parent_contacts` table with row-level security: principal/coordinator
+read+write, HOD reads all, teachers read their own sections, students nothing).
+The app works without it, but parent contacts can't be saved until it is run.
+
+**Report cards** — branded A4 card per student: overall %, grade, total marks,
+class position, subject table (teacher, tests, marks, overall %, latest test,
+section average), automatic remarks, signature lines.
+- One student: open the student drawer → **Report Card**.
+- Whole section: Section View toolbar → **Report Cards** (one card per page,
+  ordered by class position). In the print dialog choose **Save as PDF**.
+- School name on cards/messages: Parent Messages → "School name" (saved on that device).
+
+**Message Parent** — student drawer → **Message Parent** (or the list below).
+Builds a message from the student's real numbers in English or Urdu; edit it,
+then **WhatsApp** (opens wa.me with the text ready), **Email** (opens your mail app)
+or **Copy**. Nothing is sent until you press Send in WhatsApp/your mail app.
+Pakistani numbers are normalised automatically (0300…, 300…, +92 300…).
+
+**Parent Messages** (Section View toolbar) — every student in the section with
+overall %, "needs attention" flags (critical zone under 60%, or a drop of
+10+ points since the previous test), contact status and one-click WhatsApp.
+A red badge on the button counts students needing attention, and after every
+results import a notice tells you how many *newly* need attention.
+- **Download contact template** → fill Roll No., Parent Name, Phone, Email in Excel →
+  **Import contacts (Excel)**. Matching is by Roll No. (or name).
+- Only principal/coordinator can edit or import contacts; HOD/teachers can message
+  with saved contacts; students never see these controls.

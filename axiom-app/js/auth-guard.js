@@ -73,12 +73,14 @@
 
   // ---- 2. Role-based UI restrictions ----
   const role = profile.role;
+  window.axRole = role;   // used by parent-comms.js to gate contact editing
   const hide = (id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
 
   if (role === 'student') {
     // Read-only: no editing tools, no cross-student browsing controls.
     hide('actionsToolbar');
     hide('addSectionBtn'); hide('deleteSectionBtn'); hide('renameSectionBtn');
+    hide('pcBulkBtn'); hide('pcCardsBtn'); hide('drawerMsgBtn');   // students never see other families' contacts
   } else if (role === 'hod') {
     // Full read access, no editing.
     hide('actionsToolbar');
