@@ -530,7 +530,7 @@ function makeMessage(snap, c, secKey){
 function describeResult(j){
   const firstFail = (j.results||[]).map(r=>[r.parent,r.admin]).flat().find(x=>String(x).startsWith('failed'));
   const base = j.testMode
-    ? `Test mode: ${j.adminSent} of ${j.total} message(s) delivered to the admin number. Parents were not contacted.`
+    ? `Test mode: ${j.adminSent} of ${j.total} message(s) accepted by WhatsApp for the admin number. Parents were not contacted.`
     : `${j.parentSent} sent to parents, ${j.adminSent} copies to the admin number.`;
   return base + (j.failed ? ` ${j.failed} failed${firstFail ? ' — ' + String(firstFail).replace(/^failed:\s*/,'') : ''}.` : '');
 }

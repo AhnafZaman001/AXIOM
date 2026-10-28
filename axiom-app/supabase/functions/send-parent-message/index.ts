@@ -74,7 +74,8 @@ Deno.serve(async (req) => {
       return json({ error: "Only the principal or a coordinator can send messages." }, 403);
     }
 
-    const { data: rows } = await db.from("app_settings").select("key,value");
+    const { data: rows, error: settingsError } = await db.from("app_settings").select("key,value");
+    if (settingsError) return json({ error: "Messaging settings could not be loaded. No messages were sent." }, 503);
     const settings: Record<string, string> = Object.fromEntries((rows ?? []).map((r: any) => [r.key, r.value]));
     const admin = digits(settings.admin_whatsapp);
     const testMode = (settings.wa_test_mode ?? "on").toLowerCase() !== "off";
@@ -84,11 +85,15 @@ Deno.serve(async (req) => {
       return json({ configured, testMode, adminSet: !!admin, mode: Deno.env.get("WA_TEMPLATE_NAME") ? "template" : "text" });
     }
     if (body.action !== "send") return json({ error: "bad action" }, 400);
+    if (!admin) return json({ error: "Set a valid admin WhatsApp number before sending. No messages were sent." }, 400);
     if (!configured) return json({ error: "Automatic sending is not set up yet. Add the WhatsApp secrets (see SETUP.md)." }, 400);
 
     const msgs = Array.isArray(body.messages) ? body.messages : [];
     if (!msgs.length) return json({ error: "No messages to send." }, 400);
     if (msgs.length > 60) return json({ error: "Send at most 60 messages per request." }, 400);
+    if (msgs.some((m: any) => !m || typeof m !== "object" || typeof m.text !== "string" || !m.text.trim())) {
+      return json({ error: "Every message must contain non-empty text. No messages were sent." }, 400);
+    }
 
     // ---- send ------------------------------------------------------------
     const log: any[] = [];
@@ -112,12 +117,13 @@ Deno.serve(async (req) => {
       if (!text) { results.push({ label, parent: "skipped: empty message", admin: "skipped" }); continue; }
       const r: any = { label, parent: "skipped", admin: "skipped" };
 
-      if (!testMode && to) r.parent = await attempt("parent", to, text, m);
+      if (!testMode && to && to !== admin) r.parent = await attempt("parent", to, text, m);
+      else if (!testMode && to === admin) r.parent = "skipped: admin number cannot be a parent contact";
       else r.parent = testMode ? "skipped: test mode (not sent to parents)" : "skipped: no parent number saved";
 
       if (admin) {
         const head = (!testMode && to)
-          ? `[Copy] Sent to ${label} (+${to})\n\n`
+          ? `[Copy] Parent send status: ${r.parent}. Intended for ${label} (+${to})\n\n`
           : `[TEST${testMode ? "" : " - no parent number"}] Intended for ${label} (${to ? "+" + to : "no parent number saved"})\n\n`;
         r.admin = await attempt((!testMode && to) ? "admin_copy" : "admin_test", admin, head + text, m);
       } else r.admin = "skipped: admin number not set";
