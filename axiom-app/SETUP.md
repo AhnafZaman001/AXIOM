@@ -153,3 +153,47 @@ results import a notice tells you how many *newly* need attention.
   **Import contacts (Excel)**. Matching is by Roll No. (or name).
 - Only principal/coordinator can edit or import contacts; HOD/teachers can message
   with saved contacts; students never see these controls.
+
+## Automatic WhatsApp (test on the admin number first)
+
+How it behaves
+- A server function (`send-parent-message`) sends the messages — no one needs to press Send per parent.
+- **Test mode (default):** nothing goes to parents. Every message goes ONLY to the admin number,
+  labelled `[TEST] Intended for <student> (<parent number or "no parent number saved">)`.
+- **Live mode:** each message goes to the parent's saved number AND a copy goes to the admin number.
+- The admin number lives in the private `app_settings` table — never in `parent_contacts`
+  ("All Contacts") and never in this public repository. Parent contact numbers stay empty until you add them.
+- Only principal / coordinator can send. Every attempt is recorded in `message_log`.
+
+Setup
+1. SQL Editor → run `supabase/migration_009_messaging.sql`.
+2. SQL Editor → store the admin number (do this in the dashboard, not in a file):
+   ```sql
+   insert into public.app_settings (key, value) values ('admin_whatsapp', '923414703169')
+   on conflict (key) do update set value = excluded.value;
+   ```
+   After this, **Message Parent → Test on admin** already works (it opens WhatsApp to the admin number).
+3. WhatsApp Cloud API (free to test) — https://developers.facebook.com :
+   create an app (type *Business*) → add the **WhatsApp** product → **API Setup**.
+   Copy the **Phone number ID** and the **temporary access token** (valid 24 h; for a permanent one
+   create a System User token). Under **To**, add the admin number and confirm the code WhatsApp sends.
+   From the admin's WhatsApp, send "hi" to the test number — this opens the 24-hour window that lets
+   free-text messages through.
+4. Supabase → Edge Functions → **Deploy a new function** → name `send-parent-message`,
+   paste `supabase/functions/send-parent-message/index.ts`, turn **Verify JWT off** → Deploy.
+5. Edge Functions → Secrets → add `WA_PHONE_NUMBER_ID` and `WA_ACCESS_TOKEN`.
+6. Open **Parent Messages**: the banner shows TEST MODE → **Send … shown automatically**.
+   The admin number receives the messages.
+
+Going live (parents)
+- Messaging a parent who has not written to your number first requires a **template message**
+  approved by Meta (category *Utility*, body like `{{1}}`). Create it in WhatsApp Manager, then add the
+  secrets `WA_TEMPLATE_NAME` (and `WA_TEMPLATE_LANG`, e.g. `en` or `ur`). The whole message text is sent
+  as the template's single variable (line breaks become ` | `).
+- Use a real, verified business number (Meta business verification), add parent numbers via
+  **Import contacts**, then switch test mode off:
+  ```sql
+  update public.app_settings set value = 'off' where key = 'wa_test_mode';
+  ```
+  Switch back with `'on'` at any time.
+- Cost: Meta charges per conversation (a few cents in Pakistan); check current pricing.

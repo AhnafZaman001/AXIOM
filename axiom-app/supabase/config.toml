@@ -4,3 +4,8 @@
 #   - database triggers                   -> verified with the shared x-alert-secret
 [functions.send-alert]
 verify_jwt = false
+
+# Sends WhatsApp messages to parents (+ a copy to the admin). Authenticates the
+# caller itself (Supabase JWT + principal/coordinator role check).
+[functions.send-parent-message]
+verify_jwt = false

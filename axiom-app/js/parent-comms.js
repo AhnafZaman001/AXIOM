@@ -17,7 +17,7 @@
 'use strict';
 
 /* ------------------------------------------------------------- state --- */
-const PC = { map:{}, loaded:false, loading:null, tableMissing:false, lang:'en' };
+const PC = { map:{}, loaded:false, loading:null, tableMissing:false, lang:'en', admin:null, status:null, lastRows:[] };
 try { PC.lang = localStorage.getItem('ax.pcLang') || 'en'; } catch(e){}
 
 const role = ()=> window.axRole || '';
@@ -57,6 +57,10 @@ async function ensureContacts(){
       console.warn('Parent contacts unavailable:', e);
       PC.tableMissing = true;
     }
+    try{
+      const cfg = await axLoadSettings();          // admin number lives here, never in parent_contacts
+      PC.admin = waNumber(cfg.admin_whatsapp);
+    }catch(e){ PC.admin = null; }
     PC.loaded = true;
   })();
   return PC.loading;
@@ -70,7 +74,11 @@ function waNumber(raw){
   else if(d.length===10 && d.startsWith('3')) d = '92' + d;
   return (d.length>=11 && d.length<=15) ? d : null;
 }
+// The admin's own number is a test/copy destination only — it must never be
+// stored as a parent's contact.
+function isAdminNumber(phone){ return !!(PC.admin && waNumber(phone) === PC.admin); }
 async function saveContact(secKey, st, c){
+  if(isAdminNumber(c.phone)) throw new Error('That is the admin number. It receives copies automatically and is not saved as a parent contact.');
   const row = { section_key:secKey, student_key:studentKey(st), student_name:st.name,
                 parent_name:c.parentName||null, phone:c.phone||null, email:c.email||null };
   await axSaveParentContacts([row]);
@@ -309,6 +317,7 @@ function injectUi(){
   if(el('pcSingleOverlay')) return;
   const css = document.createElement('style');
   css.textContent = `
+    #confirmModal{z-index:70 !important;}   /* confirm dialogs must sit above the Parent Messages window */
     .pc-modal{max-width:620px !important;width:94% !important;max-height:92vh;overflow:auto;}
     .pc-wide{max-width:980px !important;}
     .pc-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
@@ -320,6 +329,8 @@ function injectUi(){
     .pc-flag{display:inline-block;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#b91c1c;font-size:.72rem;font-weight:600;margin:1px 4px 1px 0;}
     .pc-ok{color:#15803d;font-weight:600;} .pc-miss{color:var(--muted);}
     .pc-hint{color:var(--muted);font-size:.8rem;margin:2px 0 10px;}
+    .pc-auto{margin:0 0 10px;padding:9px 12px;border-radius:10px;font-size:.82rem;line-height:1.5;background:var(--paper);border:1px solid var(--line);}
+    .pc-auto.test{background:#fef3c7;border-color:#f59e0b;color:#78350f;} .pc-auto.live{background:#dcfce7;border-color:#22c55e;color:#14532d;} .pc-auto.off{color:var(--muted);}
     .pc-table{width:100%;border-collapse:collapse;font-size:.86rem;}
     .pc-table th{text-align:left;padding:8px 10px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper-raised);}
     .pc-table td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
@@ -344,7 +355,9 @@ function injectUi(){
       <button class="ghost" id="pcSaveContact">Save contact</button>
       <button class="ghost" id="pcCopy">Copy</button>
       <button class="ghost" id="pcEmailBtn">Email</button>
-      <button class="primary" id="pcWhatsApp">WhatsApp</button>
+      <button class="ghost" id="pcAdminCopy" title="Open WhatsApp to the admin number with this message, to test it">Test on admin</button>
+      <button class="ghost" id="pcWhatsApp">WhatsApp</button>
+      <button class="primary" id="pcAuto" title="Send through AXIOM automatically (also copies the admin number)">Send automatically</button>
       <button class="ghost" id="pcSingleClose">Close</button>
     </div>
   </div></div>
@@ -363,9 +376,11 @@ function injectUi(){
       <button class="ghost small" id="pcImportBtn">Import contacts (Excel)</button>
       <input type="file" id="pcImportFile" accept=".xlsx,.xls,.csv" style="display:none;">
     </div>
-    <div class="table-wrap" style="max-height:52vh;"><table class="pc-table"><thead><tr>
+    <div class="pc-auto" id="pcAutoBanner"></div>
+    <div class="table-wrap" style="max-height:48vh;"><table class="pc-table"><thead><tr>
       <th>Student</th><th>Overall</th><th>Flags</th><th>Parent contact</th><th></th></tr></thead><tbody id="pcBulkBody"></tbody></table></div>
-    <div class="pc-actions"><button class="ghost" id="pcBulkClose">Close</button></div>
+    <div class="pc-actions"><button class="ghost" id="pcBulkClose">Close</button>
+      <button class="primary" id="pcSendAll">Send all shown automatically</button></div>
   </div></div>`);
 
   el('pcSingleClose').onclick = ()=> el('pcSingleOverlay').classList.remove('open');
@@ -381,6 +396,13 @@ function injectUi(){
   el('pcWhatsApp').onclick = ()=> openWhatsApp(el('pcPhone').value, el('pcMsgText').value);
   el('pcEmailBtn').onclick = ()=> openMail(el('pcEmail').value.trim(), `Progress update — ${single.snap.name}`, el('pcMsgText').value);
   el('pcSaveContact').onclick = onSaveContact;
+  el('pcAdminCopy').onclick = ()=>{
+    if(!PC.admin){ showToast('Admin number is not set up yet (see SETUP.md, "Automatic WhatsApp").', 'warning'); return; }
+    const label = `${single.snap.name} (${single.snap.section}${single.snap.roll ? ', Roll ' + single.snap.roll : ''})`;
+    openWhatsApp(PC.admin, `[TEST] Intended for ${label}\n\n` + el('pcMsgText').value);
+  };
+  el('pcAuto').onclick = sendSingleAuto;
+  el('pcSendAll').onclick = sendAllShown;
   el('pcTemplateBtn').onclick = downloadTemplate;
   el('pcImportBtn').onclick = ()=> el('pcImportFile').click();
   el('pcImportFile').onchange = e=>{ const f = e.target.files[0]; e.target.value=''; if(f) importContacts(f); };
@@ -413,6 +435,8 @@ async function openSingle(id, secKey){
   const editor = canEdit();
   ['pcParent','pcPhone','pcEmail'].forEach(i=> el(i).readOnly = !editor);
   el('pcSaveContact').style.display = editor ? '' : 'none';
+  el('pcAuto').style.display = editor ? '' : 'none';
+  el('pcAdminCopy').style.display = (editor && PC.admin) ? '' : 'none';
   el('pcContactNote').textContent = PC.tableMissing
     ? 'Parent contacts are not set up in the database yet (run migration_008_parent_contacts.sql). You can still copy the message.'
     : (editor ? 'Contacts are saved to the cloud and reused every time results are re-imported.'
@@ -438,7 +462,9 @@ async function openBulk(){
   await ensureContacts();
   el('pcSchoolField').style.display = canEdit() ? '' : 'none';
   el('pcImportBtn').style.display = canEdit() ? '' : 'none';
+  el('pcSendAll').style.display = canEdit() ? '' : 'none';
   el('pcSchool').value = schoolName();
+  refreshStatus();
   setLang(PC.lang);
   renderBulk();
   el('pcBulkOverlay').classList.add('open');
@@ -454,6 +480,8 @@ function renderBulk(){
   el('pcBulkSub').textContent = `${list.length} students · ${flagged} need attention · ${withPhone} have a WhatsApp number saved`
     + (PC.tableMissing ? ' · Contacts database not set up yet (run migration 008).' : '');
   const rows = list.filter(x=> filter==='attention' ? x.flags : filter==='nocontact' ? !waNumber(x.c.phone) : true);
+  PC.lastRows = rows;
+  el('pcSendAll').textContent = `Send ${rows.length} shown automatically`;
   el('pcBulkBody').innerHTML = rows.length ? rows.map(x=>{
     const ok = waNumber(x.c.phone);
     return `<tr data-id="${esc(x.st.id)}">
@@ -472,6 +500,75 @@ function renderBulk(){
       if(b.dataset.act==='wa') openWhatsApp(x.c.phone, buildMessage(x.snap, PC.lang, x.c.parentName));
       else openSingle(x.st.id, def.key);
     };
+  });
+}
+
+/* ------------------------------------------- automatic sending (server) --- */
+async function refreshStatus(){
+  const b = el('pcAutoBanner');
+  if(!b) return;
+  if(!canEdit()){ b.style.display='none'; return; }
+  b.style.display=''; b.className='pc-auto off'; b.textContent = 'Checking automatic sending…';
+  try{
+    PC.status = await axCallMessenger({action:'status'});
+  }catch(e){ PC.status = null; }
+  const s = PC.status;
+  if(!s || !s.configured){
+    b.className='pc-auto off';
+    b.textContent = 'Automatic sending is not set up yet — the WhatsApp button still works manually. See SETUP.md, "Automatic WhatsApp".';
+    el('pcSendAll').disabled = true; return;
+  }
+  el('pcSendAll').disabled = false;
+  if(!s.adminSet) { b.className='pc-auto off'; b.textContent='Admin number is not set. Add it in app_settings (SETUP.md) before sending.'; el('pcSendAll').disabled = true; return; }
+  if(s.testMode){ b.className='pc-auto test'; b.innerHTML='<b>TEST MODE.</b> Nothing is sent to parents. Every message goes only to the admin number, labelled with the parent it was meant for.'; }
+  else { b.className='pc-auto live'; b.innerHTML='<b>LIVE.</b> Messages go to each parent\'s saved number, and a copy of each goes to the admin number.'; }
+}
+function makeMessage(snap, c, secKey){
+  return { to: c.phone || '', text: buildMessage(snap, PC.lang, c.parentName),
+           label: `${snap.name} (${snap.section}${snap.roll ? ', Roll ' + snap.roll : ''})`, studentName: snap.name };
+}
+function describeResult(j){
+  const firstFail = (j.results||[]).map(r=>[r.parent,r.admin]).flat().find(x=>String(x).startsWith('failed'));
+  const base = j.testMode
+    ? `Test mode: ${j.adminSent} of ${j.total} message(s) delivered to the admin number. Parents were not contacted.`
+    : `${j.parentSent} sent to parents, ${j.adminSent} copies to the admin number.`;
+  return base + (j.failed ? ` ${j.failed} failed${firstFail ? ' — ' + String(firstFail).replace(/^failed:\s*/,'') : ''}.` : '');
+}
+async function sendSingleAuto(){
+  const snap = single.snap; if(!snap) return;
+  const f = findStudentAnywhere(snap.st.id, single.secKey);
+  const c = { parentName: el('pcParent').value.trim(), phone: el('pcPhone').value.trim() };
+  const m = makeMessage(snap, c, single.secKey); m.text = el('pcMsgText').value;
+  const btn = el('pcAuto'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Sending…';
+  try{
+    const j = await axCallMessenger({ action:'send', messages:[m] });
+    showToast(describeResult(j), j.failed ? 'warning' : 'success', 6500);
+  }catch(e){ showToast('Could not send: ' + (e.message||e), 'warning', 6500); }
+  btn.disabled = false; btn.textContent = old;
+}
+async function sendAllShown(){
+  const rows = PC.lastRows || [];
+  if(!rows.length){ showToast('No students are shown.', 'warning'); return; }
+  const s = PC.status || {};
+  const withNo = rows.filter(x=>waNumber(x.c.phone)).length;
+  const body = s.testMode
+    ? `<p style="margin:0;"><b>Test mode is ON.</b> All ${rows.length} message(s) go only to the admin number, each labelled with the parent it was meant for. No parent will receive anything.</p>`
+    : `<p style="margin:0;"><b>Live mode.</b> ${withNo} of ${rows.length} parent(s) have a number saved and will receive their message; a copy of every message also goes to the admin number.${rows.length-withNo ? `<br><br>${rows.length-withNo} student(s) without a parent number will reach the admin number only.` : ''}</p>`;
+  showConfirm(`Send ${rows.length} message(s)?`, body, async ()=>{
+    const def = currentSectionDef();
+    const msgs = rows.map(x=>makeMessage(x.snap, x.c, def.key));
+    const tot = { total:0, failed:0, parentSent:0, adminSent:0, testMode:s.testMode, results:[] };
+    const btn = el('pcSendAll'); btn.disabled = true;
+    try{
+      for(let i=0; i<msgs.length; i+=50){
+        btn.textContent = `Sending ${Math.min(i+50, msgs.length)} of ${msgs.length}…`;
+        const j = await axCallMessenger({ action:'send', messages: msgs.slice(i, i+50) });
+        tot.total += j.total; tot.failed += j.failed; tot.parentSent += j.parentSent; tot.adminSent += j.adminSent;
+        tot.testMode = j.testMode; tot.results.push(...j.results);
+      }
+      showToast(describeResult(tot), tot.failed ? 'warning' : 'success', 8000);
+    }catch(e){ showToast('Sending stopped: ' + (e.message||e), 'warning', 8000); }
+    btn.disabled = false; btn.textContent = `Send ${msgs.length} shown automatically`;
   });
 }
 
@@ -523,7 +620,7 @@ async function importContacts(file){
     if(ix.phone<0 && ix.email<0) throw new Error('Could not find a Phone or Email column. Use "Download contact template" for the right layout.');
     if(ix.roll<0 && ix.name<0) throw new Error('Could not find a Roll No. or Student Name column.');
     const def = currentSectionDef(), store = ensureSection(def.key);
-    const out = []; let unmatched = 0, bad = 0;
+    const out = []; let unmatched = 0, bad = 0, adminSkipped = 0;
     rows.slice(1).forEach(r=>{
       const roll = ix.roll>=0 ? String(r[ix.roll]).trim() : '';
       const nm = ix.name>=0 ? String(r[ix.name]).trim().toLowerCase() : '';
@@ -531,7 +628,8 @@ async function importContacts(file){
       const st = store.students.find(s=> (roll && s.rollNo!=null && String(s.rollNo).trim()===roll) || (!roll && nm && s.name.trim().toLowerCase()===nm))
               || (nm && store.students.find(s=>s.name.trim().toLowerCase()===nm));
       if(!st){ unmatched++; return; }
-      const phone = ix.phone>=0 ? String(r[ix.phone]).trim() : '';
+      let phone = ix.phone>=0 ? String(r[ix.phone]).trim() : '';
+      if(phone && isAdminNumber(phone)){ adminSkipped++; phone = ''; }
       if(phone && !waNumber(phone)) bad++;
       const c = { parentName: ix.parent>=0 ? String(r[ix.parent]).trim() : '', phone, email: ix.email>=0 ? String(r[ix.email]).trim() : '' };
       out.push({ st, c });
@@ -542,7 +640,7 @@ async function importContacts(file){
     out.forEach(({st,c})=> setContactLocal(def.key, st, c));
     PC.tableMissing = false;
     renderBulk();
-    showToast(`Imported ${out.length} contact(s)${unmatched ? `, ${unmatched} row(s) did not match a student` : ''}${bad ? `, ${bad} phone number(s) look invalid` : ''}.`, bad||unmatched ? 'warning' : 'success', 5200);
+    showToast(`Imported ${out.length} contact(s)${unmatched ? `, ${unmatched} row(s) did not match a student` : ''}${bad ? `, ${bad} phone number(s) look invalid` : ''}${adminSkipped ? `, ${adminSkipped} admin number(s) ignored` : ''}.`, bad||unmatched||adminSkipped ? 'warning' : 'success', 5200);
   }catch(e){
     console.error(e);
     showToast('Import failed: ' + (e.message||e), 'warning', 5200);

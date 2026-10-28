@@ -244,6 +244,29 @@ async function axSaveParentContacts(rows) {
   if (error) throw error;
 }
 
+// ---------- Messaging (automatic WhatsApp) ----------
+// Settings live in app_settings (admin phone number, test mode) — NOT in
+// parent_contacts, and never in the repository.
+async function axLoadSettings() {
+  const { data, error } = await supabaseClient.from('app_settings').select('key,value');
+  if (error) throw error;
+  return Object.fromEntries((data || []).map(r => [r.key, r.value]));
+}
+// Calls the send-parent-message Edge Function as the signed-in user.
+// payload: {action:'status'} or {action:'send', messages:[{to,text,label,studentName}]}
+async function axCallMessenger(payload) {
+  const { data } = await supabaseClient.auth.getSession();
+  if (!data || !data.session) throw new Error('Please sign in again.');
+  const res = await fetch(SUPABASE_URL + '/functions/v1/send-parent-message', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + data.session.access_token },
+    body: JSON.stringify(payload),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || ('Messaging service error ' + res.status));
+  return j;
+}
+
 async function axAddSection({ key, label, sheetName, group }) {
   const { error } = await supabaseClient
     .from('sections')
