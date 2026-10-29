@@ -260,3 +260,93 @@ Going live (parents)
   ```
   Switch back with `'on'` at any time.
 - Cost: Meta charges per conversation (a few cents in Pakistan); check current pricing.
+
+## Year Comparison (compare yearly results as groups)
+
+Compares any number of years side by side: typical result, support need,
+breadth across streams, subject priorities and achievement. Each year holds
+different students, so every statement describes **groups**, never individual
+progress, and no cause is implied.
+
+**One-time setup:** SQL Editor → run `supabase/migration_013_year_comparison.sql`.
+Nothing else to deploy. (Without it the page still works, but years you add
+last only until the page is closed, and a notice says so.)
+
+**Where:** principal / coordinator → **Year Comparison** button next to Teacher
+Report. HOD → the same button in the top bar (read-only). Teachers and
+students do not see it.
+
+**Using it**
+1. **Add year** → choose the Excel (`.xls` / `.xlsx`) results workbook for one
+   year. The screen shows what was found (sheets, streams, subjects with their
+   maximum marks and source Excel row). Enter the year, assessment name, class
+   or grade and stream names. Check the student counts and maxima against the
+   workbook, tick the confirmation, then save.
+   Rename a stream so it matches the same stream in other years (PM in every
+   year). Add one workbook per year. Adding the same year + assessment again
+   replaces it (the screen says so first).
+2. Tick the years to compare. The findings compare the two most recent ticked
+   years; the table and chart show every ticked year.
+3. Read the **coverage** row and the **checks** banner first. They say how many
+   listed students have marks and whether the two years use the same assessment,
+   streams, subjects and maximum marks.
+4. Up to three findings are shown, each with evidence, what to keep in mind and
+   a next question. Everything else is in the expandable sections. **Settings**
+   (support threshold, pass mark, excellence threshold, who is counted) apply to
+   every year equally and are saved on that device. Complete results are the
+   default for overall measures; available-subject mode is an explicit option.
+5. **Print Report** gives a PDF through the normal print dialog.
+
+**Rules the page follows**
+- Workbook layout: one sheet per stream (e.g. PM, PE, ICS), a header row with
+  subject names, the maximum marks directly beneath, then one row per student.
+  Empty template rows are ignored. Rows without a Sr.No are still read. A real
+  student with only a roll number and no scores stays listed. A numeric student
+  row cannot stand in for a maximum-marks row; unsupported or ambiguous sheets
+  are skipped with a reason. Conflicting duplicate student rows must be resolved.
+- Sheets assigned to the same stream must have matching subject lists and
+  maximum marks. An omitted subject cannot silently become an exemption.
+  Different maxima must be corrected or kept in separate streams/assessments.
+- **A blank subject cell is never a zero.** It is "no score", the student is
+  measured on the subjects they have, and the subject is left out of that
+  subject's statistics. A real `0` is a score. `AB` / `ABS` means absent
+  (not a zero, not a failure); it makes the overall result incomplete. Dash,
+  `nil` and `x` placeholders mean missing; only explicit `N/A` or `exempt`
+  means not applicable. Marks above a paper's maximum are invalid and reported.
+- **Students listed with no marks at all** are counted separately (coverage),
+  never as failures.
+- **Typical result** = median overall percentage of students with every applicable
+  subject scored. Incomplete results do not enter overall support, excellence
+  or distribution by default. Available-subject mode instead uses earned / max
+  over scored subjects and is explicitly labelled as exploratory.
+- **Support need** = overall percentage below the support threshold (default
+  50%). **Below pass** = below the pass mark (default 33%) in **any one**
+  subject; a student counts once. An all-subject pass is confirmed only when
+  every applicable subject has a score. Recorded subject failures, confirmed
+  passes and unknown outcomes always use all listed students, independent of
+  the overall-result filter. Subject absence/missing counts also include
+  students without any numeric marks.
+- Whole-cohort support limits treat every incomplete overall result as unknown,
+  including partial records. They are conservative bounds, not estimated scores.
+- Different assessment names, known grades, stream lists, subject baskets or
+  maxima withhold automatic improvement/decline findings. Missing metadata or
+  incomplete coverage is flagged for review. Matching labels cannot establish
+  equal exam difficulty or a causal explanation.
+- **Excellence** = overall percentage at or above the excellence threshold
+  (default 90%). This is not the school's A+ grade boundary.
+- Subjects are compared inside their own stream only.
+
+**What is stored:** only anonymous results (stream, subject maximums and each
+student's mark or status under a made-up id such as `r12`). Student names and
+roll numbers never leave the browser. Principal/coordinator can add, replace
+and delete years; HOD can read; teachers and students have no access. Year
+Comparison does not send email alerts.
+
+**Tests:** `node --test axiom-app/tests/*.test.cjs`
+
+**Browser integration:** with Playwright and Chrome available, run
+`node axiom-app/tests/year-compare-browser.cjs`. It uses real synthetic XLSX
+workbooks and a local page with mocked Supabase storage, never production
+credentials or real student records. It covers import validation, confirmation,
+anonymous save/reload, denominators, settings, print inputs and role controls.
+Database RLS and real workbook compatibility still require a staging check.
