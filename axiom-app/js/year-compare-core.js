@@ -672,11 +672,18 @@
       var m = Math.min(r.dMedian, r.dP25);
       if (!improved || m > improved.__m) { improved = r; improved.__m = m; }
     });
+    // Structured references let the interface draw the evidence directly.
+    // Keep prose for printable reports; never recover data by parsing it.
+    ctx.signals = {
+      priority: priority ? { streamKey: priority.streamKey, subjectKey: priority.key, reason: pKind } : null,
+      gain: improved ? { streamKey: improved.streamKey, subjectKey: improved.key } : null
+    };
 
     if (priority) {
       var pr = priority;
       var sf = {
         id: 'subject', title: 'Subject to investigate',
+        subject: { streamKey: pr.streamKey, subjectKey: pr.key },
         observation: pKind === 'recurring'
           ? 'In ' + pr.stream + ', ' + pr.subject + ' is among the two lowest subjects in both years (median ' + f1(pr.a.median) + ' in ' + A.label + ', ' + f1(pr.b.median) + ' in ' + B.label + ').'
           : 'In ' + pr.stream + ', ' + pr.subject + ' has the highest share of students below ' + st.pass + '% in ' + B.label + ' (' + pr.b.below + ' of ' + pr.b.n + ', ' + f1(pr.b.belowShare) + ').',
@@ -765,7 +772,7 @@
         support: A.pooled.support.share == null || B.pooled.support.share == null ? null : B.pooled.support.share - A.pooled.support.share,
         excellence: A.pooled.excellence.share == null || B.pooled.excellence.share == null ? null : B.pooled.excellence.share - A.pooled.excellence.share
       },
-      headline: headline(ctx), findings: (ctx.found = buildFindings(ctx)), alsoChecked: ctx.found.alsoChecked || []
+      headline: headline(ctx), findings: (ctx.found = buildFindings(ctx)), alsoChecked: ctx.found.alsoChecked || [], signals: ctx.signals || {priority:null,gain:null}
     };
   }
 

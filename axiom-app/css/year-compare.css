@@ -74,3 +74,64 @@
 @media(max-width:520px){#yearComparePage .section-title{font-size:1.1rem;flex-wrap:wrap;}#yearComparePage .yc-year{min-width:100%;max-width:none;}#yearComparePage .yc-findings{grid-template-columns:1fr;}#yearComparePage .yc-banner span{display:none;}#yearComparePage .yc-cloud-label{display:none;}}
 @media(max-width:520px){#yearComparePage .yc-overview.has-change th:last-child,#yearComparePage .yc-overview.has-change td:last-child{display:none;}#yearComparePage .yc-overview th,#yearComparePage .yc-overview td{white-space:normal;font-size:.77rem;padding:12px 6px;}#yearComparePage .yc-mode-pill{font-size:.62rem;}#yearComparePage .yc-insight-value{font-size:1.6rem;}}
 @media print{#yearComparePage .yc-chart *{animation:none!important;}#yearComparePage .yc-year-files,#yearComparePage .yc-segments{display:none;}}
+
+/* Visual evidence and focused views. */
+#yearComparePage .yc-terms{display:flex;align-items:center;flex-wrap:wrap;gap:10px 24px;padding:0 2px 18px;color:var(--muted);font-size:.75rem;}
+#yearComparePage .yc-terms>span{display:inline-flex;align-items:center;gap:7px;}
+#yearComparePage .yc-terms b{font-weight:500;color:var(--ink-soft);}
+#yearComparePage .yc-terms>button{margin-left:auto;}
+#yearComparePage .yc-info{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:17px;height:17px;min-width:17px;padding:0;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--accent-2);font-size:10px;line-height:1;font-weight:600;font-style:normal;vertical-align:middle;}
+#yearComparePage .yc-info:hover,#yearComparePage .yc-info:focus-visible{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,transparent);transform:none;box-shadow:none;}
+#yearComparePage .yc-metric-label{display:inline-flex;align-items:center;gap:8px;font-weight:650;}
+#yearComparePage .yc-view-nav{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0 22px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+#yearComparePage .yc-view-nav button{font-size:.83rem;padding:9px 16px;border-color:transparent;box-shadow:none;}
+#yearComparePage .yc-view-nav button.active{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent-2);border-color:color-mix(in srgb,var(--accent) 30%,transparent);}
+#yearComparePage #ycActiveView{outline:none;}
+#yearComparePage .yc-find{display:flex;flex-direction:column;}
+#yearComparePage .yc-find .yc-svg{width:100%;max-height:108px;margin:3px 0 9px;}
+#yearComparePage .yc-mini-title{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.71rem;}
+#yearComparePage .yc-card-fact{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:.72rem;margin:7px 0;color:var(--muted);line-height:1.5;}
+#yearComparePage .yc-card-fact b{color:var(--ink-soft);font-weight:550;text-align:right;font-variant-numeric:tabular-nums;}
+#yearComparePage .yc-card-action{margin-top:auto;padding-top:14px;}
+#yearComparePage .yc-card-action button{font-size:.72rem;padding:5px 8px;color:var(--accent-2);}
+#yearComparePage .yc-mini-meters{display:grid;gap:13px;margin:18px 0 16px;}
+#yearComparePage .yc-mini-row{display:grid;grid-template-columns:65px minmax(40px,1fr) 44px;gap:8px;align-items:center;font-size:.69rem;color:var(--muted);}
+#yearComparePage .yc-mini-row b{font-size:.71rem;font-weight:550;color:var(--ink-soft);text-align:right;}
+#yearComparePage .yc-mini-track{height:8px;border-radius:5px;background:var(--surface-1);overflow:hidden;}
+#yearComparePage .yc-mini-track i{display:block;height:100%;border-radius:5px;transition:width .3s;}
+#yearComparePage .yc-spotlights{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,350px),1fr));gap:18px;margin:0 0 22px;}
+#yearComparePage .yc-spotlight{border:1px solid color-mix(in srgb,var(--accent) 26%,var(--line));background:color-mix(in srgb,var(--accent) 4%,var(--paper-raised));border-radius:18px;padding:20px;min-width:0;}
+#yearComparePage .yc-spotlight-top{display:flex;justify-content:space-between;align-items:center;color:var(--accent-2);font-size:.72rem;font-weight:600;letter-spacing:.04em;margin-bottom:13px;}
+#yearComparePage .yc-spotlight .yc-card{padding:0;border:0;background:transparent;margin:0;}
+#yearComparePage .yc-spotlight .yc-chart .yc-head{margin-bottom:7px;}
+#yearComparePage .yc-spotlight .yc-chart .yc-head h3{font-size:1.1rem;}
+#yearComparePage .yc-spotlight-stamp{font-size:.75rem;color:var(--ink-soft);margin:8px 0;}
+#yearComparePage .yc-scope-tags{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px;font-size:.73rem;color:var(--muted);}
+#yearComparePage .yc-scope-tags>span{display:inline-flex;align-items:center;gap:7px;background:var(--surface-1);padding:7px 11px;border-radius:20px;}
+#yearComparePage .yc-map{width:100%;border-collapse:separate;border-spacing:8px;min-width:360px;font-size:.84rem;}
+#yearComparePage .yc-map th{font-size:.72rem;color:var(--muted);font-weight:550;text-align:center;padding:9px;background:transparent;border:0;}
+#yearComparePage .yc-map th:first-child{text-align:left;color:var(--ink-soft);min-width:95px;}
+#yearComparePage .yc-map td{padding:0;text-align:center;border:0;}
+#yearComparePage .yc-map-cell{justify-content:center;width:100%;min-width:70px;padding:16px 10px;background:color-mix(in srgb,var(--accent) var(--yc-level),var(--surface-1));border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);border-radius:11px;color:var(--ink);font-size:.95rem;font-weight:650;box-shadow:none;}
+#yearComparePage .yc-map-cell:hover,#yearComparePage .yc-map-cell:focus-visible{border-color:var(--accent-2);transform:none;}
+#yearComparePage .yc-map-change{font-size:.77rem;color:var(--accent-2);white-space:nowrap;}
+#yearComparePage .yc-map-missing{color:var(--muted);}
+#yearComparePage .yc-map-key{display:flex;justify-content:flex-end;align-items:center;gap:5px;color:var(--muted);font-size:.65rem;margin:12px 10px 0;}
+#yearComparePage .yc-map-key i{display:block;width:22px;height:8px;border-radius:2px;background:color-mix(in srgb,var(--accent) var(--yc-level),var(--surface-1));}
+#yearComparePage .yc-check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;}
+#yearComparePage .yc-check-tile{display:flex;gap:10px;align-items:center;text-align:left;white-space:normal;padding:14px 12px;background:var(--surface-1);border:1px solid var(--line);border-radius:12px;transform:none;box-shadow:none;}
+#yearComparePage .yc-check-tile i{width:7px;height:7px;border-radius:50%;background:var(--yc-cyan);flex:0 0 auto;}
+#yearComparePage .yc-check-tile.review i{background:var(--accent-2);}
+#yearComparePage .yc-check-tile b{font-size:.76rem;font-weight:550;}
+#yearComparePage .yc-check-tile span{margin-left:auto;font-size:.68rem;color:var(--muted);}
+.yc-settings-dialog{width:min(440px,calc(100vw - 30px));max-height:90vh;overflow:auto;position:fixed;inset:0;margin:auto;padding:25px;border:1px solid var(--line);border-radius:18px;background:var(--surface-2);color:var(--ink);box-shadow:var(--shadow-lg);font-family:var(--font-body);}
+.yc-settings-dialog::backdrop{background:rgba(8,5,18,.66);}
+.yc-settings-dialog .yc-head{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
+.yc-settings-dialog h3{font-size:1rem;margin:0;}
+.yc-settings-dialog .yc-sp{flex:1;}
+.yc-settings-fields{display:grid;gap:20px;}
+.yc-settings-fields label{display:grid;gap:8px;font-size:.8rem;color:var(--ink-soft);}
+.yc-settings-fields input,.yc-settings-fields select{width:100%;}
+.yc-settings-fields label span{font-size:.72rem;line-height:1.5;color:var(--muted);}
+.yc-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:24px;margin-top:24px;border-top:1px solid var(--line);font-size:.7rem;color:var(--muted);}
+@media(max-width:520px){#yearComparePage .yc-terms{gap:10px 14px;font-size:.7rem;}#yearComparePage .yc-terms>button{margin-left:0;}#yearComparePage .yc-view-nav{gap:2px;}#yearComparePage .yc-view-nav button{padding:8px 10px;font-size:.73rem;}#yearComparePage .yc-metric-label{gap:5px;}#yearComparePage .yc-info{width:16px;height:16px;min-width:16px;}#yearComparePage .yc-map{border-spacing:5px;}#yearComparePage .yc-map-cell{font-size:.83rem;padding:12px 8px;}#yearComparePage .yc-spotlight{padding:17px;}}

@@ -1,6 +1,29 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const C=require('../js/year-compare-core.js');
+const Charts=require('../js/year-compare-charts.js');
+
+test('visual evidence uses structured subject references and withholds blocked changes',()=>{
+  const make=(label,marks)=>({label,assessment:'Annual',grade_level:'First year',streams:[{key:'PM',label:'PM',subjects:marks.map((_,i)=>({key:'S'+i,name:['Math','Biology','Physics','English'][i],max:100}))}],records:Array.from({length:20},(_,i)=>({i:'r'+i,st:'PM',c:marks.map(v=>['s',v])}))});
+  const before=make('2025',[35,60,70,75]),after=make('2026',[40,78,77,80]);
+  const cmp=C.compareDatasets(before,after);
+  assert.equal(cmp.signals.priority.subjectKey,'S0');
+  assert.equal(cmp.signals.gain.subjectKey,'S1');
+  for(const ref of Object.values(cmp.signals))assert.ok(cmp.subjects.some(r=>r.key===ref.subjectKey&&r.streamKey===ref.streamKey));
+  assert.match(Charts.movers(cmp),/percentage points/);
+  const blocked=C.compareDatasets(before,{...after,assessment:'Midterm'});
+  assert.deepEqual(blocked.signals,{priority:null,gain:null});
+  assert.equal(Charts.movers(blocked),'');
+});
+
+test('visual outcome stacks keep all listed records and escape labels',()=>{
+  const analysis=C.analyseDataset(data([[s(80),s(80)],[s(10),m],[m,m]],'<unsafe>'));
+  assert.match(Charts.outcomes([analysis]),/Recorded below pass: 1 of 3/);
+  assert.match(Charts.completeness([analysis]),/Partial: 1 of 3/);
+  assert.match(Charts.supportLimits([analysis]),/2 incomplete overall results/);
+  assert.ok(!Charts.ranges([analysis]).includes('<unsafe>'));
+  assert.match(Charts.ranges([analysis]),/&lt;unsafe&gt;/);
+});
 
 function sheet({max=100,name='Ali',score=80,subjects=['Math','English']}={}) {
   return C.parseSheet([

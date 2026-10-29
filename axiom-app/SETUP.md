@@ -369,6 +369,15 @@ email alerts. Storage access is enforced by migration 014's bucket policies.
 
 **Tests:** `node --test axiom-app/tests/*.test.cjs`
 
+**Reading the dashboard:** hover or focus the information buttons beside Typical
+result, Support need and Excellence for short definitions. Current thresholds
+appear above the years; use **Settings** to change them. **Overview** shows the
+main changes with visual evidence, **Subjects** contains the subject map and
+paired evidence charts, **Support** shows pass outcomes and missing-result
+limits, and **Data quality** holds comparison checks and the import audit.
+These views replace the previous Explore details accordions. This interface
+update needs no additional migration beyond 013 and 014.
+
 **Browser integration:** with Playwright and Chrome available, run
 `node axiom-app/tests/year-compare-browser.cjs`. It uses real synthetic XLSX
 workbooks and a local page with mocked Supabase storage, never production
