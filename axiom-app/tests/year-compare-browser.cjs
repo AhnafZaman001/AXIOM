@@ -22,7 +22,7 @@ const server=http.createServer((req,res)=>{
   if(url.pathname==='/'){
     const role=['principal','coordinator','hod','teacher','student'].includes(url.searchParams.get('role'))?url.searchParams.get('role'):'principal';
     res.setHeader('Content-Type','text/html; charset=utf-8');
-    return res.end(`<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/css/styles.css"></head><body><main style="padding:24px;max-width:1200px;margin:auto;"><div class="masthead-actions"></div><button id="teacherReportBtn">Teacher Report</button><div id="overallSummaryPage"></div></main><script>${inline}</script><script>
+    return res.end(`<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/css/styles.css"><link rel="stylesheet" href="/css/year-compare.css"></head><body><main style="padding:24px;max-width:1200px;margin:auto;"><div class="masthead-actions"></div><button id="teacherReportBtn">Teacher Report</button><div id="overallSummaryPage"></div></main><script>${inline}</script><script>
       window.axRole=${JSON.stringify(role)}; window.setActivePage=function(){};
       window.showToast=(text)=>{window.lastToast=text;};
       window.showConfirm=(title,body,callback)=>callback();
@@ -30,15 +30,22 @@ const server=http.createServer((req,res)=>{
       window.reportSectionHtml=(title,body)=>title+body;
       window.printReport=(title,subtitle,html)=>{window.printed={title,subtitle,html};};
       window.yearStore=[];
-      window.supabaseClient={from(){let op='load',payload,id;const q={
+      window.yearFiles=new Map();window.storageUploads=0;window.storageDownloads=0;
+      window.supabaseClient={storage:{from(){return {
+        async upload(path,file){if(window.failNextUpload){window.failNextUpload=false;return {error:{message:'Upload unavailable'}};}yearFiles.set(path,file);storageUploads++;return {data:{path}};},
+        async download(path){storageDownloads++;return yearFiles.has(path)?{data:yearFiles.get(path)}:{error:{message:'File not found'}};},
+        async remove(paths){paths.forEach(p=>yearFiles.delete(p));return {data:[]};}
+      };}},from(){let op='load',payload,id;const q={
         select(){return q;},order(){return q;},
         upsert(p){op='save';payload=p;return q;},delete(){op='delete';return q;},eq(k,v){id=v;return q;},
-        single(){const prior=yearStore.find(d=>d.label===payload.label);const saved={...payload,id:prior?.id||'year-'+(yearStore.length+1),created_at:new Date().toISOString()};yearStore=yearStore.filter(d=>d.id!==saved.id);yearStore.push(saved);return Promise.resolve({data:saved});},
+        update(p){op='update';payload=p;return q;},
+        single(){const prior=yearStore.find(d=>op==='update'?d.id===id:d.id===payload.id||d.label===payload.label);const saved={...prior,...payload,id:prior?.id||'year-'+(yearStore.length+1),created_at:new Date().toISOString()};yearStore=yearStore.filter(d=>d.id!==saved.id);yearStore.push(saved);return Promise.resolve({data:saved});},
+        maybeSingle(){return Promise.resolve({data:null});},
         then(resolve){if(op==='delete')yearStore=yearStore.filter(d=>d.id!==id);return Promise.resolve({data:structuredClone(yearStore)}).then(resolve);}
       };return q;}};
-      </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare.js"></script></body></html>`);
+      </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare-storage.js"></script><script src="/js/year-compare-charts.js"></script><script src="/js/year-compare.js"></script></body></html>`);
   }
-  const files={'/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
+  const files={'/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare-storage.js':'js/year-compare-storage.js','/js/year-compare-charts.js':'js/year-compare-charts.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/css/year-compare.css':'css/year-compare.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
   if(!files[url.pathname]){res.writeHead(404);return res.end();}
   res.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');
   res.end(fs.readFileSync(path.join(root,files[url.pathname])));
@@ -89,7 +96,13 @@ const server=http.createServer((req,res)=>{
     await page.locator('[data-imp-act="save"]').click();
     await page.locator('#ycModalBack.open').waitFor({state:'hidden'});
     assert.equal(await page.locator('.yc-find').count()<=3,true);
-    assert.match(await page.locator('#ycBody').innerText(),/9 of 12 listed students/);
+    assert.match(await page.locator('.yc-overview').innerText(),/9 \/ 12/);
+    assert.doesNotMatch(await page.locator('.section-title').innerText(),/results compared as groups/);
+    assert.equal(await page.locator('.yc-chart').count(),5);
+    await page.locator('[data-chart-metric="support"]').click();
+    assert.equal(await page.locator('[data-chart-metric="support"]').getAttribute('aria-pressed'),'true');
+    await page.locator('.yc-point').first().focus();
+    assert.match(await page.locator('#ycChartTooltip').innerText(),/2025/);
     await page.locator('[data-open="support"] summary').click();
     const support=await page.locator('[data-open="support"]').innerText();
     assert.match(support,/1 of 12/);assert.match(support,/3 incomplete/);
@@ -101,14 +114,65 @@ const server=http.createServer((req,res)=>{
     assert.match(await page.evaluate(()=>printed.subtitle),/every subject scored/);
     await page.locator('[data-open="settings"] summary').click();
     await page.locator('[data-set="basis"]').selectOption('marked');
-    assert.match(await page.locator('#ycBody').innerText(),/11 of 12 listed students/);
+    assert.equal(await page.locator('.yc-overview [title="11 of 12 listed students"]').count(),1);
     // Reopen from saved data, not the current screen's in-memory selection.
     await page.evaluate(()=>{AxiomYearCompare._state.loaded=false;AxiomYearCompare.open();});
     await page.waitForFunction(()=>AxiomYearCompare._state.loaded);
     assert.equal(await page.locator('.yc-year').count(),2);
+    assert.equal(await page.evaluate(()=>storageUploads),2);
+    assert.equal(await page.evaluate(()=>yearFiles.size),2);
+    await page.locator('[data-act="reload-file"]').first().click();
+    await page.locator('#ycModalBack.open').waitFor();
+    assert.match(await page.locator('#ycModalBody').innerText(),/Loaded from cloud/);
+    await page.locator('[data-imp-confirm]').check();
+    await page.locator('[data-imp-act="save"]').click();
+    await page.locator('#ycModalBack.open').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>storageUploads),2,'reload must not duplicate the workbook');
+    assert.equal(await page.evaluate(()=>yearStore.length),2);
+    const download=page.waitForEvent('download');
+    await page.locator('[data-act="download"]').first().click();
+    assert.equal((await download).suggestedFilename(),'2025.xlsx');
+    // Existing pre-014 snapshots stay usable and can acquire their source file.
+    await page.evaluate(()=>{const old=yearStore.find(d=>d.label==='2025');yearFiles.delete(old.source_path);old.source_path=null;});
+    await page.locator('[data-act="refresh"]').click();
+    await page.locator('[data-act="attach"]').waitFor();
+    await page.locator('[data-act="attach"]').click();
+    await upload(2025);
+    await page.locator('[data-imp-confirm]').check();
+    await page.evaluate(()=>{window.failNextUpload=true;});
+    await page.locator('[data-imp-act="save"]').click();
+    await page.locator('.yc-err').waitFor();
+    assert.equal(await page.evaluate(()=>yearStore.length),2,'failed upload preserves prior results');
+    await page.locator('[data-imp-act="save"]').click();
+    await page.locator('#ycModalBack.open').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>yearStore.length),2,'attaching replaces the same row');
+    assert.equal(await page.evaluate(()=>yearFiles.size),2);
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(await page.locator('.yc-bar').first().evaluate(el=>getComputedStyle(el).animationName),'none');
     if(process.env.AXIOM_SCREENSHOT){
       await page.locator('[data-set="basis"]').selectOption('complete');
+      await page.locator('#ycBody details[open]').evaluateAll(nodes=>nodes.forEach(node=>{node.open=false;}));
       await page.screenshot({path:process.env.AXIOM_SCREENSHOT,fullPage:true});
+      await page.setViewportSize({width:390,height:844});
+      await page.waitForFunction(()=>AxiomYearCompare._state.compact===true);
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-mobile.png'),fullPage:true});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'mobile must not overflow the page');
+      await page.setViewportSize({width:1440,height:1000});
+      // Separate visual fixture; synthetic data only, never persisted to a real service.
+      await page.evaluate(()=>{
+        const ds=[2024,2025,2026].map((year,ix)=>{
+          const streams=['PM','PE','ICS'].map(key=>({key,label:key,subjects:[{key:'MATH',name:'Math',max:100},{key:'ENGLISH',name:'English',max:100},{key:'PHYSICS',name:'Physics',max:100},{key:'CHEMISTRY',name:'Chemistry',max:100}]}));
+          const records=streams.flatMap((stream,k)=>Array.from({length:40},(_,i)=>{
+            const base=43+ix*5+((i*7+k*3)%44);
+            return {i:stream.key+i,st:stream.key,c:[['s',Math.min(100,base-6)],['s',Math.min(100,base+4)],['s',Math.min(100,base-1)],['s',Math.min(100,base+2)]]};
+          }));
+          return {id:'preview-'+year,label:year+'-'+String(year+1).slice(-2),assessment:'Annual exam',grade_level:'First year',streams,records,source_file:'Synthetic results.xlsx',source_path:'preview/'+year+'.xlsx'};
+        });
+        yearStore=ds;AxiomYearCompare._state.datasets=ds;AxiomYearCompare._state.selected=ds.map(d=>d.id);AxiomYearCompare._state.chartMetric='median';AxiomYearCompare._state.open={};AxiomYearCompare._state.loaded=false;AxiomYearCompare.open();
+      });
+      await page.waitForFunction(()=>AxiomYearCompare._state.loaded);
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-preview.png'),fullPage:true});
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-overview.png')});
     }
     for(const role of ['hod','teacher','student']){
       await page.goto(origin+'/?role='+role);
@@ -130,6 +194,6 @@ const server=http.createServer((req,res)=>{
       await page.evaluate(()=>setActivePage('section'));
     }
     assert.deepEqual(errors,[]);
-    console.log('PASS: real XLSX import, missing-max rejection, confirmation, anonymous save/reload, denominators, filters, print, role controls and real-app navigation/report regression checks.');
+    console.log('PASS: XLSX import, cloud workbook save/download/reload without duplication, chart controls/tooltips, reduced motion, mobile, calculations, roles and existing navigation.');
   }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

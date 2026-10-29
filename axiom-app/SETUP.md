@@ -268,9 +268,11 @@ breadth across streams, subject priorities and achievement. Each year holds
 different students, so every statement describes **groups**, never individual
 progress, and no cause is implied.
 
-**One-time setup:** SQL Editor → run `supabase/migration_013_year_comparison.sql`.
-Nothing else to deploy. (Without it the page still works, but years you add
-last only until the page is closed, and a notice says so.)
+**One-time setup:** SQL Editor → run `supabase/migration_013_year_comparison.sql`,
+then `supabase/migration_014_year_source_files.sql`. If 013 already ran, run only
+014. It adds original-file references and the private `year-result-files`
+storage bucket. Deploy the updated static files; no new keys or Edge Functions
+are needed. Cloud saving never silently falls back to a temporary local copy.
 
 **Where:** principal / coordinator → **Year Comparison** button next to Teacher
 Report. HOD → the same button in the top bar (read-only). Teachers and
@@ -281,21 +283,42 @@ students do not see it.
    year. The screen shows what was found (sheets, streams, subjects with their
    maximum marks and source Excel row). Enter the year, assessment name, class
    or grade and stream names. Check the student counts and maxima against the
-   workbook, tick the confirmation, then save.
+   workbook, tick the confirmation, then save. The original workbook and its
+   calculated results are both saved to Supabase. Maximum upload size is 6 MB.
    Rename a stream so it matches the same stream in other years (PM in every
    year). Add one workbook per year. Adding the same year + assessment again
    replaces it (the screen says so first).
 2. Tick the years to compare. The findings compare the two most recent ticked
    years; the table and chart show every ticked year.
-3. Read the **coverage** row and the **checks** banner first. They say how many
-   listed students have marks and whether the two years use the same assessment,
-   streams, subjects and maximum marks.
-4. Up to three findings are shown, each with evidence, what to keep in mind and
-   a next question. Everything else is in the expandable sections. **Settings**
+3. Saved years load from cloud whenever the page opens; **Refresh** fetches
+   updates without another local upload. Each year offers **Download** for its
+   original file. Principal/coordinator can use **Reload file** to reimport it
+   from cloud; saving that reimport reuses the original object, not a duplicate.
+   Existing years without a source file show **Attach workbook**; attach the
+   local original once. Their calculated results remain available meanwhile.
+4. The overview shows complete-result counts, median, support and excellence.
+   Purple comparison notes open the checks; they indicate differences in exam,
+   subject, grade or coverage, not an application failure. Up to three insight
+   cards show a short metric; **Details** expands evidence and qualifications.
+   Charts include a year trend (median/support/excellence toggle), stacked score
+   bands, result-status donut, stream bars and subject bars with a stream filter.
+   Hover or keyboard-focus data points for exact counts. Phone layouts adapt
+   chart dimensions and reduced-motion preferences disable chart animation.
+   Everything else is in expandable sections. **Settings**
    (support threshold, pass mark, excellence threshold, who is counted) apply to
    every year equally and are saved on that device. Complete results are the
    default for overall measures; available-subject mode is an explicit option.
-5. **Print Report** gives a PDF through the normal print dialog.
+5. **Print Report** gives a PDF through the normal print dialog. It retains the
+   detailed evidence and comparison checks, even though the screen is concise.
+
+Cloud replacement uploads a new object, saves the result reference, then removes
+the previous file. A failed upload does not replace saved results. An ambiguous
+save failure retains a file if it may be referenced by a committed dataset;
+refresh before retrying. Cleanup failures are reported for administrator review.
+Deleting a year removes its result row and attempts source-file cleanup. An
+unconfirmed cleanup can leave an orphan in Storage, but never silently claims
+that everything was removed. Raw workbooks may contain names; keep this bucket
+private and separate from the broader roster-files permissions.
 
 **Rules the page follows**
 - Workbook layout: one sheet per stream (e.g. PM, PE, ICS), a header row with
@@ -336,11 +359,13 @@ students do not see it.
   (default 90%). This is not the school's A+ grade boundary.
 - Subjects are compared inside their own stream only.
 
-**What is stored:** only anonymous results (stream, subject maximums and each
-student's mark or status under a made-up id such as `r12`). Student names and
-roll numbers never leave the browser. Principal/coordinator can add, replace
-and delete years; HOD can read; teachers and students have no access. Year
-Comparison does not send email alerts.
+**What is stored:** anonymous result records (stream, subject maximums and each
+student's mark/status under a made-up id such as `r12`) in `year_datasets`, plus
+the original Excel workbook in private Storage. Original files retain their
+contents, including any student names or roll numbers. Principal/coordinator
+can add, replace and delete years; HOD can view results and download files;
+teachers and students have no access to either. Year Comparison does not send
+email alerts. Storage access is enforced by migration 014's bucket policies.
 
 **Tests:** `node --test axiom-app/tests/*.test.cjs`
 

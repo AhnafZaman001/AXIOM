@@ -9,13 +9,14 @@
 (function () {
   'use strict';
   var Core = window.AxiomYearCore;
+  var Charts = window.AxiomYearCharts;
+  var Cloud = window.AxiomYearStorage;
   if (!Core) { console.error('year-compare-core.js did not load'); return; }
 
   var SETTINGS_KEY = 'axiom.yearCompare.settings.v2';
-  var PALETTE = ['#8B5CF6', '#22b8cf', '#f59f00', '#40c057', '#f06595'];
   var state = {
     datasets: [], selected: [], settings: loadSettings(), tableMissing: false, loaded: false, loading: false,
-    error: '', imp: null, busy: false, open: { checks: false, typical: false, support: false, streams: false, subjects: false, achievement: false, notes: false, settings: false }
+    error: '', imp: null, busy: false, chartMetric: 'median', chartStream: '', open: { checks: false, typical: false, support: false, streams: false, subjects: false, achievement: false, notes: false, settings: false }
   };
 
   /* ------------------------------ small helpers ------------------------------ */
@@ -57,14 +58,13 @@
     var done = function () { state.loading = false; state.loaded = true; render(); };
     if (typeof supabaseClient === 'undefined') { state.tableMissing = true; done(); return Promise.resolve(); }
     return supabaseClient.from('year_datasets')
-      .select('id,label,assessment,grade_level,source_file,import_report,streams,records,created_at')
+      .select('*')
       .order('created_at', { ascending: true })
       .then(function (res) {
         if (res.error) {
           if (isMissingTable(res.error)) state.tableMissing = true; else state.error = 'Saved years could not be loaded: ' + res.error.message;
         } else {
-          var local = state.datasets.filter(function (d) { return String(d.id).indexOf('local-') === 0; });
-          state.datasets = (res.data || []).concat(local);
+          state.datasets = res.data || [];
           state.tableMissing = false;
           sortDatasets();
           if (!state.selected.length) state.selected = state.datasets.slice(-2).map(function (d) { return d.id; });
@@ -74,23 +74,12 @@
       }, function (err) { state.error = 'Saved years could not be loaded: ' + (err && err.message || err); done(); });
   }
 
-  function persist(ds) {
-    var local = function () { var copy = Object.assign({}, ds, { id: 'local-' + Date.now(), created_at: new Date().toISOString() }); return Promise.resolve(copy); };
-    if (state.tableMissing || typeof supabaseClient === 'undefined') return local();
-    return supabaseClient.from('year_datasets')
-      .upsert({ label: ds.label, assessment: ds.assessment, grade_level: ds.grade_level, source_file: ds.source_file, import_report: ds.import_report, streams: ds.streams, records: ds.records }, { onConflict: 'label,assessment,grade_level' })
-      .select('id,created_at').single()
-      .then(function (res) {
-        if (res.error) {
-          if (isMissingTable(res.error)) { state.tableMissing = true; return local(); }
-          throw new Error(res.error.message);
-        }
-        return Object.assign({}, ds, { id: res.data.id, created_at: res.data.created_at });
-      });
+  function persist(ds, file, previous, cloudSource) {
+    if (state.tableMissing || typeof supabaseClient === 'undefined' || !Cloud) return Promise.reject(new Error('Cloud storage is unavailable. Run migrations 013 and 014, then refresh.'));
+    return cloudSource ? Cloud.create(supabaseClient).saveSnapshot(ds,cloudSource) : Cloud.create(supabaseClient).save(ds,file,previous);
   }
   function removeFromStore(d) {
-    if (String(d.id).indexOf('local-') === 0 || state.tableMissing) return Promise.resolve();
-    return supabaseClient.from('year_datasets').delete().eq('id', d.id).then(function (res) { if (res.error) throw new Error(res.error.message); });
+    return Cloud.create(supabaseClient).remove(d);
   }
 
   /* ----------------------------------- CSS ----------------------------------- */
@@ -180,11 +169,10 @@
     host.id = 'yearComparePage';
     host.style.display = 'none';
     host.innerHTML =
-      '<div class="section-title">Year Comparison <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— results compared as groups, year to year</span>' +
+      '<div class="section-title">Year Comparison ' +
       '<span style="flex:1;"></span>' +
       '<button class="ghost small" id="ycBackBtn" title="Return to Section View">← Back to Section View</button>' +
       '<button class="ghost small" id="ycPrintBtn" title="Print or save the comparison as a PDF">Print Report</button></div>' +
-      '<p class="yc-note">Each year holds different students. Differences describe the groups, not individual progress, and no cause is implied.</p>' +
       '<div id="ycBody"></div>';
     var anchor = $('overallSummaryPage');
     if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(host, anchor); else document.body.appendChild(host);
@@ -193,6 +181,10 @@
     var body = $('ycBody');
     body.addEventListener('click', onClick);
     body.addEventListener('change', onChange);
+    body.addEventListener('pointermove', showChartTip);
+    body.addEventListener('pointerleave', hideChartTip);
+    body.addEventListener('focusin', showChartTip);
+    body.addEventListener('focusout', hideChartTip);
     body.addEventListener('toggle', function (e) { var id = e.target && e.target.getAttribute && e.target.getAttribute('data-open'); if (id) state.open[id] = e.target.open; }, true);
   }
 
@@ -242,7 +234,7 @@
   function openPage() {
     if (typeof setActivePage === 'function') setActivePage('yearCompare');
     window.scrollTo(0, 0);
-    if (!state.loaded) loadDatasets(); else render();
+    loadDatasets();
   }
 
   /* ------------------------------- view helpers ------------------------------- */
@@ -257,26 +249,26 @@
   function share(m, k) { return m[k].share == null ? '—' : pct(m[k].share) + ' (' + m[k].n + ' of ' + m.n + ')'; }
 
   function yearsPanel() {
-    var h = '<div class="yc-card"><div class="yc-head"><div><h3>Years to compare</h3><div class="yc-sub">Tick two or more years. The findings compare the two most recent ticked years; the table and chart show every ticked year.</div></div><span class="yc-sp"></span>';
-    if (canManage()) h += '<input type="file" id="ycFileInput" accept=".xls,.xlsx" style="display:none;"><button class="primary" data-act="add" title="Upload one Excel results workbook for a year">Add year</button>';
+    var h = '<div class="yc-card yc-library"><div class="yc-head"><h3>Years to compare</h3><span class="yc-cloud-label">Private cloud</span><span class="yc-sp"></span><button class="ghost small" data-act="refresh"'+(state.loading||state.busy?' disabled':'')+'>Refresh</button>';
+    if (canManage()) h += '<input type="file" id="ycFileInput" accept=".xls,.xlsx" style="display:none;"><button class="primary" data-act="add"'+(state.busy||state.loading?' disabled':'')+'>Add year</button>';
     h += '</div>';
     if (state.loading) h += '<div class="yc-sub">Loading saved years…</div>';
     if (state.error) h += '<div class="yc-err">' + esc(state.error) + '</div>';
-    if (state.tableMissing) h += '<div class="yc-warn">Saved years are not set up yet, so years added now last only until this page is closed. Run <b>supabase/migration_013_year_comparison.sql</b> once in the Supabase SQL Editor to keep them.</div>';
+    if (state.tableMissing) h += '<div class="yc-warn">Cloud setup required: run migrations 013 and 014 in Supabase.</div>';
     if (!state.datasets.length && !state.loading) h += '<div class="yc-empty">No years have been added yet.' + (canManage() ? ' Choose <b>Add year</b> and upload the Excel results workbook for one year. Add a workbook for each year you want to compare.' : ' A principal or coordinator needs to add them.') + '</div>';
     h += '<div class="yc-years">' + state.datasets.map(function (d) {
       var on = state.selected.indexOf(d.id) >= 0, r = d.import_report || {}, listed = (d.records || []).length;
-      return '<label class="yc-year' + (on ? ' on' : '') + '"><input type="checkbox" data-act="pick" data-id="' + esc(d.id) + '"' + (on ? ' checked' : '') + '><div><b>' + esc(d.label) + '</b><span>' + esc(d.assessment || 'Assessment not named') + (d.grade_level ? ' · ' + esc(d.grade_level) : '') + '</span><span>' + listed + ' students listed · ' + (d.streams || []).length + ' streams' + (String(d.id).indexOf('local-') === 0 ? ' · this visit only' : '') + '</span></div>' +
-        (canManage() ? '<button class="ghost small yc-del" data-act="del" data-id="' + esc(d.id) + '" title="Delete this year">Delete</button>' : '') + '</label>';
+      return '<div class="yc-year' + (on ? ' on' : '') + '"><label class="yc-year-pick"><input type="checkbox" data-act="pick" data-id="' + esc(d.id) + '"' + (on ? ' checked' : '') + '><div><b>' + esc(d.label) + '</b><span>' + esc(d.assessment || 'Assessment not named') + (d.grade_level ? ' · ' + esc(d.grade_level) : '') + '</span><span>' + listed + ' students</span></div></label><div class="yc-year-files"><span class="yc-file-badge" title="'+esc(d.source_file||'Saved results')+'">'+(d.source_path?'Workbook saved':'Results saved')+'</span>'+
+        (d.source_path?'<button class="ghost small" data-act="download" data-id="'+esc(d.id)+'" title="Download original Excel workbook">Download</button>':'')+
+        (canManage()?(d.source_path?'<button class="ghost small" data-act="reload-file" data-id="'+esc(d.id)+'" title="Reimport the original workbook from cloud">Reload file</button>':'<button class="ghost small" data-act="attach" data-id="'+esc(d.id)+'">Attach workbook</button>')+'<button class="ghost small yc-del" data-act="del" data-id="'+esc(d.id)+'" aria-label="Delete '+esc(d.label)+'">Delete</button>':'')+'</div></div>';
     }).join('') + '</div></div>';
     return h;
   }
 
   function checksBanner(cmp) {
     var review = cmp.checks.filter(function (c) { return c.status === 'review'; });
-    var h = '<div class="yc-banner ' + cmp.status + '" role="status">';
-    if (!review.length) h += '<b>Ready to compare.</b> The two years use the same assessment, streams, subjects and maximum marks, and results are present for the listed students.';
-    else h += '<b>Review before using these results.</b> ' + review.length + (review.length === 1 ? ' check needs' : ' checks need') + ' attention:<ul>' + review.slice(0, 4).map(function (c) { return '<li>' + esc(c.detail) + '</li>'; }).join('') + '</ul>';
+    if (!review.length) return '';
+    var h = '<div class="yc-banner review" role="status"><div><b>'+review.length+' comparison '+(review.length===1?'note':'notes')+'</b><span>'+esc(cmp.A.label)+' vs '+esc(cmp.B.label)+'</span></div><button class="ghost small" data-act="checks">View checks</button>';
     return h + '</div>';
   }
 
@@ -286,52 +278,33 @@
     if (prev) heads.push('Change, ' + prev.label + ' to ' + last.label);
     function chg(v) { return prev ? [{ html: '<span class="yc-chg">' + esc(pts(v)) + '</span>' }] : []; }
     var rows = [
-      ['<b>Coverage</b><span class="yc-small">Students with any marks, of those listed</span>'].map(function (x) { return { html: x }; }).concat(analyses.map(function (a) { return { html: '<b>' + a.pooled.withMarks + ' of ' + a.pooled.listed + '</b><span class="yc-small">' + pct(a.pooled.coverage) + ' with any marks · ' + a.pooled.complete + ' of ' + a.pooled.listed + ' complete (' + pct(a.pooled.completeCoverage) + ')</span>' }; })).concat(prev ? [''] : []),
-      ['<b>Typical result</b><span class="yc-small">Median of eligible overall results</span>'].map(function (x) { return { html: x }; }).concat(analyses.map(function (a) { return { html: '<b>' + pct(a.pooled.median) + '</b><span class="yc-small">' + a.pooled.n + ' of ' + a.pooled.listed + ' listed students</span>' }; })).concat(chg(cmp ? cmp.deltas.median : null)),
-      ['<b>Support need</b><span class="yc-small">Below ' + st.support + '% overall</span>'].map(function (x) { return { html: x }; }).concat(analyses.map(function (a) { return { html: '<b>' + pct(a.pooled.support.share) + '</b><span class="yc-small">' + nOf(a.pooled.support.n, a.pooled.n) + '</span>' }; })).concat(chg(cmp ? cmp.deltas.support : null)),
-      ['<b>Excellence</b><span class="yc-small">' + st.excellence + '% overall or above</span>'].map(function (x) { return { html: x }; }).concat(analyses.map(function (a) { return { html: '<b>' + pct(a.pooled.excellence.share) + '</b><span class="yc-small">' + nOf(a.pooled.excellence.n, a.pooled.n) + '</span>' }; })).concat(chg(cmp ? cmp.deltas.excellence : null))
+      [{html:'<b title="Students with complete results / all listed students">Complete results</b>'}].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.withMarks+' of '+a.pooled.listed+' have any marks">'+a.pooled.complete+' / '+a.pooled.listed+'</b>'};})).concat(prev?['']:[]),
+      [{html:'<b title="Median overall percentage of eligible results">Typical result</b>'}].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.n+' of '+a.pooled.listed+' listed students">'+pct(a.pooled.median)+'</b>'};})).concat(chg(cmp?cmp.deltas.median:null)),
+      [{html:'<b title="Overall result below '+st.support+'%">Support need</b>'}].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.support.n,a.pooled.n)+' eligible results">'+pct(a.pooled.support.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.support:null)),
+      [{html:'<b title="Overall result at least '+st.excellence+'%">Excellence</b>'}].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.excellence.n,a.pooled.n)+' eligible results">'+pct(a.pooled.excellence.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.excellence:null))
     ];
-    return '<div class="yc-card"><div class="yc-head"><div><h3>Headline</h3><div class="yc-sub">' + (st.basis === 'complete' ? 'Students with every subject scored only.' : 'All students with marks, scored on the subjects they have (available-subject percentage).') + ' Changes are in percentage points.</div></div></div>' + table(heads, rows, 1) + '</div>';
+    return '<div class="yc-card yc-overview'+(prev?' has-change':'')+'"><div class="yc-head"><h3>At a glance</h3><span class="yc-sp"></span><span class="yc-mode-pill" title="Changes use percentage points. See How results are calculated for definitions.">'+(st.basis==='complete'?'Complete results':'Available subjects')+'</span></div>' + table(heads, rows, 1) + '</div>';
   }
 
   function findingsView(cmp) {
-    var h = '<p class="yc-headline">' + esc(cmp.headline) + '</p><div class="yc-findings">';
+    var h = '<div class="yc-findings">';
     cmp.findings.forEach(function (f) {
-      h += '<div class="yc-find"><h4>' + esc(f.title) + '</h4><p class="obs">' + esc(f.observation) + '</p>' +
+      var metric,caption;
+      if(f.id==='typical'){metric=pts(cmp.deltas.median);caption=pct(cmp.A.pooled.median)+' → '+pct(cmp.B.pooled.median);}
+      else if(f.id==='support'){metric=pts(cmp.deltas.support);caption=cmp.B.pooled.support.n+' of '+cmp.B.pooled.n+' need support';}
+      else if(f.id==='achievement'){metric=pct(cmp.B.pooled.excellence.share);caption=cmp.B.pooled.excellence.n+' of '+cmp.B.pooled.n+' at '+cmp.settings.excellence+'%+';}
+      else if(f.id==='subject'){
+        var pr=cmp.subjects.filter(function(s){return f.observation.indexOf('In '+s.stream+', '+s.subject+' ')===0;})[0];
+        metric=pr?pr.subject:'Review subject';caption=pr?pr.stream+' · '+pct(pr.b.median)+' median':'See evidence';
+      }else{metric='Review needed';caption=f.id==='insufficient'?'More complete results needed':'Comparison inputs differ';}
+      h += '<div class="yc-find"><h4>' + esc(f.title) + '</h4><div class="yc-insight-value">'+esc(metric)+'</div><p class="yc-insight-caption">'+esc(caption)+'</p><details class="yc-insight-detail"><summary>Details</summary><p class="obs">'+esc(f.observation)+'</p>' +
         '<div class="lbl">Evidence</div><ul>' + f.evidence.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>' +
         '<div class="lbl">Worth knowing</div><ul>' + f.qualification.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>' +
-        '<div class="lbl">Next question</div><p class="next">' + esc(f.next) + '</p></div>';
+        '<div class="lbl">Next question</div><p class="next">' + esc(f.next) + '</p></details></div>';
     });
     h += '</div>';
     if (cmp.alsoChecked && cmp.alsoChecked.length) h += '<details class="yc-det"><summary>Other observations</summary><p class="yc-also">' + cmp.alsoChecked.map(function (a) { return esc(a.summary); }).join(' ') + '</p></details>';
     return h;
-  }
-
-  function distChart(analyses) {
-    var W = 680, H = 262, L = 46, R = 10, T = 14, B = 52, pw = W - L - R, ph = H - T - B, k = analyses.length;
-    var shorts = ['<40', '40–49', '50–59', '60–69', '70–79', '80–89', '90+'];
-    var maxV = 0;
-    analyses.forEach(function (a) { a.pooled.bandShares.forEach(function (v) { if (v > maxV) maxV = v; }); });
-    var top = Math.max(20, Math.ceil(maxV / 10) * 10), step = top > 60 ? 20 : 10;
-    var gw = pw / shorts.length, bw = Math.min(30, (gw - 12) / k), svg = '';
-    for (var g = 0; g <= top; g += step) {
-      var y = T + ph - (g / top) * ph;
-      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + g + '%</text>';
-    }
-    shorts.forEach(function (label, gi) {
-      var gx = L + gi * gw + (gw - bw * k) / 2;
-      analyses.forEach(function (a, ki) {
-        var v = a.pooled.bandShares[gi] || 0, bh = (v / top) * ph, x = gx + ki * bw, y = T + ph - bh;
-        svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw - 2).toFixed(1) + '" height="' + Math.max(bh, 0).toFixed(1) + '" rx="3" fill="' + PALETTE[ki % PALETTE.length] + '"><title>' + esc(a.label + ' · ' + Core.BAND_LABELS[gi] + ': ' + pct(a.pooled.bandShares[gi]) + ' (' + a.pooled.bands[gi] + ' of ' + a.pooled.n + ')') + '</title></rect>';
-        if (k <= 3 && v > 0) svg += '<text class="yc-val" x="' + (x + (bw - 2) / 2).toFixed(1) + '" y="' + (y - 3).toFixed(1) + '" text-anchor="middle">' + v.toFixed(0) + '</text>';
-      });
-      svg += '<text x="' + (L + gi * gw + gw / 2).toFixed(1) + '" y="' + (T + ph + 18) + '" text-anchor="middle">' + label + '</text>';
-    });
-    svg += '<text x="' + (L + pw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">Overall result band, share of eligible results</text>';
-    var aria = 'Distribution of overall results. ' + analyses.map(function (a) { return a.label + ': ' + Core.BAND_LABELS.map(function (b, i) { return b + ' ' + pct(a.pooled.bandShares[i]); }).join(', '); }).join('. ');
-    return '<div class="yc-card"><div class="yc-head"><div><h3>Where the results sit</h3><div class="yc-sub">Share of eligible overall results in each band. Incomplete results are excluded by default. Bars describe cohorts, not individual progress.</div></div></div>' +
-      '<div class="yc-legend">' + analyses.map(function (a, i) { return '<span><i style="background:' + PALETTE[i % PALETTE.length] + '"></i>' + esc(a.label) + '</span>'; }).join('') + '</div>' +
-      '<svg class="yc-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(aria) + '">' + svg + '</svg></div>';
   }
 
   function detailSections(analyses, cmp) {
@@ -367,7 +340,7 @@
     // import notes
     out += det('notes', 'Import notes', 'what was ignored or left out', analyses.map(function (a) {
       var r = a.report || {}, w = (r.warnings || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('');
-      return '<p class="yc-sub"><b>' + esc(a.label) + '</b> · ' + a.pooled.listed + ' students listed, ' + a.pooled.withMarks + ' with marks. ' + cnt(r.padding || 0, 'empty template row', 'empty template rows') + ' ignored' + (r.duplicates ? ', ' + cnt(r.duplicates, 'duplicate row', 'duplicate rows') + ' excluded' : '') + (r.summaryRows ? ', ' + cnt(r.summaryRows, 'summary row', 'summary rows') + ' skipped' : '') + '. Student names and roll numbers are not stored.</p>' + (w ? '<ul class="yc-sub">' + w + '</ul>' : '');
+      return '<p class="yc-sub"><b>' + esc(a.label) + '</b> · ' + a.pooled.listed + ' students listed, ' + a.pooled.withMarks + ' with marks. ' + cnt(r.padding || 0, 'empty template row', 'empty template rows') + ' ignored' + (r.duplicates ? ', ' + cnt(r.duplicates, 'duplicate row', 'duplicate rows') + ' excluded' : '') + (r.summaryRows ? ', ' + cnt(r.summaryRows, 'summary row', 'summary rows') + ' skipped' : '') + '. Calculated result records are anonymous. Original workbooks are private cloud files.</p>' + (w ? '<ul class="yc-sub">' + w + '</ul>' : '');
     }).join(''));
     // settings
     out += det('settings', 'Settings', 'applied to every year equally',
@@ -386,14 +359,20 @@
     if (!sel.length) return '<div class="yc-card"><div class="yc-empty">Tick at least two years above to compare them.</div></div>';
     var analyses = sel.map(function (d) { return Core.analyseDataset(d, state.settings); });
     if (analyses.length === 1) {
-      return headlineTable(analyses, null) + distChart(analyses) + '<div class="yc-card"><div class="yc-empty">Tick a second year to see the comparison, checks and findings.</div></div>';
+      return headlineTable(analyses, null) + '<div class="yc-charts">'+Charts.status(analyses[0])+Charts.distribution(analyses,Core.BAND_LABELS)+'</div>';
     }
     var cmp = Core.compareDatasets(analyses[analyses.length - 2], analyses[analyses.length - 1], state.settings);
     state.last = { analyses: analyses, cmp: cmp };
-    return checksBanner(cmp) + headlineTable(analyses, cmp) + findingsView(cmp) + distChart(analyses) + detailSections(analyses, cmp);
+    return checksBanner(cmp) + headlineTable(analyses, cmp) + findingsView(cmp) +
+      '<div class="yc-charts">'+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.status(analyses[analyses.length-1])+Charts.distribution(analyses,Core.BAND_LABELS)+Charts.streams(cmp)+Charts.subjects(cmp,state.chartStream)+'</div>'+
+      '<div class="yc-details-title">Explore details</div>'+detailSections(analyses, cmp)+
+      '<details class="yc-det"><summary>How results are calculated</summary><div class="yc-in yc-sub">Typical result is the median. Support means below '+state.settings.support+'%; excellence means '+state.settings.excellence+'% or above. Overall measures use '+(state.settings.basis==='complete'?'complete results only':'available scored subjects')+'. Hover or focus a chart for counts. Changes are percentage points. Different cohorts and papers do not prove individual progress or a teaching effect.</div></details>';
   }
 
   function render() {
+    state.compact=window.matchMedia('(max-width:600px)').matches;
+    if(Charts)Charts.setCompact(state.compact);
+    hideChartTip();
     var host = $('ycBody');
     if (!host) return;
     state.last = null;
@@ -404,18 +383,56 @@
 
   /* --------------------------------- page events --------------------------------- */
   function onClick(e) {
+    var metricButton=e.target.closest?e.target.closest('[data-chart-metric]'):null;
+    if(metricButton){state.chartMetric=metricButton.getAttribute('data-chart-metric');render();return;}
     var t = e.target.closest ? e.target.closest('[data-act]') : null;
     if (!t) return;
     var act = t.getAttribute('data-act');
-    if (act === 'add') { e.preventDefault(); var fi = $('ycFileInput'); if (fi) fi.click(); }
+    if(state.busy && act!=='checks')return;
+    if(state.loading && ['add','attach','reload-file','del'].indexOf(act)>=0)return;
+    if (act === 'add') { e.preventDefault(); state.attachTarget=null; var fi = $('ycFileInput'); if (fi) fi.click(); }
+    else if (act === 'refresh' && !state.busy) loadDatasets();
+    else if (act === 'checks') { var check=document.querySelector('[data-open="checks"]'); if(check){check.open=true;state.open.checks=true;check.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});} }
+    else if (act === 'download' || act === 'reload-file') cloudFile(t.getAttribute('data-id'),act==='reload-file');
+    else if (act === 'attach' && canManage()) { state.attachTarget=state.datasets.filter(function(d){return d.id===t.getAttribute('data-id');})[0]; $('ycFileInput').click(); }
     else if (act === 'del') { e.preventDefault(); e.stopPropagation(); askDelete(t.getAttribute('data-id')); }
     else if (act === 'reset') { state.settings = Core.settingsFrom({}); saveSettings(); render(); }
   }
+
+  function hideChartTip(){var tip=$('ycChartTooltip');if(tip)tip.hidden=true;}
+  function showChartTip(event){
+    var target=event.target.closest?event.target.closest('[data-yc-tip]'):null;
+    if(!target){hideChartTip();return;}
+    var box=$('ycChartTooltip');
+    if(!box){box=document.createElement('div');box.id='ycChartTooltip';box.className='yc-tooltip';box.setAttribute('role','tooltip');document.body.appendChild(box);}
+    box.textContent=target.getAttribute('data-yc-tip');box.hidden=false;
+    target.setAttribute('aria-describedby','ycChartTooltip');
+    var rect=target.getBoundingClientRect(),x=event.clientX==null?rect.left+rect.width/2:event.clientX,y=event.clientY==null?rect.top:event.clientY;
+    box.style.left=Math.max(10,Math.min(x+12,window.innerWidth-box.offsetWidth-12))+'px';
+    box.style.top=Math.max(10,Math.min(y+16,window.innerHeight-box.offsetHeight-10))+'px';
+  }
+  async function cloudFile(id,reload){
+    if(state.busy || (reload&&!canManage()))return;
+    var d=state.datasets.filter(function(x){return x.id===id;})[0];if(!d)return;
+    state.busy=true;
+    try{
+      var blob=await Cloud.create(supabaseClient).download(d);
+      if(reload){
+        var source=Object.assign({},d,{_reload:true});
+        await readFile(new File([blob],d.source_file||'results.xlsx',{type:blob.type}),source);
+      }else{
+        var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=d.source_file||'results.xlsx';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
+      }
+    }catch(error){toast('Could not load cloud file: '+error.message,'warning');}
+    finally{state.busy=false;if(state.imp)refreshModal();}
+  }
   function onChange(e) {
     var t = e.target;
+    if(t.hasAttribute('data-chart-metric'))return;
+    if(t.hasAttribute('data-chart-stream')){state.chartStream=t.value;render();return;}
     if (t.id === 'ycFileInput') {
       var file = t.files && t.files[0];
-      if (file) readFile(file);
+      if (file) readFile(file,state.attachTarget);
       t.value = '';   // lets the same file be chosen again later
       return;
     }
@@ -433,28 +450,30 @@
   }
 
   function askDelete(id) {
+    if(!canManage() || state.busy)return;
     var d = state.datasets.filter(function (x) { return x.id === id; })[0];
     if (!d) return;
     var go = function () {
-      removeFromStore(d).then(function () {
+      removeFromStore(d).then(function (warning) {
         state.datasets = state.datasets.filter(function (x) { return x.id !== id; });
         state.selected = state.selected.filter(function (x) { return x !== id; });
-        render(); toast('Deleted ' + d.label + '.', 'success');
+        render(); toast(warning || 'Deleted ' + d.label + '.', warning?'warning':'success');
       }, function (err) { state.error = 'Could not delete: ' + err.message; render(); });
     };
-    var msg = 'This removes the saved ' + esc(d.label) + ' results for everyone. The Excel file you uploaded is not affected, and you can add it again.';
+    var msg = 'Delete ' + esc(d.label) + ' and its cloud workbook for everyone? Your local original is not affected.';
     if (typeof showConfirm === 'function') showConfirm('Delete ' + d.label + '?', '<p>' + msg + '</p>', go); else if (window.confirm('Delete ' + d.label + '? ' + msg.replace(/<[^>]+>/g, ''))) go();
   }
 
   /* ---------------------------------- import flow ---------------------------------- */
-  function readFile(file) {
+  function readFile(file,source) {
     if (typeof XLSX === 'undefined') { toast('The Excel reader is not available in this page.', 'warn'); return; }
-    file.arrayBuffer().then(function (buf) {
+    try{Cloud.checkFile(file);}catch(error){toast(error.message,'warning');return;}
+    return file.arrayBuffer().then(function (buf) {
       var wb = XLSX.read(buf, { type: 'array', cellDates: false });
       var sheets = wb.SheetNames.map(function (n) { return { name: n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: null, raw: true, blankrows: true }) }; });
       var parsed = Core.parseWorkbook(sheets, { fileName: file.name });
       state.imp = {
-        fileName: file.name, parsed: parsed, label: parsed.yearGuess || '', assessment: parsed.assessmentGuess || '', grade: '', error: '',
+        fileName: file.name, file:file, cloudSource:source && source._reload?source:null, parsed: parsed, label: source?source.label:parsed.yearGuess || '', assessment: source?source.assessment:parsed.assessmentGuess || '', grade: source?source.grade_level:'', error: '',
         include: parsed.sheets.map(function () { return true; }), streams: parsed.sheets.map(function (s) { return s.stream.label; }), confirmed: false
       };
       openModal();
@@ -477,7 +496,7 @@
   }
   function modalHtml() {
     var imp = state.imp, p = imp.parsed;
-    var h = '<h3 id="ycModalTitle">Add a year</h3><div class="yc-sub">' + esc(imp.fileName) + ' · check what was found, then save. Student names and roll numbers are not saved, only anonymous results.</div>';
+    var h = '<h3 id="ycModalTitle">'+(imp.cloudSource?'Reload cloud workbook':'Add a year')+'</h3><div class="yc-sub">' + esc(imp.fileName) + ' · '+(imp.cloudSource?'Loaded from cloud.':'Workbook and results will be saved privately in cloud.')+'</div>';
     if (!p.sheets.length) {
       h += '<div class="yc-err">No result sheets were recognised in this workbook. A result sheet needs a header row with subject names, a row of maximum marks beneath it, and one row per student.</div>';
     } else {
@@ -536,8 +555,9 @@
     catch (err) { imp.error = err.message || 'The selected sheets could not be combined.'; refreshModal(); return; }
     if (!ds.records.length) { imp.error = 'No student rows were found in the ticked sheets.'; refreshModal(); return; }
     var existing = existingFor({ label: ds.label, assessment: ds.assessment, grade: ds.grade_level });
+    if(imp.cloudSource && existing && existing.id!==imp.cloudSource.id){imp.error='Those year details belong to another saved dataset. Keep this workbook attached to its own year.';refreshModal();return;}
     state.busy = true; imp.error = ''; refreshModal();
-    persist(ds).then(function (saved) {
+    persist(ds,imp.file,existing,imp.cloudSource).then(function (saved) {
       state.busy = false;
       state.datasets = state.datasets.filter(function (d) { return d.id !== saved.id && !(existing && d.id === existing.id); });
       state.datasets.push(saved); sortDatasets();
@@ -545,7 +565,7 @@
       if (state.selected.indexOf(saved.id) < 0) state.selected.push(saved.id);
       var order = {}; state.datasets.forEach(function (d, ix) { order[d.id] = ix; });
       state.selected.sort(function (a, b) { return order[a] - order[b]; });
-      closeModal(); render(); toast((existing ? 'Replaced ' : 'Saved ') + saved.label + '.', 'success');
+      closeModal(); render(); toast(saved.cleanupWarning || (existing ? 'Updated ' : 'Saved ') + saved.label + ' in cloud.',saved.cleanupWarning?'warning':'success');
     }, function (err) { state.busy = false; imp.error = 'Could not save: ' + err.message; refreshModal(); });
   }
   function norm(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
@@ -581,6 +601,7 @@
     if (r !== 'principal' && r !== 'coordinator' && r !== 'hod') return;
     injectCss(); injectPage(); injectModal(); injectButtons(); patchNavigation();
     render();
+    window.addEventListener('resize',function(){if(state.compact!==window.matchMedia('(max-width:600px)').matches)render();});
   }
   function boot() {
     if (window.axRole) { init(); return; }
