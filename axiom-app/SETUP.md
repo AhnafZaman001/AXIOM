@@ -154,6 +154,69 @@ results import a notice tells you how many *newly* need attention.
 - Only principal/coordinator can edit or import contacts; HOD/teachers can message
   with saved contacts; students never see these controls.
 
+## Admin-controlled bulk WhatsApp (new queue setup)
+
+The principal/coordinator opens **Parent Messages**, chooses current/all sections,
+filters low performers (below 60% or a drop of at least 10 points), top performers
+(80% or above), or all students, then checks individual rows or **Select all**.
+Choose progress report summary, low-performance alert, congratulations, or
+individual test marks. A named test includes only students with a record for
+that test and reports each subject's marks/absence. Preview the personalised
+messages, then press **Send to selected students** and confirm.
+No WhatsApp window opens. Progress report messages are text summaries; PDF
+attachments and delivery/read receipt webhooks are not implemented.
+
+### Additional one-time setup (after migrations 008–010)
+
+1. Run `supabase/migration_011_bulk_messaging.sql` in SQL Editor.
+2. Generate a private worker secret in Supabase Vault (run once):
+   ```sql
+   select vault.create_secret(encode(gen_random_bytes(32),'hex'), 'axiom_messaging_worker_secret');
+   select decrypted_secret from vault.decrypted_secrets
+   where name='axiom_messaging_worker_secret';
+   ```
+   Copy the resulting value directly into Edge Function Secrets as
+   `MESSAGING_WORKER_SECRET`. Do not put it in application settings, Git, or frontend code.
+3. Run `supabase/migration_012_bulk_worker_schedule.sql`. It installs the named
+   minute-by-minute queue worker using pg_cron + pg_net; credentials come from Vault.
+   The project URL is the current AXIOM project. Change it if deploying elsewhere.
+4. Redeploy the updated `send-parent-message/index.ts` function with Verify JWT
+   disabled. It checks user tokens/roles internally; the worker endpoint instead
+   checks the separate private worker secret.
+5. Add `WA_PHONE_NUMBER_ID` and `WA_ACCESS_TOKEN` as described below. The function
+   uses Graph v23.0 by default; optionally set `WA_GRAPH_VERSION` to a supported
+   version from your Meta app. Keep `wa_test_mode=on` for admin-only tests.
+6. Send one selected student, then a small batch. Close the page and reopen
+   **Parent Messages → Recent batches → View progress** to check server progress.
+
+Queue behaviour:
+- Up to 1000 students per batch. Test mode sends only to the admin. Live mode
+  requires a valid parent phone for every selected student and an approved
+  `WA_TEMPLATE_NAME`. Each parent message has a separately queued admin copy.
+- Selections hidden by a filter are not sent. Preview/confirmation freezes the
+  message content submitted for this batch; changing test/live mode before
+  submission requires reviewing again.
+- Queued jobs are saved transactionally. Workers claim jobs atomically; a retry
+  of the same unconfirmed submission uses the same batch ID in that browser tab.
+- Messages to the same phone are spaced by at least seven seconds. Admin-only
+  tests and admin copies therefore take several minutes for large batches.
+- **Accepted** means Meta returned a message ID, not confirmed delivery.
+- **Failed** means a definite rejection or a local block before sending; the
+  **Retry rejected messages only** button retries only these jobs after you fix
+  the cause. Accepted jobs are never retried by this action.
+- **Uncertain** means a network failure, server error, or interrupted send whose
+  outcome cannot be confirmed. Check the recipient before creating a replacement.
+  No automatic retry is performed for these jobs, to avoid duplicate messages.
+- Enabling test mode blocks remaining queued parent jobs. Admin copies retain
+  the destination captured when the batch was created and do not claim parent delivery.
+- The existing `message_log` covers the older individual send path; bulk results
+  live in `message_batches` and `message_jobs`. Only principal/coordinator can read them.
+
+Troubleshooting: inspect function logs and `cron.job_run_details`. Queued jobs
+that remain untouched usually indicate a missing/mismatched worker secret,
+missing schedule, or an undeployed function. This schedule only processes batches
+an admin explicitly submitted; it does not generate alerts automatically.
+
 ## Automatic WhatsApp (test on the admin number first)
 
 How it behaves

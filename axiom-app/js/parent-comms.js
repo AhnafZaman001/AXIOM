@@ -17,7 +17,7 @@
 'use strict';
 
 /* ------------------------------------------------------------- state --- */
-const PC = { map:{}, loaded:false, loading:null, tableMissing:false, lang:'en', admin:null, status:null, lastRows:[] };
+const PC = { map:{}, loaded:false, loading:null, tableMissing:false, lang:'en', admin:null, status:null, lastRows:[], selected:new Set(), poll:null, pending:null };
 try { PC.lang = localStorage.getItem('ax.pcLang') || 'en'; } catch(e){}
 
 const role = ()=> window.axRole || '';
@@ -367,7 +367,10 @@ function injectUi(){
     <div class="pc-hint" id="pcBulkSub"></div>
     <div class="pc-row" style="align-items:flex-end;">
       <div class="field" style="max-width:190px;"><label>Show</label>
-        <select id="pcFilter"><option value="all">All students</option><option value="attention">Needs attention</option><option value="nocontact">Missing contact</option></select></div>
+        <select id="pcFilter"><option value="all">All students</option><option value="attention">Needs attention (below 60% or drop ≥10)</option><option value="top">Top performers (80% or above)</option><option value="nocontact">Missing contact</option></select></div>
+      <div class="field"><label>Sections</label><select id="pcScope"><option value="section">Current section</option><option value="all">All sections</option></select></div>
+      <div class="field"><label>Message type</label><select id="pcMessageType"><option value="report">Progress report summary</option><option value="low">Low-performance alert</option><option value="congrats">Congratulations</option><option value="test">Individual test marks</option></select></div>
+      <div class="field" id="pcTestField" style="display:none;"><label>Test</label><select id="pcTest"></select></div>
       <div class="field" style="max-width:170px;"><label>Message language</label>
         <select id="pcBulkLang"><option value="en">English</option><option value="ur">اردو (Urdu)</option></select></div>
       <div class="field" id="pcSchoolField" style="max-width:260px;"><label>School name (on cards &amp; messages)</label><input type="text" id="pcSchool" placeholder="e.g. KIPS College"></div>
@@ -378,16 +381,26 @@ function injectUi(){
     </div>
     <div class="pc-auto" id="pcAutoBanner"></div>
     <div class="table-wrap" style="max-height:48vh;"><table class="pc-table"><thead><tr>
-      <th>Student</th><th>Overall</th><th>Flags</th><th>Parent contact</th><th></th></tr></thead><tbody id="pcBulkBody"></tbody></table></div>
+      <th><input type="checkbox" id="pcSelectAll" aria-label="Select all shown students"></th><th>Student</th><th>Overall</th><th>Flags</th><th>Parent contact</th><th></th></tr></thead><tbody id="pcBulkBody"></tbody></table></div>
+    <div class="pc-hint" id="pcSelection" aria-live="polite"></div>
+    <div class="pc-actions"><button class="ghost" id="pcPreview">Preview selected messages</button><button class="ghost" id="pcHistory">Refresh batch history</button></div>
+    <div id="pcPreviewBody" style="max-height:30vh;overflow:auto;"></div>
+    <div id="pcBatchHistory"></div><div id="pcBatchProgress" aria-live="polite"></div>
     <div class="pc-actions"><button class="ghost" id="pcBulkClose">Close</button>
       <button class="primary" id="pcSendAll">Send all shown automatically</button></div>
   </div></div>`);
 
   el('pcSingleClose').onclick = ()=> el('pcSingleOverlay').classList.remove('open');
-  el('pcBulkClose').onclick = ()=> el('pcBulkOverlay').classList.remove('open');
+  el('pcBulkClose').onclick = ()=> { el('pcBulkOverlay').classList.remove('open'); clearTimeout(PC.poll); };
   el('pcLang').onchange = ()=>{ setLang(el('pcLang').value); refreshSingleText(); };
   el('pcBulkLang').onchange = ()=>{ setLang(el('pcBulkLang').value); };
   el('pcFilter').onchange = renderBulk;
+  el('pcScope').onchange = ()=>{ PC.selected.clear(); populateTests(); renderBulk(); };
+  el('pcMessageType').onchange = ()=>{ el('pcTestField').style.display=el('pcMessageType').value==='test'?'':'none'; renderBulk(); };
+  el('pcTest').onchange = renderBulk;
+  el('pcSelectAll').onchange = ()=>{ PC.lastRows.forEach(x=>{ if(el('pcSelectAll').checked) PC.selected.add(rowKey(x)); else PC.selected.delete(rowKey(x)); }); renderBulk(); };
+  el('pcPreview').onclick = previewBulk;
+  el('pcHistory').onclick = loadBatchHistory;
   el('pcSchool').onchange = ()=>{ try{ localStorage.setItem('ax.schoolName', el('pcSchool').value.trim()); }catch(e){} showToast('School name saved on this device.', 'success'); };
   el('pcCopy').onclick = async ()=>{
     try{ await navigator.clipboard.writeText(el('pcMsgText').value); showToast('Message copied.', 'success'); }
@@ -464,41 +477,48 @@ async function openBulk(){
   el('pcImportBtn').style.display = canEdit() ? '' : 'none';
   el('pcSendAll').style.display = canEdit() ? '' : 'none';
   el('pcSchool').value = schoolName();
+  populateTests();
   refreshStatus();
+  if(canEdit()) loadBatchHistory();
   setLang(PC.lang);
   renderBulk();
   el('pcBulkOverlay').classList.add('open');
 }
 function renderBulk(){
   const def = currentSectionDef();
-  const store = ensureSection(def.key);
   const filter = el('pcFilter').value;
-  const list = store.students.map(st=>({ st, snap: snapshot(st, def), flags: attentionReasons(st, def), c: getContact(def.key, st) }))
+  const list = bulkDefs().flatMap(d=>ensureSection(d.key).students.map(st=>({ st, def:d, snap: snapshot(st, d), flags: attentionReasons(st, d), c: getContact(d.key, st) })))
     .sort((a,b)=> (a.snap.pos?a.snap.pos.rank:9999) - (b.snap.pos?b.snap.pos.rank:9999));
   const flagged = list.filter(x=>x.flags).length, withPhone = list.filter(x=>waNumber(x.c.phone)).length;
-  el('pcBulkTitle').textContent = `Parent Messages — ${def.label}`;
+  el('pcBulkTitle').textContent = `Parent Messages — ${el('pcScope').value==='all'?'All sections':def.label}`;
   el('pcBulkSub').textContent = `${list.length} students · ${flagged} need attention · ${withPhone} have a WhatsApp number saved`
     + (PC.tableMissing ? ' · Contacts database not set up yet (run migration 008).' : '');
-  const rows = list.filter(x=> filter==='attention' ? x.flags : filter==='nocontact' ? !waNumber(x.c.phone) : true);
+  const rows = list.filter(x=> (filter==='attention' ? x.flags : filter==='top' ? x.snap.overall!=null && x.snap.overall>=80 : filter==='nocontact' ? !waNumber(x.c.phone) : true)
+    && (el('pcMessageType').value!=='test' || testRows(x).length));
   PC.lastRows = rows;
-  el('pcSendAll').textContent = `Send ${rows.length} shown automatically`;
+  const count = rows.filter(x=>PC.selected.has(rowKey(x))).length;
+  el('pcSendAll').textContent = `Send to ${count} selected students`;
+  el('pcSelection').textContent = `${count} selected from ${rows.length} shown. Only selected, currently shown students will be sent messages.`;
+  el('pcSelectAll').checked = !!rows.length && count===rows.length;
+  el('pcSelectAll').indeterminate = count>0 && count<rows.length;
+  el('pcPreviewBody').innerHTML='';
   el('pcBulkBody').innerHTML = rows.length ? rows.map(x=>{
     const ok = waNumber(x.c.phone);
-    return `<tr data-id="${esc(x.st.id)}">
-      <td><b>${esc(x.st.name)}</b><div class="pc-hint" style="margin:0;">${x.snap.roll ? 'Roll ' + esc(x.snap.roll) : ''}</div></td>
+    return `<tr data-id="${esc(x.st.id)}" data-section="${esc(x.def.key)}">
+      <td><input type="checkbox" data-select="${esc(rowKey(x))}" aria-label="Select ${esc(x.st.name)}" ${PC.selected.has(rowKey(x))?'checked':''}></td>
+      <td><b>${esc(x.st.name)}</b><div class="pc-hint" style="margin:0;">${esc(x.def.label)} · ${x.snap.roll ? 'Roll ' + esc(x.snap.roll) : ''}</div></td>
       <td>${x.snap.overall!=null ? `<b>${x.snap.overall}%</b> ${esc(x.snap.grade)}` : '—'}</td>
       <td>${x.flags ? x.flags.map(f=>`<span class="pc-flag">${esc(f)}</span>`).join('') : '<span class="pc-miss">—</span>'}</td>
       <td>${ok ? `<span class="pc-ok">${esc(x.c.parentName || 'Parent')}</span> <span class="pc-miss">${esc(x.c.phone)}</span>` : '<span class="pc-miss">No number saved</span>'}</td>
-      <td class="act"><button class="ghost small" data-act="msg">Message…</button>
-        <button class="primary small" data-act="wa" ${ok ? '' : 'disabled title="No WhatsApp number saved"'}>WhatsApp</button></td></tr>`;
-  }).join('') : `<tr><td colspan="5" class="pc-miss" style="padding:22px;text-align:center;">No students match this filter.</td></tr>`;
+      <td class="act"><button class="ghost small" data-act="msg">Contact / message…</button></td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="pc-miss" style="padding:22px;text-align:center;">No students match this filter or selected test.</td></tr>`;
+  el('pcBulkBody').querySelectorAll('[data-select]').forEach(c=>{ c.onchange=()=>{ if(c.checked) PC.selected.add(c.dataset.select); else PC.selected.delete(c.dataset.select); renderBulk(); }; });
   el('pcBulkBody').querySelectorAll('button').forEach(b=>{
     b.onclick = ()=>{
       const id = b.closest('tr').dataset.id;
-      const x = list.find(y=>String(y.st.id)===String(id));
+      const x = list.find(y=>String(y.st.id)===String(id) && y.def.key===b.closest('tr').dataset.section);
       if(!x) return;
-      if(b.dataset.act==='wa') openWhatsApp(x.c.phone, buildMessage(x.snap, PC.lang, x.c.parentName));
-      else openSingle(x.st.id, def.key);
+      openSingle(x.st.id, x.def.key);
     };
   });
 }
@@ -520,6 +540,7 @@ async function refreshStatus(){
   }
   el('pcSendAll').disabled = false;
   if(!s.adminSet) { b.className='pc-auto off'; b.textContent='Admin number is not set. Add it in app_settings (SETUP.md) before sending.'; el('pcSendAll').disabled = true; return; }
+  if(!s.queueConfigured) { b.className='pc-auto off'; b.textContent='Bulk queue setup is incomplete. Deploy the updated function and configure the worker secret and schedule (SETUP.md).'; el('pcSendAll').disabled=true; return; }
   if(s.testMode){ b.className='pc-auto test'; b.innerHTML='<b>TEST MODE.</b> Nothing is sent to parents. Every message goes only to the admin number, labelled with the parent it was meant for.'; }
   else { b.className='pc-auto live'; b.innerHTML='<b>LIVE.</b> Messages go to each parent\'s saved number, and a copy of each goes to the admin number.'; }
 }
@@ -546,30 +567,103 @@ async function sendSingleAuto(){
   }catch(e){ showToast('Could not send: ' + (e.message||e), 'warning', 6500); }
   btn.disabled = false; btn.textContent = old;
 }
+
+function bulkDefs(){ return el('pcScope').value==='all' ? SECTION_DEFS : [currentSectionDef()]; }
+function rowKey(x){ return JSON.stringify([x.def.key,String(x.st.id)]); }
+function populateTests(){
+  const names = new Set();
+  bulkDefs().forEach(d=>ensureSection(d.key).students.forEach(st=>Object.values(st.tests||{}).forEach(ts=>ts.forEach(t=>{ if(t.test) names.add(t.test); }))));
+  el('pcTest').innerHTML = [...names].sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+function testRows(x){
+  const name=el('pcTest').value;
+  return x.def.subjects.flatMap(subject=>(x.st.tests?.[subject]||[]).filter(t=>t.test===name).map(t=>({subject,...t})));
+}
+function bulkMessage(x){
+  const m=makeMessage(x.snap,x.c,x.def.key), type=el('pcMessageType').value;
+  if(type==='report') return m;
+  const greeting = PC.lang==='ur' ? 'محترم والدین،' : `Dear ${x.c.parentName||'Parent / Guardian'},`;
+  const identity=`${x.snap.name} (${x.snap.section}${x.snap.roll?', Roll '+x.snap.roll:''})`;
+  let content;
+  if(type==='test') {
+    const marks=testRows(x).map(t=>`${t.subject}: ${t.absent?(PC.lang==='ur'?'غیر حاضر':'Absent'):`${t.obtained ?? '—'} / ${t.max ?? '—'}`}`).join('\n');
+    content=`${PC.lang==='ur'?'ٹیسٹ کے نتائج':'Test results'} — ${el('pcTest').value}\n${identity}\n\n${marks}`;
+  } else if(type==='low') {
+    content=PC.lang==='ur'
+      ? `${identity}\nمجموعی نتیجہ: ${x.snap.overall ?? '—'}%\nبراہ کرم بچے کی تعلیمی کارکردگی میں بہتری کے لیے اسکول سے رابطہ کریں۔`
+      : `Performance alert for ${identity}\nOverall result: ${x.snap.overall ?? '—'}%\n${(x.flags||[]).join('; ')}\nPlease contact the school so we can discuss difficulties and plan support together.`;
+  } else {
+    content=PC.lang==='ur'
+      ? `${identity}\nمجموعی نتیجہ: ${x.snap.overall ?? '—'}%\nشاندار کارکردگی پر مبارکباد! اسی طرح محنت جاری رکھیں۔`
+      : `Congratulations to ${identity}!\nOverall result: ${x.snap.overall ?? '—'}%\nWe are proud of this excellent performance. Please encourage the same effort.`;
+  }
+  m.text=`${greeting}\n\n${content}\n\n${schoolName()||'School Administration'}`;
+  return m;
+}
+function selectedBulkMessages(){ return PC.lastRows.filter(x=>PC.selected.has(rowKey(x))).map(bulkMessage); }
+function previewBulk(){
+  const msgs=selectedBulkMessages();
+  el('pcPreviewBody').innerHTML=msgs.length?msgs.map(m=>`<details><summary>${esc(m.label)}</summary><pre style="white-space:pre-wrap;">${esc(m.text)}</pre></details>`).join(''):'Select students first.';
+}
 async function sendAllShown(){
-  const rows = PC.lastRows || [];
-  if(!rows.length){ showToast('No students are shown.', 'warning'); return; }
-  const s = PC.status || {};
-  const withNo = rows.filter(x=>waNumber(x.c.phone)).length;
-  const body = s.testMode
-    ? `<p style="margin:0;"><b>Test mode is ON.</b> All ${rows.length} message(s) go only to the admin number, each labelled with the parent it was meant for. No parent will receive anything.</p>`
-    : `<p style="margin:0;"><b>Live mode.</b> ${withNo} of ${rows.length} parent(s) have a number saved and will receive their message; a copy of every message also goes to the admin number.${rows.length-withNo ? `<br><br>${rows.length-withNo} student(s) without a parent number will reach the admin number only.` : ''}</p>`;
-  showConfirm(`Send ${rows.length} message(s)?`, body, async ()=>{
-    const def = currentSectionDef();
-    const msgs = rows.map(x=>makeMessage(x.snap, x.c, def.key));
-    const tot = { total:0, failed:0, parentSent:0, adminSent:0, testMode:s.testMode, results:[] };
-    const btn = el('pcSendAll'); btn.disabled = true;
-    try{
-      for(let i=0; i<msgs.length; i+=50){
-        btn.textContent = `Sending ${Math.min(i+50, msgs.length)} of ${msgs.length}…`;
-        const j = await axCallMessenger({ action:'send', messages: msgs.slice(i, i+50) });
-        tot.total += j.total; tot.failed += j.failed; tot.parentSent += j.parentSent; tot.adminSent += j.adminSent;
-        tot.testMode = j.testMode; tot.results.push(...j.results);
-      }
-      showToast(describeResult(tot), tot.failed ? 'warning' : 'success', 8000);
-    }catch(e){ showToast('Sending stopped: ' + (e.message||e), 'warning', 8000); }
-    btn.disabled = false; btn.textContent = `Send ${msgs.length} shown automatically`;
+  if(!canEdit()) return;
+  if(PC.submitting) return;
+  const msgs=selectedBulkMessages();
+  if(!msgs.length) { showToast('Select at least one student.', 'warning'); return; }
+  if(msgs.length>1000) { showToast('Select at most 1000 students per batch.', 'warning'); return; }
+  await refreshStatus();
+  const s=PC.status;
+  if(!s?.configured || !s.adminSet || !s.queueConfigured) return;
+  if(!s.testMode && msgs.some(m=>!waNumber(m.to)||isAdminNumber(m.to))) { showToast('Every selected student needs a valid parent number in live mode.', 'warning'); return; }
+  const payload=JSON.stringify({messages:msgs,testMode:s.testMode});
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(payload)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  // Preserve the idempotency key on a network failure so a retry cannot duplicate a batch.
+  if(!PC.pending || PC.pending.payload!==payload) {
+    let saved; try{ saved=JSON.parse(sessionStorage.getItem('ax.pendingBulk')||'null'); }catch(e){}
+    PC.pending={payload,id:saved?.hash===hash?saved.id:crypto.randomUUID()};
+    try{sessionStorage.setItem('ax.pendingBulk',JSON.stringify({hash,id:PC.pending.id}));}catch(e){}
+  }
+  const batchId=PC.pending.id;
+  const preview=msgs.map(m=>`<details><summary>${esc(m.label)}</summary><pre style="white-space:pre-wrap;">${esc(m.text)}</pre></details>`).join('');
+  showConfirm(`Send to ${msgs.length} selected students?`,
+    `<p>${s.testMode?'TEST MODE: every message goes only to the admin number. Parents will not be contacted.':'LIVE MODE: messages go to parents and copies go to the admin.'}</p><p>Each student receives a separate personalised message. Review before sending:</p><div style="max-height:35vh;overflow:auto;">${preview}</div>`, async()=>{
+    if(PC.submitting) return;
+    PC.submitting=true;
+    const btn=el('pcSendAll'); btn.disabled=true; btn.textContent='Queueing…';
+    try {
+      const j=await axCallMessenger({action:'enqueue',batchId,expectedTestMode:s.testMode,title:el('pcMessageType').selectedOptions[0].textContent,messages:msgs});
+      try{sessionStorage.removeItem('ax.pendingBulk');}catch(e){}
+      PC.pending=null; PC.selected.clear(); renderBulk();
+      showToast(`${j.students} student messages queued. You may close this page; server processing continues.`, 'success',7000);
+      loadBatchHistory(); watchBatch(j.batchId);
+    } catch(e) { showToast('Could not confirm queue submission: '+(e.message||e)+'. Retry the same selection to safely check again.', 'warning',8000); }
+    finally { PC.submitting=false; btn.disabled=false; }
   });
+}
+async function loadBatchHistory(){
+  if(!canEdit()) return;
+  try {
+    const j=await axCallMessenger({action:'batches'});
+    el('pcBatchHistory').innerHTML='<b>Recent batches</b>'+j.batches.map(b=>`<div><button class="ghost small" data-batch="${esc(b.id)}">View progress</button> ${esc(b.title)} · ${b.test_mode?'TEST':'LIVE'} · ${esc(new Date(b.created_at).toLocaleString())}</div>`).join('');
+    el('pcBatchHistory').querySelectorAll('[data-batch]').forEach(b=>{ b.onclick=()=>watchBatch(b.dataset.batch); });
+  } catch(e) { el('pcBatchHistory').textContent='Batch history unavailable: '+(e.message||e); }
+}
+async function watchBatch(id){
+  clearTimeout(PC.poll);
+  PC.watching=id;
+  try {
+    const j=await axCallMessenger({action:'batch-status',batchId:id});
+    if(PC.watching!==id) return;
+    const counts={}; j.jobs.forEach(x=>counts[x.status]=(counts[x.status]||0)+1);
+    el('pcBatchProgress').innerHTML=`<p><b>Batch progress:</b> ${esc(Object.entries(counts).map(([k,v])=>`${v} ${k}`).join(' · '))}</p><p class="pc-hint">Accepted means WhatsApp accepted the API request; delivery/read receipts are not tracked. Uncertain sends require checking WhatsApp before sending a replacement.</p>`+
+      (counts.failed?'<button class="ghost" id="pcRetryFailed">Retry rejected messages only</button>':'')+
+      j.jobs.map(x=>`<div>${esc(x.label)} · ${esc(x.kind)} · <b>${esc(x.status)}</b>${x.status==='uncertain'||x.status==='failed'?' — '+esc(x.detail):''}</div>`).join('');
+    if(el('pcRetryFailed')) el('pcRetryFailed').onclick=async()=>{
+      el('pcRetryFailed').disabled=true;
+      try{await axCallMessenger({action:'retry-failed',batchId:id});watchBatch(id);}catch(e){showToast('Retry failed: '+(e.message||e),'warning');watchBatch(id);}
+    };
+    if((counts.queued||counts.sending) && el('pcBulkOverlay').classList.contains('open')) PC.poll=setTimeout(()=>watchBatch(id),4000);
+  } catch(e) { el('pcBatchProgress').textContent='Could not load progress: '+(e.message||e); }
 }
 
 /* ------------------------------------------ Excel import / template --- */
