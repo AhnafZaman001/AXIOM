@@ -378,6 +378,37 @@ limits, and **Data quality** holds comparison checks and the import audit.
 These views replace the previous Explore details accordions. This interface
 update needs no additional migration beyond 013 and 014.
 
+**Required meeting reports:** inside **Year Comparison → Meeting reports**, select
+the report year and stream (or All streams). The comparison uses the immediately
+preceding selected year. One selected year is enough for current-year reporting.
+
+- **Subject results & vista:** scored counts, average, median, highest percentage,
+  pass/fail counts and percentages, absent/missing/exempt counts; previous/current
+  subject comparison; and visual outcome and score-distribution cards. “Vista”
+  is treated as a visual overview, not a separate board-defined formula.
+- **Top 10:** separate rankings for each subject within its stream. Competition
+  ranks include all students tied at rank 10, so a list can exceed ten rows.
+  Use **Load student names** to read the private cloud workbook. Its sheet mapping,
+  subject maxima and marks must match the saved snapshot before identities appear.
+  Names/roll numbers remain in memory, never in anonymous `year_datasets` records.
+  Old years without an attached workbook need an administrator to attach it first.
+- **Supplies:** subject failures in both years plus distinct students with one,
+  two, or three-plus recorded failed subjects. A student counts once in the total
+  with any failure. Failure-count groups are minimum recorded counts when other
+  marks remain unresolved; the report discloses those students separately.
+- **Teacher notes:** faculty issues and subject-wise explanations are entered by
+  staff, never inferred. Drafts last for this browser tab only; include them in
+  the printed report to retain a copy. They are not cloud-saved.
+
+**Print meeting report** includes the six numerical reports plus teacher notes.
+**Print Top 10 separately** respects its subject filter. The full report includes
+all subjects in the selected stream scope. If names are not loaded, printing reads
+the workbook first. A source mismatch blocks named printing and asks for a reload.
+No new migrations, API keys or Edge Functions are required. Subject rates use
+scored subject results; student supplies rates use all listed students. Missing
+and absent marks are never turned into failures. Changes in incompatible
+assessments are withheld; both years' descriptive figures remain visible.
+
 **Browser integration:** with Playwright and Chrome available, run
 `node axiom-app/tests/year-compare-browser.cjs`. It uses real synthetic XLSX
 workbooks and a local page with mocked Supabase storage, never production

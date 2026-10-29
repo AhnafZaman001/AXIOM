@@ -2,7 +2,7 @@
    AXIOM — Year Comparison core (no DOM, no network)
    Works in the browser (window.AxiomYearCore) and in Node (module.exports),
    so the same code is unit-tested. Three jobs:
-     1. READ   a yearly Excel result workbook, tolerantly, without storing names
+     1. READ   a yearly Excel result workbook; save anonymous result snapshots
      2. MEASURE cohort statistics (typical result, support need, excellence...)
      3. COMPARE two yearly datasets and write at most three cautious findings
 
@@ -274,7 +274,7 @@
         var sumE = cells.reduce(function (a, cl) { return a + cl[1]; }, 0);
         if (Math.abs(sumE - row[totalCol]) > 0.5) stat.totalMismatches++;
       }
-      records.push({ c: cells.map(function (cl) { return [cl[0], cl[1]]; }) });
+      records.push({ name: name, roll: roll, sheet: sheetName, c: cells.map(function (cl) { return [cl[0], cl[1]]; }) });
     }
     var withMarks = records.filter(function (r) { return r.c.some(function (cl) { return cl[0] === 's'; }); }).length;
     var warnings = [];
@@ -304,7 +304,8 @@
     return { sheets: parsed, skipped: skipped, yearGuess: yg, assessmentGuess: ag, fileName: opts.fileName || '' };
   }
 
-  // Turn confirmed sheets into one anonymous dataset: no names, no roll numbers.
+  // Turn confirmed sheets into one anonymous dataset by default.
+  // includeIdentity is used only to reconstruct a verified report in memory.
   // included: [{parsed, streamLabel}]; sheets that share a stream are merged.
   function buildDataset(meta, included) {
     var streams = [], byKey = {}, records = [], report = { sheets: [], padding: 0, summaryRows: 0, duplicates: 0, unnamedWithMarks: 0, invalidCells: 0, aboveMax: 0, unreadable: 0, totalMismatches: 0, warnings: [], skippedSheets: (meta.skipped || []).length };
@@ -334,7 +335,10 @@
       p.records.forEach(function (r) {
         n++;
         var cells = s.subjects.map(function (sub) { return pos[sub.key] === undefined ? ['n', null] : r.c[pos[sub.key]]; });
-        records.push({ i: 'r' + n, st: key, c: cells });
+        var record = { i: 'r' + n, st: key, c: cells };
+        // Opt-in for an in-memory report only. Normal cloud snapshots stay anonymous.
+        if (meta.includeIdentity) { record.name = r.name || ''; record.roll = r.roll || ''; record.sheet = r.sheet || p.sheet; }
+        records.push(record);
       });
       report.sheets.push({ sheet: p.sheet, stream: s.label, listed: p.listed, withMarks: p.withMarks });
       ['padding', 'summaryRows', 'duplicates', 'unnamedWithMarks', 'invalidCells', 'aboveMax', 'unreadable', 'totalMismatches'].forEach(function (f) { report[f] += p.stats[f]; });

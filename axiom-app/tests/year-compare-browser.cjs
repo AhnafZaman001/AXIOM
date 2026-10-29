@@ -43,9 +43,9 @@ const server=http.createServer((req,res)=>{
         maybeSingle(){return Promise.resolve({data:null});},
         then(resolve){if(op==='delete')yearStore=yearStore.filter(d=>d.id!==id);return Promise.resolve({data:structuredClone(yearStore)}).then(resolve);}
       };return q;}};
-      </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare-storage.js"></script><script src="/js/year-compare-charts.js"></script><script src="/js/year-compare.js"></script></body></html>`);
+      </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare-storage.js"></script><script src="/js/year-compare-charts.js"></script><script src="/js/year-compare-reports.js"></script><script src="/js/year-compare.js"></script></body></html>`);
   }
-  const files={'/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare-storage.js':'js/year-compare-storage.js','/js/year-compare-charts.js':'js/year-compare-charts.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/css/year-compare.css':'css/year-compare.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
+  const files={'/js/year-compare-reports.js':'js/year-compare-reports.js','/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare-storage.js':'js/year-compare-storage.js','/js/year-compare-charts.js':'js/year-compare-charts.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/css/year-compare.css':'css/year-compare.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
   if(!files[url.pathname]){res.writeHead(404);return res.end();}
   res.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');
   res.end(fs.readFileSync(path.join(root,files[url.pathname])));
@@ -124,6 +124,50 @@ const server=http.createServer((req,res)=>{
     assert.doesNotMatch(stored,/Synthetic/,'student names must not reach storage');
     await page.locator('#ycPrintBtn').click();
     assert.match(await page.evaluate(()=>printed.subtitle),/every subject scored/);
+    await page.locator('[data-view="reports"]').click();
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/Subject vista/);
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/Pass ≥ 33%/);
+    await page.locator('[data-report-tab="top"]').click();
+    await page.locator('[data-act="report-names"]').click();
+    await page.waitForFunction(()=>document.querySelector('.yc-meeting-reports').textContent.includes('Synthetic'));
+    assert.doesNotMatch(await page.evaluate(()=>JSON.stringify(yearStore)),/Synthetic/,'named reports must not modify snapshots');
+    await page.locator('[data-report-subject]').selectOption({label:'Math'});
+    await page.locator('[data-act="print-top"]').click();
+    assert.match(await page.evaluate(()=>printed.title),/Subject Top 10/);
+    assert.match(await page.evaluate(()=>printed.html),/Synthetic/);
+    assert.doesNotMatch(await page.evaluate(()=>printed.html),/Teacher observations/);
+    await page.locator('[data-report-tab="supplies"]').click();
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/1 \/ 12 \(8.3%\)/);
+    await page.locator('[data-report-tab="notes"]').click();
+    await page.locator('[data-report-note="faculty"]').fill('Teacher-entered faculty observation');
+    await page.locator('[data-report-note="reasons"]').fill('Teacher-entered subject explanation');
+    await page.locator('[data-report-tab="subjects"]').click();
+    await page.locator('[data-act="print-meeting"]').click();
+    const meeting=await page.evaluate(()=>printed);
+    assert.match(meeting.title,/Meeting report/);
+    for(const value of ['Subject vista','subject supplies','Synthetic','Teacher-entered faculty observation','Teacher-entered subject explanation'])assert.ok(meeting.html.includes(value),value);
+    await page.evaluate(()=>{AxiomYearCompare._state.namedYears={};window.printed=null;});
+    await page.locator('[data-act="print-meeting"]').click();
+    await page.waitForFunction(()=>window.printed&&printed.html.includes('Synthetic'));
+    assert.match(await page.evaluate(()=>printed.html),/Teacher-entered subject explanation/,'automatic name loading preserves teacher notes');
+    if(process.env.AXIOM_SCREENSHOT){
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-meeting.png'),fullPage:true});
+      await page.locator('[data-report-tab="top"]').click();
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-top10.png'),fullPage:true});
+      await page.setViewportSize({width:390,height:844});
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-meeting-mobile.png'),fullPage:true});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'meeting reports must not overflow mobile');
+      await page.setViewportSize({width:1440,height:1000});
+      await page.locator('[data-report-tab="subjects"]').click();
+    }
+    await page.locator('[data-report-year]').selectOption({label:'2025'});
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/Select an earlier year/);
+    await page.locator('[data-report-year]').selectOption({label:'2026'});
+    // A single selected year still supports the mandatory current-year reports.
+    await page.locator('[data-act="pick"]').first().uncheck();
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/Subject vista/);
+    await page.locator('[data-act="pick"]').first().check();
+    await page.locator('[data-view="overview"]').click();
     await page.locator('[data-act="settings"]').click();
     await page.locator('#ycSettings [data-set="support"]').fill('60');
     await page.locator('#ycSettings [data-set="support"]').press('Tab');
@@ -218,6 +262,12 @@ const server=http.createServer((req,res)=>{
     for(const [button,target] of [['overallSummaryBtn','overallSummaryPage'],['sectionSummaryBtn','sectionSummaryPage'],['teacherReportBtn','teacherReportPage']]){
       await page.locator('#'+button).click();assert.equal(await page.locator('#'+target).isVisible(),true);
       await page.evaluate(()=>setActivePage('section'));
+    }
+    if(process.env.AXIOM_SCREENSHOT){
+      await page.evaluate(m=>{window.print=()=>{};printReport(m.title,m.subtitle,m.html,{compact:true});},meeting);
+      await page.emulateMedia({media:'print'});
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-print.png'),fullPage:true});
+      await page.pdf({path:process.env.AXIOM_SCREENSHOT.replace('.png','-print.pdf'),format:'A4',printBackground:true});
     }
     assert.deepEqual(errors,[]);
     console.log('PASS: XLSX import, cloud workbook save/download/reload without duplication, chart controls/tooltips, reduced motion, mobile, calculations, roles and existing navigation.');

@@ -11,12 +11,14 @@
   var Core = window.AxiomYearCore;
   var Charts = window.AxiomYearCharts;
   var Cloud = window.AxiomYearStorage;
+  var Reports = window.AxiomYearReports;
   if (!Core) { console.error('year-compare-core.js did not load'); return; }
 
   var SETTINGS_KEY = 'axiom.yearCompare.settings.v2';
   var state = {
     datasets: [], selected: [], settings: loadSettings(), tableMissing: false, loaded: false, loading: false,
-    error: '', imp: null, busy: false, chartMetric: 'median', chartStream: '', view: 'overview', subjectMetric: 'median'
+    error: '', imp: null, busy: false, chartMetric: 'median', chartStream: '', view: 'overview', subjectMetric: 'median',
+    reportTab: 'subjects', reportYear: '', reportStream: '', reportSubject: '', namedYears: {}, reportNotes: {}
   };
 
   /* ------------------------------ small helpers ------------------------------ */
@@ -181,6 +183,10 @@
     var body = $('ycBody');
     body.addEventListener('click', onClick);
     body.addEventListener('change', onChange);
+    body.addEventListener('input', function(e){
+      var key=e.target.getAttribute('data-report-note');
+      if(key==='faculty'||key==='reasons'){var ctx=reportContext();if(ctx){var notes=state.reportNotes[ctx.current.id]||(state.reportNotes[ctx.current.id]={});notes[key]=e.target.value;}}
+    });
     body.addEventListener('pointermove', showChartTip);
     body.addEventListener('pointerleave', hideChartTip);
     body.addEventListener('focusin', showChartTip);
@@ -291,7 +297,8 @@
     return '<div class="yc-terms" aria-label="Current thresholds"><span><b>Support &lt; '+s.support+'%</b>'+infoButton('support threshold','Overall results below '+s.support+'% are counted as needing support. This is separate from the subject pass mark.')+'</span><span><b>Subject pass '+s.pass+'%</b>'+infoButton('subject pass','A recorded subject score below '+s.pass+'% counts as below pass. Missing or absent scores remain unknown, not zero.')+'</span><span><b>Excellence ≥ '+s.excellence+'%</b>'+infoButton('excellence threshold','Overall results at or above '+s.excellence+'% count as excellence. This is not necessarily the school A+ boundary.')+'</span><button class="ghost small" data-act="settings">Settings</button></div>';
   }
   function viewNavigation(){
-    return '<nav class="yc-view-nav" aria-label="Comparison views">'+[['overview','Overview'],['subjects','Subjects'],['support','Support'],['quality','Data quality']].map(function(v){return '<button class="ghost'+(state.view===v[0]?' active':'')+'" data-view="'+v[0]+'" aria-current="'+(state.view===v[0]?'page':'false')+'">'+v[1]+'</button>';}).join('')+'</nav>';
+    var views=selectedDatasets().length===1?[['overview','Overview'],['reports','Meeting reports']]:[['overview','Overview'],['subjects','Subjects'],['support','Support'],['quality','Data quality'],['reports','Meeting reports']];
+    return '<nav class="yc-view-nav" aria-label="Comparison views">'+views.map(function(v){return '<button class="ghost'+(state.view===v[0]?' active':'')+'" data-view="'+v[0]+'" aria-current="'+(state.view===v[0]?'page':'false')+'">'+v[1]+'</button>';}).join('')+'</nav>';
   }
   function signalRow(cmp,ref){
     return ref?cmp.subjects.filter(function(r){return r.streamKey===ref.streamKey && r.key===ref.subjectKey;})[0]:null;
@@ -391,15 +398,72 @@
     if(!dialog){dialog=document.createElement('dialog');dialog.id='ycSettings';dialog.className='yc-settings-dialog';dialog.setAttribute('aria-label','Comparison settings');dialog.addEventListener('click',onClick);dialog.addEventListener('change',onChange);document.body.appendChild(dialog);}
     dialog.innerHTML=settingsContent();dialog.showModal();
   }
+  /* Meeting reports remain inside Year Comparison; names never enter snapshots. */
+  function reportContext(){
+    var years=selectedDatasets();if(!years.length)return null;
+    var current=years.filter(function(d){return d.id===state.reportYear;})[0]||years[years.length-1];
+    var index=years.indexOf(current),previous=index>0?years[index-1]:null;
+    var groups=current.streams.slice();if(previous)previous.streams.forEach(function(s){if(!groups.some(function(g){return g.key===s.key;}))groups.push(s);});
+    if(!groups.some(function(s){return s.key===state.reportStream;}))state.reportStream='';
+    return {years:years,current:current,previous:previous,groups:groups};
+  }
+  function reportSignature(d){return JSON.stringify([d.label,d.assessment,d.grade_level,d.source_path,d.streams,d.records,d.import_report]);}
+  function namedEntry(d){var e=state.namedYears[d.id];return e&&e.signature===reportSignature(d)?e:null;}
+  function meetingReportsView(){
+    var ctx=reportContext();if(!ctx||!Reports)return '';
+    var d=ctx.current,entry=namedEntry(d);
+    var html='<section class="yc-card"><div class="yc-head"><h3>Meeting reports</h3><span class="yc-sp"></span><button class="ghost small" data-act="print-meeting">Print meeting report</button></div><div class="yc-report-controls"><label>Report year<select data-report-year>'+ctx.years.map(function(y){return '<option value="'+esc(y.id)+'"'+(y.id===d.id?' selected':'')+'>'+esc(y.label)+'</option>';}).join('')+'</select></label><label>Stream<select data-report-stream><option value="">All streams</option>'+ctx.groups.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportStream?' selected':'')+'>'+esc(s.label)+'</option>';}).join('')+'</select></label><span class="yc-report-caption">'+(ctx.previous?'Comparison: '+esc(ctx.previous.label)+' → '+esc(d.label):'Select an earlier year above to add a comparison.')+'</span></div><nav class="yc-report-tabs" aria-label="Meeting report sections">'+[['subjects','Subject results & vista'],['top','Top 10'],['supplies','Supplies'],['notes','Teacher notes']].map(function(t){return '<button class="ghost small'+(state.reportTab===t[0]?' active':'')+'" data-report-tab="'+t[0]+'" aria-current="'+(state.reportTab===t[0]?'page':'false')+'">'+t[1]+'</button>';}).join('')+'</nav></section>';
+    if(state.reportTab==='top'){
+      var subjects=[];d.streams.filter(function(s){return !state.reportStream||s.key===state.reportStream;}).forEach(function(s){s.subjects.forEach(function(sub){if(!subjects.some(function(x){return x.key===sub.key;}))subjects.push(sub);});});
+      if(!subjects.some(function(s){return s.key===state.reportSubject;}))state.reportSubject='';
+      html+='<div class="yc-report-controls"><label>Subject<select data-report-subject><option value="">All subjects</option>'+subjects.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportSubject?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select></label><button class="ghost small" data-act="print-top">Print Top 10 separately</button></div>';
+      if(!entry||!entry.data)html+='<section class="yc-card"><h3>Student names</h3><p class="yc-report-caption">'+esc(entry&&entry.error?entry.error:d.source_path?'Load names from the private workbook for this report. Saved comparison results remain anonymous.':'Attach the original workbook to this year to include names and roll numbers. An administrator can use Attach workbook above.')+'</p>'+(d.source_path?'<button class="ghost small" data-act="report-names"'+(entry&&entry.loading?' disabled':'')+'>'+(entry&&entry.loading?'Loading names…':'Load student names')+'</button>':'')+'</section>';
+      html+=Reports.topsHtml(entry&&entry.data||d,state.reportStream,state.reportSubject);
+    }else if(state.reportTab==='supplies')html+=Reports.suppliesHtml(d,ctx.previous,state.settings,state.reportStream);
+    else if(state.reportTab==='notes')html+=Reports.notesHtml(d,state.reportNotes[d.id],true);
+    else html+=Reports.subjectsHtml(d,ctx.previous,state.settings,state.reportStream);
+    return '<div class="yc-meeting-reports">'+html+'</div>';
+  }
+  async function loadReportNames(){
+    var ctx=reportContext();if(!ctx)return;var d=ctx.current,old=namedEntry(d);if(old&&old.loading)return;
+    var entry={signature:reportSignature(d),loading:true};state.namedYears[d.id]=entry;render();
+    try{
+      var blob=await Cloud.create(supabaseClient).download(d),wb=XLSX.read(await blob.arrayBuffer(),{type:'array',cellDates:false});
+      var sheets=wb.SheetNames.map(function(n){return {name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:null,raw:true,blankrows:true})};});
+      entry.data=Reports.hydrateIdentities(d,Core.parseWorkbook(sheets,{fileName:d.source_file}));
+    }catch(error){entry.error='Names could not be loaded: '+error.message;}
+    finally{entry.loading=false;render();}
+    return entry.data;
+  }
+  async function printMeetingReport(topOnly){
+    var ctx=reportContext();if(!ctx||typeof printReport!=='function')return;
+    var d=ctx.current,entry=namedEntry(d),named=entry&&entry.data;
+    if(d.source_path&&!named){
+      if(entry&&entry.loading){toast('Student names are still loading.','info');return;}
+      var signature=reportSignature(d);named=await loadReportNames();
+      var latest=reportContext();
+      if(!named){state.reportTab='top';render();toast('Resolve the workbook issue shown under Student names before printing.','warning');return;}
+      if(!latest||latest.current.id!==d.id||reportSignature(latest.current)!==signature){toast('The selected year changed. Press Print for the new selection.','info');return;}
+    }
+    var html=topOnly?'':Reports.subjectsHtml(d,ctx.previous,state.settings,state.reportStream)+Reports.suppliesHtml(d,ctx.previous,state.settings,state.reportStream);
+    if(!named)html+='<p>Student names are unavailable: attach the original workbook to this year. Anonymous result rankings follow.</p>';
+    html+=Reports.topsHtml(named||d,state.reportStream,topOnly?state.reportSubject:'');
+    if(!topOnly)html+=Reports.notesHtml(d,state.reportNotes[d.id],false);
+    var scope=ctx.groups.find(function(s){return s.key===state.reportStream;});
+    var subtitle=(scope?scope.label:'All streams')+' · '+(d.assessment||'Assessment not recorded')+' · '+(d.grade_level||'Grade not recorded')+' · '+(ctx.previous?'Compared with '+ctx.previous.label:'Current year only')+' · Subject pass ≥ '+state.settings.pass+'%';
+    html='<div class="yc-meeting-print">'+html+'</div>';
+    printReport('Year Comparison · '+(topOnly?'Subject Top 10':'Meeting report')+' · '+d.label,subtitle,html,{compact:true});
+  }
   function body(){
     var sel=selectedDatasets();
     if(!state.datasets.length)return '';
     if(!sel.length)return '<div class="yc-card yc-empty">Select at least one year.</div>';
     var analyses=sel.map(function(d){return Core.analyseDataset(d,state.settings);});
-    if(analyses.length===1)return headlineTable(analyses,null)+'<div class="yc-charts">'+Charts.status(analyses[0])+Charts.distribution(analyses,Core.BAND_LABELS)+'</div>';
+    if(analyses.length===1&&state.view!=='reports')state.view='overview';
+    if(analyses.length===1)return viewNavigation()+'<div id="ycActiveView" tabindex="-1">'+(state.view==='reports'?meetingReportsView():headlineTable(analyses,null)+'<div class="yc-charts">'+Charts.status(analyses[0])+Charts.distribution(analyses,Core.BAND_LABELS)+'</div>')+'</div>';
     var cmp=Core.compareDatasets(analyses[analyses.length-2],analyses[analyses.length-1],state.settings);
     state.last={analyses:analyses,cmp:cmp};
-    var view=state.view==='subjects'?subjectView(analyses,cmp):state.view==='support'?supportView(analyses,cmp):state.view==='quality'?qualityView(analyses,cmp):
+    var view=state.view==='reports'?meetingReportsView():state.view==='subjects'?subjectView(analyses,cmp):state.view==='support'?supportView(analyses,cmp):state.view==='quality'?qualityView(analyses,cmp):
       headlineTable(analyses,cmp)+findingsView(cmp)+subjectSpotlights(cmp,true)+'<div class="yc-charts">'+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.status(analyses[analyses.length-1])+Charts.distribution(analyses,Core.BAND_LABELS)+Charts.streams(cmp)+Charts.subjects(cmp,state.chartStream)+Charts.streams(cmp,'excellence')+'</div>';
     return checksBanner(cmp)+viewNavigation()+'<div id="ycActiveView" tabindex="-1" aria-label="'+esc(state.view)+' view">'+view+'</div>';
   }
@@ -421,12 +485,14 @@
     var info=e.target.closest?e.target.closest('.yc-info'):null;if(info){showChartTip({target:info});return;}
     var viewButton=e.target.closest?e.target.closest('[data-view]'):null;
     if(viewButton){
-      var nextView=viewButton.getAttribute('data-view');if(['overview','subjects','support','quality'].indexOf(nextView)<0)return;
+      var nextView=viewButton.getAttribute('data-view');if(['overview','subjects','support','quality','reports'].indexOf(nextView)<0)return;
       state.view=nextView;if(nextView==='support')state.chartMetric='support';
       render();var active=$('ycActiveView');if(active)active.focus({preventScroll:true});return;
     }
     var subjectMetric=e.target.closest?e.target.closest('[data-subject-metric]'):null;
     if(subjectMetric){state.subjectMetric=subjectMetric.getAttribute('data-subject-metric');render();return;}
+    var reportTab=e.target.closest?e.target.closest('[data-report-tab]'):null;
+    if(reportTab){state.reportTab=reportTab.getAttribute('data-report-tab');render();return;}
     var metricButton=e.target.closest?e.target.closest('[data-chart-metric]'):null;
     if(metricButton){state.chartMetric=metricButton.getAttribute('data-chart-metric');render();return;}
     var t = e.target.closest ? e.target.closest('[data-act]') : null;
@@ -435,6 +501,8 @@
     if(state.busy && act!=='checks')return;
     if(state.loading && ['add','attach','reload-file','del'].indexOf(act)>=0)return;
     if (act === 'add') { e.preventDefault(); state.attachTarget=null; var fi = $('ycFileInput'); if (fi) fi.click(); }
+    else if (act === 'report-names') loadReportNames();
+    else if (act === 'print-meeting' || act === 'print-top') printMeetingReport(act==='print-top');
     else if (act === 'refresh' && !state.busy) loadDatasets();
     else if (act === 'checks') {state.view='quality';render();}
     else if (act === 'settings') openSettings();
@@ -475,6 +543,9 @@
   }
   function onChange(e) {
     var t = e.target;
+    if(t.hasAttribute('data-report-year')){state.reportYear=t.value;state.reportStream='';state.reportSubject='';render();return;}
+    if(t.hasAttribute('data-report-stream')){state.reportStream=t.value;state.reportSubject='';render();return;}
+    if(t.hasAttribute('data-report-subject')){state.reportSubject=t.value;render();return;}
     if(t.hasAttribute('data-chart-metric'))return;
     if(t.hasAttribute('data-chart-stream')){state.chartStream=t.value;render();return;}
     if (t.id === 'ycFileInput') {
