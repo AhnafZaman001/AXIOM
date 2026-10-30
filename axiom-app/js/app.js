@@ -5526,12 +5526,15 @@ document.addEventListener('keydown', (e)=>{
   // --- Custom floating tooltips (replaces native title tooltip) ---
   let tipEl = null;
   let tipTimer = null;
+  let rosterScrollUntil = 0;
   function hideTooltip(){
-    if(tipEl){ tipEl.classList.remove('show'); }
+    if(tipEl && tipEl.classList.contains('show')){ tipEl.classList.remove('show'); }
     if(tipTimer){ clearTimeout(tipTimer); tipTimer = null; }
   }
   document.addEventListener('mouseover', function(e){
+    if(performance.now() < rosterScrollUntil) return;
     const target = e.target.closest('[title]');
+    if(target && target.closest('#tableSection, #trRTableWrap')) return;
     if(!target || !target.getAttribute('title')) return;
     const text = target.getAttribute('title');
     target.setAttribute('data-spl-title', text);
@@ -5563,7 +5566,10 @@ document.addEventListener('keydown', (e)=>{
     target.removeAttribute('data-spl-title');
     hideTooltip();
   }, true);
-  document.addEventListener('scroll', hideTooltip, true);
+  document.addEventListener('scroll', function(e){
+    if(e.target instanceof Element && e.target.closest('#tableSection, #trRTableWrap')) rosterScrollUntil = performance.now() + 150;
+    hideTooltip();
+  }, {capture:true, passive:true});
   window.addEventListener('blur', hideTooltip);
 
   // --- Interface Sounds toggle ---

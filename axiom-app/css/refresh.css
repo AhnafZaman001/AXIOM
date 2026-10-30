@@ -312,3 +312,8 @@ select,select option,select optgroup{background-color:var(--paper-raised);color:
 select option:checked,select option:hover{background-color:#4B2E91;color:#fff}
 /* small screens: dropdown menus never push the page wider than the screen */
 @media (max-width:640px){.menu-dropdown{position:fixed!important;left:16px!important;right:16px!important;width:auto!important;max-width:none!important;min-width:0!important;overflow-wrap:anywhere}}
+
+/* Keep wide roster scrolling within its own paint area. Native title tooltips
+   retain assessment details without floating-tooltip layout work per cell. */
+body:not([data-ax-page="yearCompare"]) :is(#tableSection,#trRTableWrap){contain:paint;isolation:isolate;scroll-behavior:auto}
+body:not([data-ax-page="yearCompare"]) :is(#tableSection,#trRTableWrap) table.main-table tbody tr{transition:none;animation:none}
