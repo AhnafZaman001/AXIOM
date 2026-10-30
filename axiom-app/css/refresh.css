@@ -1,0 +1,62 @@
+/* AXIOM visual refresh — applies to every screen EXCEPT Year Comparison.
+   Everything is scoped to  body:not([data-ax-page="yearCompare"])  (app.js sets data-ax-page in setActivePage),
+   so css/year-compare.css and the year comparison screens are left exactly as they were. Remove this file to revert. */
+/* =====  Flat, neutral palette (dark theme) — tokens set on <body>, so every existing component picks them up  ===== */
+:root:not([data-theme="light"]) body:not([data-ax-page="yearCompare"]){--paper:#121216;--paper-raised:#1A1A20;--line:#2A2A33;--muted:#9A98A8;--ink:#EDEAF2;--ink-soft:#CFCCDA;--surface-1:#17171C;--surface-2:#1F1F27;--shadow-sm:none;--shadow-md:none;--shadow-lg:0 18px 44px rgba(0,0,0,.5);--glass-bg:#1A1A20;--font-display:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+body:not([data-ax-page="yearCompare"]){background:var(--paper)}
+body:not([data-ax-page="yearCompare"]) .bg-animated{display:none}
+:root:not([data-theme="light"]) body:not([data-ax-page="yearCompare"]) .masthead{background:var(--surface-1);border-bottom:1px solid var(--line);box-shadow:none;border-radius:14px}
+:root:not([data-theme="light"]) body:not([data-ax-page="yearCompare"]) .masthead::after{display:none}
+body:not([data-ax-page="yearCompare"]) .masthead h1{font-weight:600;letter-spacing:-.01em}
+/* =====  Headings, buttons  ===== */
+body:not([data-ax-page="yearCompare"]) .section-title{font-weight:600;font-size:1.05rem;letter-spacing:-.01em;margin:30px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+body:not([data-ax-page="yearCompare"]) .section-title::after{display:none}
+body:not([data-ax-page="yearCompare"]) button.primary{background:var(--accent);box-shadow:none}
+body:not([data-ax-page="yearCompare"]) button.primary:hover{background:var(--accent-2);box-shadow:none;transform:none}
+body:not([data-ax-page="yearCompare"]) .modal-overlay{backdrop-filter:none;background:rgba(8,8,12,.7)}
+/* =====  KPI strip: one row of figures separated by thin dividers, not four identical boxes  ===== */
+body:not([data-ax-page="yearCompare"]) .hero-strip{gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:24px}
+body:not([data-ax-page="yearCompare"]) .hero-metric{background:none;border:0;border-left:1px solid var(--line);border-radius:0;box-shadow:none;padding:16px 24px}
+body:not([data-ax-page="yearCompare"]) .hero-metric:first-child{border-left:0;padding-left:0}
+body:not([data-ax-page="yearCompare"]) .hero-metric::before{display:none}
+body:not([data-ax-page="yearCompare"]) .hero-metric .hm-value{font-weight:600;font-size:1.7rem;letter-spacing:-.01em}
+body:not([data-ax-page="yearCompare"]) .hero-metric .hm-value.small{font-size:1.1rem}
+/* =====  Cards, panels, tables  ===== */
+body:not([data-ax-page="yearCompare"]) .cards{gap:12px}
+body:not([data-ax-page="yearCompare"]) .card{background:var(--paper-raised);border-radius:14px;box-shadow:none;padding:16px 18px}
+body:not([data-ax-page="yearCompare"]) .card::before{display:none}
+body:not([data-ax-page="yearCompare"]) .card .count{font-weight:600;font-size:1.6rem;letter-spacing:-.01em}
+body:not([data-ax-page="yearCompare"]) .card.clickable:hover{transform:none;border-color:#3A3945}
+body:not([data-ax-page="yearCompare"]) .chart-card{border-radius:14px;box-shadow:none;padding:18px 20px}
+body:not([data-ax-page="yearCompare"]) .chart-card h4{font-size:.7rem;letter-spacing:.07em}
+body:not([data-ax-page="yearCompare"]) .panel,
+body:not([data-ax-page="yearCompare"]) .modal{box-shadow:none}
+body:not([data-ax-page="yearCompare"]) .modal{border-radius:16px;box-shadow:var(--shadow-lg)}
+body:not([data-ax-page="yearCompare"]) .table-wrap{background:none;border:0;border-radius:0;box-shadow:none}
+body:not([data-ax-page="yearCompare"]) table.main-table thead th{background:var(--paper);border-bottom:1px solid var(--line)}
+body:not([data-ax-page="yearCompare"]) table.main-table tbody tr:nth-child(even){background:none}
+body:not([data-ax-page="yearCompare"]) table.main-table tbody tr:hover{background:rgba(255,255,255,.035)}
+body:not([data-ax-page="yearCompare"]) table.main-table td{padding:11px 14px}
+body:not([data-ax-page="yearCompare"]) .zone-pill.green,
+body:not([data-ax-page="yearCompare"]) .zone-pill.blue,
+body:not([data-ax-page="yearCompare"]) .zone-pill.yellow,
+body:not([data-ax-page="yearCompare"]) .zone-pill.pink,
+body:not([data-ax-page="yearCompare"]) .zone-pill.red{box-shadow:none;border-color:transparent}
+/* =====  Charts: readable labels, softer rounded shapes, no 9px monospace  ===== */
+body:not([data-ax-page="yearCompare"]) .chart-card svg text{font-family:var(--font-body) !important;font-size:11px !important;font-weight:500}
+body:not([data-ax-page="yearCompare"]) .chart-card svg rect[rx="2"]{rx:5px}
+body:not([data-ax-page="yearCompare"]) .chart-card svg path[stroke-width="2"]{stroke-width:2.75px;stroke-linecap:round;stroke-linejoin:round}
+/* =====  Launch screen: flat, left-aligned, no floating shards / orb / glow  ===== */
+body:not([data-ax-page="yearCompare"]) .welcome-hero{background:#121216}
+body:not([data-ax-page="yearCompare"]) .wh-decor,
+body:not([data-ax-page="yearCompare"]) .wh-orb,
+body:not([data-ax-page="yearCompare"]) .wh-vignette{display:none}
+body:not([data-ax-page="yearCompare"]) .wh-nav{padding:22px max(40px,8vw);border-bottom:1px solid #2A2A33}
+body:not([data-ax-page="yearCompare"]) .wh-wordmark{font-weight:600}
+body:not([data-ax-page="yearCompare"]) .wh-main{align-items:flex-start;text-align:left;padding:0 max(40px,8vw) 72px}
+body:not([data-ax-page="yearCompare"]) .wh-title{font-weight:600;font-size:clamp(2rem,4.6vw,3.5rem);line-height:1.1;letter-spacing:-.02em;max-width:760px;margin-bottom:36px}
+body:not([data-ax-page="yearCompare"]) .wh-cta{background:#EDEAF2;color:#121216;border:0;box-shadow:none;border-radius:12px;padding:10px 10px 10px 22px}
+body:not([data-ax-page="yearCompare"]) .wh-cta:hover{background:#fff;transform:none;box-shadow:none}
+body:not([data-ax-page="yearCompare"]) .wh-cta-arrow{background:#121216;color:#EDEAF2;border-radius:8px;width:30px;height:30px}
+body:not([data-ax-page="yearCompare"]) .wh-credit{text-align:left}
+body:not([data-ax-page="yearCompare"]) .loading-bar-fill{background:var(--accent)}

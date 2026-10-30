@@ -2818,6 +2818,7 @@ document.getElementById('osZoneCardsWrap').addEventListener('click', (e)=>{
 });
 
 function setActivePage(page){
+  document.body.setAttribute('data-ax-page', page);   // lets css/refresh.css leave Year Comparison untouched
   // page: 'section' | 'overall' | 'sectionSummary' | 'teacherReport'
   overallSummaryOpen = (page === 'overall');
   sectionSummaryOpen = (page === 'sectionSummary');
