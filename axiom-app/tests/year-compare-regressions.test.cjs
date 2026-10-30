@@ -18,7 +18,7 @@ test('visual evidence uses structured subject references and withholds blocked c
 
 test('visual outcome stacks keep all listed records and escape labels',()=>{
   const analysis=C.analyseDataset(data([[s(80),s(80)],[s(10),m],[m,m]],'<unsafe>'));
-  assert.match(Charts.outcomes([analysis]),/Recorded below pass: 1 of 3/);
+  assert.match(Charts.outcomes([analysis]),/Failed at least one subject: 1 of 3/);
   assert.match(Charts.completeness([analysis]),/Partial: 1 of 3/);
   assert.match(Charts.supportLimits([analysis]),/2 incomplete overall results/);
   assert.ok(!Charts.ranges([analysis]).includes('<unsafe>'));

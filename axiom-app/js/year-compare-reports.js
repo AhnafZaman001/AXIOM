@@ -72,11 +72,11 @@
     if(previous){var reviews=Core.compareDatasets(previous,current,settings).checks.filter(function(c){return c.status==='review';});if(reviews.length)html+='<p class="yc-report-caption">Review: '+esc(reviews.map(function(c){return c.label;}).join(' · '))+'.</p>';}
     if(previous&&!allowed)html+='<p class="yc-report-caption">These assessments are not directly comparable. Both years are shown; change figures are withheld.</p>';
     now.filter(function(s){return !streamKey||s.key===streamKey;}).forEach(function(s){
-      html+=panel(s.label+' · '+current.label,table(['Subject','Scored','Average','Median','Highest','Pass','Pass %','Fail','Fail %','Absent','Missing / invalid','Exempt'],s.subjects.map(function(x){return [x.name,x.n,pct(x.mean),pct(x.median),pct(x.highest),x.passed,pct(x.passRate),x.failed,pct(x.failRate),x.absent,x.unknown,x.exempt];})));
+      html+=panel(s.label+' · '+current.label,table(['Subject','Scored','Average','Highest','Pass','Pass %','Fail','Fail %','Absent','Missing / invalid','Exempt'],s.subjects.map(function(x){return [x.name,x.n,pct(x.mean),pct(x.highest),x.passed,pct(x.passRate),x.failed,pct(x.failRate),x.absent,x.unknown,x.exempt];})));
       var old=before.filter(function(b){return b.key===s.key;})[0];
       if(previous){
         var keys=s.subjects.map(function(x){return x.key;});if(old)old.subjects.forEach(function(x){if(keys.indexOf(x.key)<0)keys.push(x.key);});
-        html+=panel(s.label+' · '+previous.label+' → '+current.label,table(['Subject','Previous scored','Current scored','Average (prev → now)','Median (prev → now)','Pass % (prev → now)','Fail % (prev → now)','Pass change'],keys.map(function(k){var a=old&&old.subjects.filter(function(x){return x.key===k;})[0],b=s.subjects.filter(function(x){return x.key===k;})[0];return [(b||a).name,a?a.n:'—',b?b.n:'—',pct(a&&a.mean)+' → '+pct(b&&b.mean),pct(a&&a.median)+' → '+pct(b&&b.median),pct(a&&a.passRate)+' → '+pct(b&&b.passRate),pct(a&&a.failRate)+' → '+pct(b&&b.failRate),delta(a&&a.passRate,b&&b.passRate,allowed&&a&&b&&a.max===b.max)];})));
+        html+=panel(s.label+' · '+previous.label+' → '+current.label,table(['Subject','Previous scored','Current scored','Average (prev → now)','Highest (prev → now)','Pass % (prev → now)','Fail % (prev → now)','Pass change'],keys.map(function(k){var a=old&&old.subjects.filter(function(x){return x.key===k;})[0],b=s.subjects.filter(function(x){return x.key===k;})[0];return [(b||a).name,a?a.n:'—',b?b.n:'—',pct(a&&a.mean)+' → '+pct(b&&b.mean),pct(a&&a.highest)+' → '+pct(b&&b.highest),pct(a&&a.passRate)+' → '+pct(b&&b.passRate),pct(a&&a.failRate)+' → '+pct(b&&b.failRate),delta(a&&a.passRate,b&&b.passRate,allowed&&a&&b&&a.max===b.max)];})));
       }
       html+=panel(s.label+' · Subject vista',legend(['Pass','Fail','Absent','Missing / invalid','Exempt'])+'<div class="yc-vista-grid">'+s.subjects.map(function(x){return '<article class="yc-vista"><h4>'+esc(x.name)+'</h4><strong>'+pct(x.passRate)+' <small>pass</small></strong>'+strip([['Pass',x.passed],['Fail',x.failed],['Absent',x.absent],['Missing / invalid',x.unknown],['Exempt',x.exempt]],x.listed)+'<p>'+x.passed+' pass · '+x.failed+' fail · '+(x.absent+x.unknown)+' unresolved · '+x.listed+' listed</p><div class="yc-report-bands">'+strip(x.bands.map(function(n,i){return [['Below 40%','40–59%','60–79%','80–89%','90%+'][i],n];}),x.n)+'</div><p>Score bands · '+x.n+' scored</p></article>';}).join('')+'</div>'+legend(['Below 40%','40–59%','60–79%','80–89%','90%+'],'yc-report-bands'));
     });
@@ -101,5 +101,122 @@
   function notesHtml(current,notes,editable){
     notes=notes||{};return panel('Teacher observations · '+current.label,'<p class="yc-report-caption">Written by the teacher. '+(editable?'Drafts stay in this browser tab; print the meeting report to keep them.':'')+'</p>'+[['faculty','Faculty-related issues · previous and current year'],['reasons','Subject-wise reasons for improvement or decline']].map(function(x){return editable?'<label class="yc-report-note">'+x[1]+'<textarea data-report-note="'+x[0]+'" rows="5" placeholder="Subject / stream, year, observation and supporting evidence">'+esc(notes[x[0]]||'')+'</textarea></label>':'<div class="yc-teacher-entry"><h4>'+x[1]+'</h4><div class="yc-note-print'+(notes[x[0]]?'':' yc-note-blank')+'">'+esc(notes[x[0]]||'To be completed by the teacher.').replace(/\n/g,'<br>')+'</div></div>';}).join(''));
   }
-  return {subjectStats:subjectStats,topTen:topTen,supplies:supplies,hydrateIdentities:hydrateIdentities,subjectsHtml:subjectsHtml,topsHtml:topsHtml,suppliesHtml:suppliesHtml,notesHtml:notesHtml,esc:esc};
+
+  /* ===== Overall marks: complete list, Top 10 and year comparison ===== */
+  function rowsForOverall(ds,streamKey,settings){
+    var pass=Core.settingsFrom(settings).pass,out=[];
+    (ds.streams||[]).filter(function(s){return !streamKey||s.key===streamKey;}).forEach(function(s){
+      (ds.records||[]).filter(function(r){return r.st===s.key;}).forEach(function(r){
+        var total=0,max=0,scored=0,applicable=0,failed=0;
+        s.subjects.forEach(function(sub,i){
+          var raw=(r.c||[])[i];if(raw&&raw[0]==='n')return;applicable++;
+          var c=cell(r,i,sub.max);if(c){scored++;total+=c[1];max+=sub.max;if(c[1]*100/sub.max<pass)failed++;}
+        });
+        out.push({id:r.i,stream:s.key,streamLabel:s.label,name:r.name||'',roll:r.roll||'',sheet:r.sheet||'',total:total,max:max,
+          percent:max?total*100/max:null,scored:scored,applicable:applicable,failed:failed,complete:scored>0&&scored===applicable,appeared:scored>0});
+      });
+    });
+    return out;
+  }
+  // Complete results are ranked (competition ranking: ties share a rank); incomplete results are listed after them, unranked.
+  function overallRanking(ds,streamKey,settings){
+    var all=rowsForOverall(ds,streamKey,settings),groups=[];
+    (ds.streams||[]).filter(function(s){return !streamKey||s.key===streamKey;}).forEach(function(s){
+      var mine=all.filter(function(r){return r.stream===s.key;});
+      var ranked=mine.filter(function(r){return r.complete;}).sort(function(a,b){return b.percent-a.percent||b.total-a.total||a.name.localeCompare(b.name)||a.roll.localeCompare(b.roll)||String(a.id).localeCompare(String(b.id));});
+      var rank=0,lastP=null,lastT=null;
+      ranked.forEach(function(r,i){if(r.percent!==lastP||r.total!==lastT)rank=i+1;r.rank=rank;lastP=r.percent;lastT=r.total;});
+      var rest=mine.filter(function(r){return !r.complete;}).sort(function(a,b){return a.name.localeCompare(b.name)||a.roll.localeCompare(b.roll)||String(a.id).localeCompare(String(b.id));});
+      rest.forEach(function(r){r.rank=null;});
+      groups.push({key:s.key,label:s.label,max:s.subjects.reduce(function(a,x){return a+x.max;},0),ranked:ranked,top:ranked.filter(function(r){return r.rank<=10;}),incomplete:rest,listed:mine.length});
+    });
+    return groups;
+  }
+  function overallSummary(group){
+    var top=group.top,ranked=group.ranked;
+    return {listed:group.listed,ranked:ranked.length,incomplete:group.incomplete.length,
+      highestMarks:ranked.length?ranked[0].total:null,highestMax:ranked.length?ranked[0].max:null,highest:ranked.length?ranked[0].percent:null,
+      topAverage:top.length?top.reduce(function(a,r){return a+r.percent;},0)/top.length:null,
+      tenth:ranked.length>=10?ranked[9].percent:null,
+      average:ranked.length?ranked.reduce(function(a,r){return a+r.percent;},0)/ranked.length:null};
+  }
+  function overallHtml(ds,previous,settings,streamKey,mode){
+    var now=overallRanking(ds,streamKey,settings),before=previous?overallRanking(previous,streamKey,settings):[],allowed=comparisonAllowed(previous,ds,settings);
+    var html='<p class="yc-report-caption">Overall marks are the sum of every applicable subject; ranking uses percentage within each stream. Exempt subjects reduce the applicable maximum. Only complete results (every subject scored) are ranked; students with a missing or absent subject are listed afterwards without a rank. Ties share a rank'+(mode==='top'?', so a list can run past ten rows':'')+'.</p>';
+    if(previous&&!allowed)html+='<p class="yc-report-caption">These assessments are not directly comparable. Both years are shown; change figures are withheld.</p>';
+    now.forEach(function(g){
+      var sum=overallSummary(g),old=before.filter(function(b){return b.key===g.key;})[0],os=old?overallSummary(old):null;
+      if(previous){
+        var rows=[['Students with complete results',os?os.ranked:'—',sum.ranked,'—'],
+          ['Highest result',os?pct(os.highest):'—',pct(sum.highest),os?delta(os.highest,sum.highest,allowed):'—'],
+          ['Average of the top 10',os?pct(os.topAverage):'—',pct(sum.topAverage),os?delta(os.topAverage,sum.topAverage,allowed):'—'],
+          ['10th place',os?pct(os.tenth):'—',pct(sum.tenth),os?delta(os.tenth,sum.tenth,allowed):'—'],
+          ['Average of everyone ranked',os?pct(os.average):'—',pct(sum.average),os?delta(os.average,sum.average,allowed):'—']];
+        html+=panel(g.label+' · overall marks, '+previous.label+' → '+ds.label,table(['Measure',previous.label,ds.label,'Change'],rows));
+      }
+      var head=['Rank','Student','Roll','Source sheet','Marks (out of '+g.max+')','Percentage'];
+      var list=mode==='top'?g.top:g.ranked;
+      var body=list.map(function(r){return [r.rank,r.name||'Name unavailable',r.roll||'—',r.sheet||'—',r.total+' / '+r.max,pct(r.percent)];});
+      var extra=mode==='top'?[]:g.incomplete.map(function(r){return ['—',r.name||'Name unavailable',r.roll||'—',r.sheet||'—',r.appeared?r.total+' / '+r.max+' so far':'No marks','Incomplete: '+r.scored+' of '+r.applicable+' subjects'];});
+      html+=panel(g.label+' · overall marks · '+(mode==='top'?'Top 10':'complete list')+' · '+ds.label,(body.length||extra.length)?table(head,body.concat(extra)):'<p>No complete results.</p>');
+    });
+    return html;
+  }
+
+  /* ===== School-format result tables: %-age wise, marks wise, grade wise ===== */
+  function gradeFor(percent,failed,pass){
+    if(failed>0||percent==null||percent<pass)return 'F';
+    return percent>=80?'A+':percent>=70?'A':percent>=60?'B':percent>=50?'C':percent>=40?'D':'E';
+  }
+  var PCT_BANDS=[['90% -> 100%',90],['80% -> 89%',80],['70% -> 79%',70],['60% -> 69%',60],['50% -> 59%',50],['40% -> 49%',40],['30% -> 39%',30],['20% -> 29%',20],['Less than 20%',-1]];
+  function bandIndex(percent){for(var i=0;i<PCT_BANDS.length-1;i++)if(percent>=PCT_BANDS[i][1])return i;return PCT_BANDS.length-1;}
+  function resultTables(ds,settings,streamKey){
+    var st=Core.settingsFrom(settings),streams=(ds.streams||[]).filter(function(s){return !streamKey||s.key===streamKey;}),all=rowsForOverall(ds,streamKey,st);
+    var counted=function(r){return st.basis==='complete'?r.complete:r.appeared;};
+    var cols=streams.map(function(s){return s.label;});
+    var per=streams.map(function(s){return all.filter(function(r){return r.stream===s.key;});});
+    function build(labels,pick){
+      var counts=labels.map(function(){return per.map(function(){return 0;});});
+      per.forEach(function(rows,c){rows.filter(counted).forEach(function(r){counts[pick(r)][c]++;});});
+      return counts;
+    }
+    function withTotals(labels,counts){
+      return labels.map(function(l,i){var total=counts[i].reduce(function(a,b){return a+b;},0);return [l].concat(counts[i].map(function(n){return n?n:'-';})).concat([total]);});
+    }
+    var appeared=per.map(function(rows){return rows.filter(function(r){return r.appeared;}).length;});
+    var bandedN=per.map(function(rows){return rows.filter(counted).length;});
+    function footer(){
+      var out=[];
+      var diff=appeared.map(function(n,i){return n-bandedN[i];}),anyDiff=diff.some(function(n){return n>0;});
+      if(anyDiff){out.push(['Counted in this table'].concat(bandedN.map(function(n){return n||'-';})).concat([bandedN.reduce(function(a,b){return a+b;},0)]));
+        out.push(['Incomplete results, not counted'].concat(diff.map(function(n){return n||'-';})).concat([diff.reduce(function(a,b){return a+b;},0)]));}
+      out.push(['Total Appeared in Exams'].concat(appeared).concat([appeared.reduce(function(a,b){return a+b;},0)]));
+      return out;
+    }
+    var pctLabels=PCT_BANDS.map(function(b){return b[0];});
+    var pctRows=withTotals(pctLabels,build(pctLabels,function(r){return bandIndex(r.percent);}));
+    var mb=st.marksBands,marksLabels=mb.map(function(b){return b+'+';}).concat([mb[mb.length-1]+' BELOW']);
+    var marksRows=withTotals(marksLabels,build(marksLabels,function(r){for(var i=0;i<mb.length;i++)if(r.total>=mb[i])return i;return mb.length;}));
+    var gradeLabels=['A+','A','B','C','D','E','F'];
+    var gradeRows=withTotals(gradeLabels,build(gradeLabels,function(r){return gradeLabels.indexOf(gradeFor(r.percent,r.failed,st.pass));}));
+    var head=[''].concat(cols).concat(['Total']);
+    var assessment=String(ds.assessment||'RESULT').toUpperCase();
+    var note=st.basis==='complete'?'Students are counted when every subject has a score.':'Students are counted on the subjects they have a score for; totals for students with a missing subject are lower.';
+    return {label:ds.label,basis:st.basis,tables:[
+      {id:'percent',sheet:'%age wise',title:'%AGE WISE RESULT '+ds.label,subtitle:'',head:head,rows:pctRows.concat(footer()),notes:[note]},
+      {id:'marks',sheet:'Marks wise',title:'MARKS WISE RESULT '+ds.label,subtitle:'',head:head,rows:marksRows.concat(footer()),notes:[note,'Marks bands: '+mb.join(', ')+' (total marks obtained).']},
+      {id:'grades',sheet:'Grade wise',title:assessment+' '+ds.label,subtitle:'GRADE WISE RESULT',head:['Grades'].concat(cols).concat(['Total']),rows:gradeRows.concat(footer()),
+        notes:[note,'Calculated grade bands: A+ 80% and above · A 70–79% · B 60–69% · C 50–59% · D 40–49% · E below 40%, provided the pass threshold is met. F = any recorded subject below '+st.pass+'% (or overall below '+st.pass+'%).',st.basis==='marked'?'Available-subject grades are provisional; incomplete results cannot confirm a pass.':'Check these calculated grade bands against your school’s grading rules.']}
+    ]};
+  }
+  function resultTablesHtml(ds,settings,streamKey){
+    var t=resultTables(ds,settings,streamKey);
+    return t.tables.map(function(x){
+      var last=x.rows.length-1,foot=x.rows.filter(function(r){return /^(Total Appeared|Counted in|Incomplete results)/.test(r[0]);}).length;
+      return '<section class="yc-card yc-report-section yc-school-table"><h3>'+esc(x.title)+(x.subtitle?' · '+esc(x.subtitle):'')+'</h3><div class="yc-wrap"><table class="yc-report-table yc-school"><thead><tr>'+x.head.map(function(h){return '<th scope="col">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+
+        x.rows.map(function(r,ri){var isFoot=ri>=x.rows.length-foot;return '<tr'+(isFoot?' class="yc-school-foot"':'')+'>'+r.map(function(c,i){return '<'+(i?'td':'th scope="row"')+(i===r.length-1&&i?' class="yc-school-total"':'')+'>'+esc(c)+'</'+(i?'td':'th')+'>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>'+x.notes.map(function(n){return '<p class="yc-report-caption">'+esc(n)+'</p>';}).join('')+'</section>';
+    }).join('');
+  }
+
+  return {overallRows:rowsForOverall,overallRanking:overallRanking,overallSummary:overallSummary,overallHtml:overallHtml,gradeFor:gradeFor,resultTables:resultTables,resultTablesHtml:resultTablesHtml,subjectStats:subjectStats,topTen:topTen,supplies:supplies,hydrateIdentities:hydrateIdentities,subjectsHtml:subjectsHtml,topsHtml:topsHtml,suppliesHtml:suppliesHtml,notesHtml:notesHtml,esc:esc};
 });

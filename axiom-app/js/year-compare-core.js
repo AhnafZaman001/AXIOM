@@ -31,7 +31,8 @@
     excellence: 90,   // overall % at or above which a result counts as excellent
     basis: 'complete', // use complete results by default; available-subject mode must be explicitly selected
     minGroup: 5,      // smallest group a subject/stream statement is made about
-    minCohort: 10     // smallest cohort for a headline comparison
+    minCohort: 10,    // smallest cohort for a headline comparison
+    marksBands: [500, 450, 400, 350]   // total-marks bands for the school-format marks-wise table
   };
 
   // Cell status codes stored with every record
@@ -360,6 +361,10 @@
       o[f] = isFinite(v) ? Math.min(100, Math.max(0, v)) : DEFAULTS[f];
     });
     o.basis = o.basis === 'marked' ? 'marked' : 'complete';
+    var raw = Array.isArray(o.marksBands) ? o.marksBands : String(o.marksBands).split(/[\s,;]+/);
+    var bands = raw.map(Number).filter(function (v) { return isFinite(v) && v > 0 && v <= 100000; });
+    bands = bands.filter(function (v, i) { return bands.indexOf(v) === i; }).sort(function (a, b) { return b - a; }).slice(0, 8);
+    o.marksBands = bands.length >= 2 ? bands : DEFAULTS.marksBands.slice();
     return o;
   }
 
@@ -406,6 +411,7 @@
       completeShare: share(items.filter(function (x) { return x.d.complete; }).length, withMarks.length),
       completeCoverage: share(listed - incomplete, listed),
       n: n, median: quantile(vals, 0.5), mean: mean(vals), p25: quantile(vals, 0.25), p75: quantile(vals, 0.75),
+      highest: vals.length ? Math.max.apply(null, vals) : null,
       support: { n: supportN, share: share(supportN, n) },
       excellence: { n: excN, share: share(excN, n) },
       belowPass: { recorded: belowN, n: listed, share: share(belowN, listed), confirmedPass: confirmed, unknown: listed - belowN - confirmed },
@@ -524,6 +530,7 @@
       rows.push({
         key: k, label: label, a: a ? a.metrics : null, b: b ? b.metrics : null, enough: !!ok,
         dMedian: a && b && a.metrics.median != null && b.metrics.median != null ? b.metrics.median - a.metrics.median : null,
+        dMean: a && b && a.metrics.mean != null && b.metrics.mean != null ? b.metrics.mean - a.metrics.mean : null,
         dSupport: a && b && a.metrics.support.share != null && b.metrics.support.share != null ? b.metrics.support.share - a.metrics.support.share : null,
         dExcellence: a && b && a.metrics.excellence.share != null && b.metrics.excellence.share != null ? b.metrics.excellence.share - a.metrics.excellence.share : null
       });
@@ -536,8 +543,8 @@
     A.streams.forEach(function (sa) {
       var sb = streamByKey(B, sa.key);
       if (!sb) return;
-      var rankA = sa.subjects.filter(function (x) { return x.n >= st.minGroup; }).slice().sort(function (x, y) { return x.median - y.median; }).map(function (x) { return x.key; });
-      var rankB = sb.subjects.filter(function (x) { return x.n >= st.minGroup; }).slice().sort(function (x, y) { return x.median - y.median; }).map(function (x) { return x.key; });
+      var rankA = sa.subjects.filter(function (x) { return x.n >= st.minGroup; }).slice().sort(function (x, y) { return x.mean - y.mean; }).map(function (x) { return x.key; });
+      var rankB = sb.subjects.filter(function (x) { return x.n >= st.minGroup; }).slice().sort(function (x, y) { return x.mean - y.mean; }).map(function (x) { return x.key; });
       sa.subjects.forEach(function (xa) {
         var xb = sb.subjects.filter(function (y) { return y.key === xa.key; })[0];
         if (!xb) return;
@@ -545,6 +552,7 @@
         rows.push({
           stream: sa.label, streamKey: sa.key, subject: xb.name, key: xa.key, a: xa, b: xb, enough: enough,
           dMedian: enough ? xb.median - xa.median : null,
+          dMean: enough ? xb.mean - xa.mean : null,
           dP25: enough ? xb.p25 - xa.p25 : null,
           rankA: rankA.indexOf(xa.key) + 1, rankB: rankB.indexOf(xa.key) + 1, of: Math.min(rankA.length, rankB.length),
           rankBOf: rankB.length, sameMax: xa.max === xb.max
@@ -574,6 +582,17 @@
     return { kind: kind, text: text, ups: ups, downs: downs };
   }
 
+  // Share of students who passed every subject, among those whose outcome is known
+  // (a confirmed pass or a recorded failure). Students whose result is incomplete are not guessed at.
+  function passRate(m) {
+    var known = m.belowPass.confirmedPass + m.belowPass.recorded;
+    return known > 0 ? (m.belowPass.confirmedPass / known) * 100 : null;
+  }
+  function passText(m) {
+    var known = m.belowPass.confirmedPass + m.belowPass.recorded;
+    return known > 0 ? m.belowPass.confirmedPass + ' of ' + known + ' students with a known result (' + f1(passRate(m)) + ')' + (m.belowPass.unknown > 0 ? ', ' + m.belowPass.unknown + ' cannot be confirmed' : '') : 'not known yet';
+  }
+
   function buildFindings(ctx) {
     var A = ctx.A, B = ctx.B, st = ctx.settings, P = ctx.pooled, streams = ctx.streams, subjects = ctx.subjects, checks = ctx.checks, mix = ctx.mix;
     var pA = A.pooled, pB = B.pooled;
@@ -592,8 +611,8 @@
     if (pA.n < st.minCohort || pB.n < st.minCohort) {
       return [{
         id: 'insufficient', title: 'No clear conclusion yet',
-        observation: 'There are too few eligible overall results to draw a clear comparison.',
-        evidence: [A.label + ': ' + pA.n + ' eligible overall results. ' + B.label + ': ' + pB.n + ' eligible overall results.'],
+        observation: 'There are too few students with complete results to draw a clear comparison.',
+        evidence: [A.label + ': ' + pA.n + ' students counted. ' + B.label + ': ' + pB.n + ' students counted.'],
         qualification: ['Percentages from groups under ' + st.minCohort + ' students move a lot when one student changes.'],
         next: 'Can the missing results be entered, or a year with a larger group be added to the comparison?',
         strength: 0
@@ -604,14 +623,14 @@
     var worse = pB.coverage < pA.coverage ? B : A, worseM = worse.pooled;
 
     /* ---- typical performance ---- */
-    var dMed = pB.median - pA.median;
+    var dMed = pB.mean - pA.mean;      // the average result, in percentage points
     var typical = {
-      id: 'typical', title: 'Typical result',
-      observation: 'The typical (median) result among ' + (st.basis === 'complete' ? 'students with complete results' : 'students with available-subject results') + ' is ' + dirWord(dMed, 1.5, 'higher', 'lower') + ' in ' + B.label + ': ' + f1(pB.median) + ' against ' + f1(pA.median) + ' in ' + A.label + ' (' + pts(dMed) + ').',
+      id: 'typical', title: 'Average result',
+      observation: 'The average result among ' + (st.basis === 'complete' ? 'students with complete results' : 'students with available-subject results') + ' is ' + dirWord(dMed, 1.5, 'higher', 'lower') + ' in ' + B.label + ': ' + f1(pB.mean) + ' against ' + f1(pA.mean) + ' in ' + A.label + ' (' + pts(dMed) + ').',
       evidence: [
         'Students with marks: ' + pB.withMarks + ' of ' + pB.listed + ' listed in ' + B.label + ' (' + f1(pB.coverage) + '); ' + pA.withMarks + ' of ' + pA.listed + ' in ' + A.label + ' (' + f1(pA.coverage) + ').',
-        'Middle half of results: ' + f1(pB.p25) + ' to ' + f1(pB.p75) + ' in ' + B.label + '; ' + f1(pA.p25) + ' to ' + f1(pA.p75) + ' in ' + A.label + '.',
-        'Mean (secondary): ' + f1(pB.mean) + ' against ' + f1(pA.mean) + '.'
+        'Highest result: ' + f1(pB.highest) + ' in ' + B.label + '; ' + f1(pA.highest) + ' in ' + A.label + '.',
+        'Passed every subject: ' + passText(pB) + ' in ' + B.label + '; ' + passText(pA) + ' in ' + A.label + '.'
       ],
       qualification: [], next: '', strength: 1 + Math.min(Math.abs(dMed) / 5, 3)
     };
@@ -621,11 +640,11 @@
       : 'Available-subject results include ' + (pA.partial + pB.partial) + ' students across the two cohorts with incomplete subject coverage. Their percentages may not be comparable.');
     if (chk('basket').status === 'review' || chk('maxima').status === 'review') typical.qualification.push('Subject lists or maximum marks differ between the years (see Comparison checks), so the two percentages are not built from identical papers.');
     if (mix && (mix.reversal || mix.material)) typical.qualification.push(mix.reversal ? 'Stream mix reverses the picture: the pooled mean moves ' + pts(mix.pooled) + ' but within streams it moves ' + pts(mix.within) + '.' : 'Stream mix differs between the years; the pooled mean moves ' + pts(mix.pooled) + ' against ' + pts(mix.within) + ' with stream weights held fixed.');
-    if (!typical.qualification.length) typical.qualification.push('These are different student groups; a difference of ' + pts(dMed) + ' can reflect who was in each group as well as how they performed.');
+    if (!typical.qualification.length) typical.qualification.push('These are different student groups; a difference of ' + pts(dMed) + ' can reflect who was in each group as well as how they performed. An average can also be pulled by a few very high or very low results.');
     typical.next = covGap && worseM.noMarks > 0 ? 'Are the ' + worseM.noMarks + ' listed students in ' + worse.label + ' without marks absent, withdrawn or not yet entered?'
       : mix && (mix.reversal || mix.material) ? 'Does the same direction hold inside each stream?'
       : (chk('basket').status === 'review' || chk('maxima').status === 'review') ? 'Can the subject lists and maximum marks be aligned before the years are compared?'
-      : 'Is the difference in the typical result seen in every stream or only some?';
+      : 'Is the difference in the average result seen in every stream or only some?';
     findings.push(typical);
 
     /* ---- support need and breadth ---- */
@@ -638,7 +657,7 @@
       });
       var concentrated = br && br.kind === 'mixed' && streams.filter(function (r) { return r.enough; }).length > 1;
       var sup = {
-        id: 'support', title: 'Support need',
+        id: 'support', title: 'Needs support',
         observation: 'The share of students below ' + st.support + '% is ' + dirWord(dSup, 1, 'higher', 'lower') + ' in ' + B.label + ': ' + f1(pB.support.share) + ' (' + pB.support.n + ' of ' + pB.n + ') against ' + f1(pA.support.share) + ' (' + pA.support.n + ' of ' + pA.n + ') in ' + A.label + '.',
         evidence: [],
         qualification: bound.slice(), next: '',
@@ -660,7 +679,7 @@
     var priority = null, pKind = '';
     usable.forEach(function (r) {
       if (r.rankA <= 2 && r.rankB <= 2) {
-        var score = (r.a.median + r.b.median) / 2;
+        var score = (r.a.mean + r.b.mean) / 2;
         if (!priority || score < priority.__score) { priority = r; priority.__score = score; pKind = 'recurring'; }
       }
     });
@@ -672,8 +691,8 @@
       });
     }
     var improved = null;
-    subjects.filter(function (r) { return r.enough && r.dMedian >= 5 && r.dP25 >= 5 && !(priority && r.streamKey === priority.streamKey && r.key === priority.key); }).forEach(function (r) {
-      var m = Math.min(r.dMedian, r.dP25);
+    subjects.filter(function (r) { return r.enough && r.dMean >= 5 && r.dP25 >= 5 && !(priority && r.streamKey === priority.streamKey && r.key === priority.key); }).forEach(function (r) {
+      var m = Math.min(r.dMean, r.dP25);
       if (!improved || m > improved.__m) { improved = r; improved.__m = m; }
     });
     // Structured references let the interface draw the evidence directly.
@@ -689,7 +708,7 @@
         id: 'subject', title: 'Subject to investigate',
         subject: { streamKey: pr.streamKey, subjectKey: pr.key },
         observation: pKind === 'recurring'
-          ? 'In ' + pr.stream + ', ' + pr.subject + ' is among the two lowest subjects in both years (median ' + f1(pr.a.median) + ' in ' + A.label + ', ' + f1(pr.b.median) + ' in ' + B.label + ').'
+          ? 'In ' + pr.stream + ', ' + pr.subject + ' is among the two lowest subjects in both years (average ' + f1(pr.a.mean) + ' in ' + A.label + ', ' + f1(pr.b.mean) + ' in ' + B.label + ').'
           : 'In ' + pr.stream + ', ' + pr.subject + ' has the highest share of students below ' + st.pass + '% in ' + B.label + ' (' + pr.b.below + ' of ' + pr.b.n + ', ' + f1(pr.b.belowShare) + ').',
         evidence: [
           pr.subject + ' is ' + ordinalLow(pr.rankB) + ' of ' + pr.rankBOf + ' ' + pr.stream + ' subjects in ' + B.label + ' (' + ordinalLow(pr.rankA).replace(/^the /, '') + ' in ' + A.label + ').',
@@ -710,13 +729,13 @@
     if (pA.excellence.n + pB.excellence.n > 0 || improved) {
       var bre = breadthText(streams, 'dExcellence', 1, 'higher', 'lower', st.minGroup);
       var ach = {
-        id: 'achievement', title: 'Achievement to understand',
+        id: 'achievement', title: 'Top results',
         observation: 'The share of students at or above ' + st.excellence + '% is ' + dirWord(dExc, 1, 'higher', 'lower') + ' in ' + B.label + ': ' + f1(pB.excellence.share) + ' (' + pB.excellence.n + ' of ' + pB.n + ') against ' + f1(pA.excellence.share) + ' (' + pA.excellence.n + ' of ' + pA.n + ') in ' + A.label + '.',
         evidence: [], qualification: [], next: '',
         strength: Math.abs(dExc) / 5 + (improved ? 0.8 : 0)
       };
       if (bre) ach.evidence.push('Across streams: ' + bre.text + '.');
-      if (improved) ach.evidence.push(improved.stream + ' ' + improved.subject + ': median ' + f1(improved.a.median) + ' to ' + f1(improved.b.median) + ' (' + pts(improved.dMedian) + ') and lower quartile ' + f1(improved.a.p25) + ' to ' + f1(improved.b.p25) + ' (' + pts(improved.dP25) + '). Both the middle and lower quartile are higher; this does not establish a shift at every point in the distribution.');
+      if (improved) ach.evidence.push(improved.stream + ' ' + improved.subject + ': the average rose from ' + f1(improved.a.mean) + ' to ' + f1(improved.b.mean) + ' (' + pts(improved.dMean) + '), and about three in four students scored at least ' + f1(improved.b.p25) + ' (it was ' + f1(improved.a.p25) + '). Results rose across the group, not only at the top; this does not establish why.');
       ach.qualification.push(st.excellence + '% is the excellence threshold set here; the school’s own A+ grade boundary is a different measure.');
       if (covGap && worseM.noMarks > 0) ach.qualification.push('Shares are of students with marks; ' + worseM.noMarks + ' listed students in ' + worse.label + ' have none.');
       if (improved) ach.qualification.push('Subject results do not remove differences in paper difficulty or marking between the years.');
@@ -736,7 +755,7 @@
     var shown = {};
     kept.forEach(function (f) { shown[f.id] = 1; });
     kept.alsoChecked = findings.filter(function (f) { return !shown[f.id]; }).map(function (f) { return { id: f.id, title: f.title, summary: f.observation }; });
-    if (!shown.support && !findings.some(function (f) { return f.id === 'support'; })) kept.alsoChecked.push({ id: 'support', title: 'Support need', summary: 'No eligible overall result is below ' + st.support + '% in either year. Incomplete results may remain outside this measure.' });
+    if (!shown.support && !findings.some(function (f) { return f.id === 'support'; })) kept.alsoChecked.push({ id: 'support', title: 'Support need', summary: 'No counted student is below ' + st.support + '% in either year. Incomplete results may remain outside this measure.' });
     return kept;
   }
 
@@ -749,10 +768,10 @@
   function headline(ctx) {
     var A = ctx.A, B = ctx.B, st = ctx.settings, pA = A.pooled, pB = B.pooled;
     if (comparabilityBlockers(ctx).length) return 'Comparability is not established. Review the assessment, grade, stream and subject checks before describing an improvement or decline.';
-    if (pA.n < st.minCohort || pB.n < st.minCohort) return 'There are too few eligible overall results to draw a clear comparison.';
-    var d = pB.median - pA.median;
+    if (pA.n < st.minCohort || pB.n < st.minCohort) return 'There are too few students with complete results to draw a clear comparison.';
+    var d = pB.mean - pA.mean;
     var dir = dirWord(d, 1.5, 'higher', 'lower');
-    var s = 'Among ' + (st.basis === 'complete' ? 'students with complete results' : 'students with available-subject results') + ', the typical result is ' + dir + ' in ' + B.label + ' compared with ' + A.label + ' (' + pts(d) + ')';
+    var s = 'Among ' + (st.basis === 'complete' ? 'students with complete results' : 'students with available-subject results') + ', the average result is ' + dir + ' in ' + B.label + ' compared with ' + A.label + ' (' + pts(d) + ')';
     var cov = ctx.checks.filter(function (c) { return c.id === 'coverage' && c.status === 'review'; }).length;
     if (cov) {
       var w = pB.coverage < pA.coverage ? B : A;
@@ -772,6 +791,7 @@
       A: A, B: B, settings: st, checks: checks, status: checks.some(function (c) { return c.status === 'review'; }) ? 'review' : 'ready',
       streams: streams, subjects: subjects, mix: mix,
       deltas: {
+        mean: A.pooled.mean == null || B.pooled.mean == null ? null : B.pooled.mean - A.pooled.mean,
         median: A.pooled.median == null || B.pooled.median == null ? null : B.pooled.median - A.pooled.median,
         support: A.pooled.support.share == null || B.pooled.support.share == null ? null : B.pooled.support.share - A.pooled.support.share,
         excellence: A.pooled.excellence.share == null || B.pooled.excellence.share == null ? null : B.pooled.excellence.share - A.pooled.excellence.share
@@ -784,7 +804,7 @@
     DEFAULTS: DEFAULTS, BAND_LABELS: BAND_LABELS, settingsFrom: settingsFrom,
     classifyCell: classifyCell, subjectKey: subjectKey, streamKey: streamKey, detectStream: detectStream,
     parseSheet: parseSheet, parseWorkbook: parseWorkbook, buildDataset: buildDataset,
-    analyseDataset: analyseDataset, compareDatasets: compareDatasets, quantile: quantile,
+    analyseDataset: analyseDataset, compareDatasets: compareDatasets, quantile: quantile, deriveRecord: deriveRecord, passRate: passRate,
     fmt: { pct: f1, pts: pts }
   };
 });

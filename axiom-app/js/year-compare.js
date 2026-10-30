@@ -12,13 +12,14 @@
   var Charts = window.AxiomYearCharts;
   var Cloud = window.AxiomYearStorage;
   var Reports = window.AxiomYearReports;
+  var Export = window.AxiomYearExport;
   if (!Core) { console.error('year-compare-core.js did not load'); return; }
 
   var SETTINGS_KEY = 'axiom.yearCompare.settings.v2';
   var state = {
     datasets: [], selected: [], settings: loadSettings(), tableMissing: false, loaded: false, loading: false,
-    error: '', imp: null, busy: false, chartMetric: 'median', chartStream: '', view: 'overview', subjectMetric: 'median',
-    reportTab: 'subjects', reportYear: '', reportStream: '', reportSubject: '', namedYears: {}, reportNotes: {}
+    error: '', imp: null, busy: false, chartMetric: 'mean', chartStream: '', view: 'overview', subjectMetric: 'mean',
+    reportTab: 'subjects', reportTopMode: 'overall', reportOverallView: 'top', reportYear: '', reportStream: '', reportSubject: '', namedYears: {}, reportNotes: {}
   };
 
   /* ------------------------------ small helpers ------------------------------ */
@@ -279,22 +280,26 @@
     var heads = ['Measure'].concat(analyses.map(function (a) { return a.label; }));
     if (prev) heads.push('Change, ' + prev.label + ' to ' + last.label);
     function chg(v) { return prev ? [{ html: '<span class="yc-chg">' + esc(pts(v)) + '</span>' }] : []; }
+    function name(text, tip) { return { html: '<span class="yc-metric-label">' + text + infoButton(text.toLowerCase(), tip) + '</span>' }; }
+    function diff(f) { var a = f(prev), b = f(last); return a == null || b == null ? null : b - a; }
+    function known(m) { return m.belowPass.confirmedPass + m.belowPass.recorded; }
     var rows = [
-      [{html:'<span class="yc-metric-label">Complete results'+infoButton('complete results','Students with a recorded score in every applicable subject, out of all listed students. Absence and missing scores are incomplete.')+'</span>'}].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.withMarks+' of '+a.pooled.listed+' have any marks">'+a.pooled.complete+' / '+a.pooled.listed+'</b>'};})).concat(prev?['']:[]),
-      [{html:'<span class="yc-metric-label">Typical result'+infoButton('typical result','The median overall percentage: half the eligible results are at or below it, and half at or above. It is not the average.')+'</span>'}].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.n+' of '+a.pooled.listed+' listed students">'+pct(a.pooled.median)+'</b>'};})).concat(chg(cmp?cmp.deltas.median:null)),
-      [{html:'<span class="yc-metric-label">Support need'+infoButton('support need','The percentage of eligible overall results below '+st.support+'%. Hover a value for its student count. A support need is separate from failing a subject.')+'</span>'}].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.support.n,a.pooled.n)+' eligible results">'+pct(a.pooled.support.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.support:null)),
-      [{html:'<span class="yc-metric-label">Excellence'+infoButton('excellence','The percentage of eligible overall results at or above '+st.excellence+'%. Hover a value for its student count.')+'</span>'}].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.excellence.n,a.pooled.n)+' eligible results">'+pct(a.pooled.excellence.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.excellence:null))
+      [name('Complete results', 'Students with a recorded score in every subject, out of all listed students. Students with a missing or absent mark are incomplete.')].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.withMarks+' of '+a.pooled.listed+' have any marks">'+a.pooled.complete+' / '+a.pooled.listed+'</b>'};})).concat(prev?['']:[]),
+      [name('Average result', 'The average overall percentage of the students counted. A few very high or very low results can pull an average up or down.')].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.n+' of '+a.pooled.listed+' listed students counted">'+pct(a.pooled.mean)+'</b>'};})).concat(prev?chg(diff(function(a){return a.pooled.mean;})):[]),
+      [name('Pass percentage', 'Students who passed every subject, out of the students whose result is known. Students with a missing or absent mark cannot be confirmed either way, so they are left out of this percentage.')].concat(analyses.map(function(a){var m=a.pooled;return {html:'<b title="'+m.belowPass.confirmedPass+' of '+known(m)+' students with a known result; '+m.belowPass.unknown+' cannot be confirmed">'+pct(Core.passRate(m))+'</b>'};})).concat(prev?chg(diff(function(a){return Core.passRate(a.pooled);})):[]),
+      [name('Needs support', 'The percentage of counted students whose overall result is below '+st.support+'%. This is separate from failing a subject.')].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.support.n,a.pooled.n)+' students counted">'+pct(a.pooled.support.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.support:null)),
+      [name('Top results', 'The percentage of counted students whose overall result is '+st.excellence+'% or more.')].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.excellence.n,a.pooled.n)+' students counted">'+pct(a.pooled.excellence.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.excellence:null)),
+      [name('Highest result', 'The best overall percentage among the students counted.')].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.n+' students counted">'+pct(a.pooled.highest)+'</b>'};})).concat(prev?chg(diff(function(a){return a.pooled.highest;})):[])
     ];
     return '<div class="yc-card yc-overview'+(prev?' has-change':'')+'"><div class="yc-head"><h3>At a glance</h3><span class="yc-sp"></span><span class="yc-mode-pill" title="Changes use percentage points. See How results are calculated for definitions.">'+(st.basis==='complete'?'Complete results':'Available subjects')+'</span></div>' + table(heads, rows, 1) + '</div>';
   }
-
 
   function infoButton(name,definition){
     return '<button type="button" class="yc-info" aria-label="Define '+esc(name)+'" data-yc-tip="'+esc(definition)+'">i</button>';
   }
   function termsBar(){
     var s=state.settings;
-    return '<div class="yc-terms" aria-label="Current thresholds"><span><b>Support &lt; '+s.support+'%</b>'+infoButton('support threshold','Overall results below '+s.support+'% are counted as needing support. This is separate from the subject pass mark.')+'</span><span><b>Subject pass '+s.pass+'%</b>'+infoButton('subject pass','A recorded subject score below '+s.pass+'% counts as below pass. Missing or absent scores remain unknown, not zero.')+'</span><span><b>Excellence ≥ '+s.excellence+'%</b>'+infoButton('excellence threshold','Overall results at or above '+s.excellence+'% count as excellence. This is not necessarily the school A+ boundary.')+'</span><button class="ghost small" data-act="settings">Settings</button></div>';
+    return '<div class="yc-terms" aria-label="Current thresholds"><span><b>Needs support: below '+s.support+'%</b>'+infoButton('needs-support threshold','Students whose overall result is below '+s.support+'% are counted as needing support. This is separate from the subject pass mark.')+'</span><span><b>Subject pass: '+s.pass+'%</b>'+infoButton('subject pass','A subject score below '+s.pass+'% counts as a failed subject. Missing or absent scores are not counted as zero.')+'</span><span><b>Top results: '+s.excellence+'% and above</b>'+infoButton('top-results threshold','Students whose overall result is '+s.excellence+'% or more. This is not necessarily the school A+ boundary.')+'</span><button class="ghost small" data-act="settings">Settings</button></div>';
   }
   function viewNavigation(){
     var views=selectedDatasets().length===1?[['overview','Overview'],['reports','Meeting reports']]:[['overview','Overview'],['subjects','Subjects'],['support','Support'],['quality','Data quality'],['reports','Meeting reports']];
@@ -313,26 +318,26 @@
     return '<div class="yc-findings">'+cmp.findings.map(function(f){
       var metric='',caption='',visual='',facts='',action='';
       if(f.id==='typical'){
-        metric=pts(cmp.deltas.median);caption=pct(A.pooled.median)+' → '+pct(B.pooled.median);
-        visual='<div class="yc-mini-title">Middle 50% '+infoButton('middle 50%','The band runs from the 25th to the 75th percentile. The dot is the median. Hover a band for its exact values.')+'</div>'+Charts.ranges([A,B]);
-        var enough=cmp.streams.filter(function(r){return r.enough&&r.dMedian!=null;}),higher=enough.filter(function(r){return r.dMedian>=1.5;}).length;
-        facts='<div class="yc-card-fact"><span>Average</span><b>'+esc(pct(A.pooled.mean))+' → '+esc(pct(B.pooled.mean))+'</b></div><div class="yc-card-fact"><span>Streams higher</span><b>'+higher+' / '+enough.length+'</b></div>';
+        metric=pts(cmp.deltas.mean);caption=pct(A.pooled.mean)+' → '+pct(B.pooled.mean);
+        visual=meters([{label:A.label,v:A.pooled.mean},{label:B.label,v:B.pooled.mean}]);
+        var enough=cmp.streams.filter(function(r){return r.enough&&r.dMean!=null;}),higher=enough.filter(function(r){return r.dMean>=1.5;}).length;
+        facts='<div class="yc-card-fact"><span>Pass percentage</span><b>'+esc(pct(Core.passRate(A.pooled)))+' → '+esc(pct(Core.passRate(B.pooled)))+'</b></div><div class="yc-card-fact"><span>Highest result</span><b>'+esc(pct(A.pooled.highest))+' → '+esc(pct(B.pooled.highest))+'</b></div><div class="yc-card-fact"><span>Streams higher</span><b>'+higher+' / '+enough.length+'</b></div>';
         action='<button class="ghost small" data-act="distribution">View distribution</button>';
       }else if(f.id==='support'){
         metric=pts(cmp.deltas.support);caption=B.pooled.support.n+' of '+B.pooled.n+' below '+s.support+'%';
         visual=meters([{label:A.label,v:A.pooled.support.share},{label:B.label,v:B.pooled.support.share}]);
-        facts='<div class="yc-card-fact"><span>Need support</span><b>'+A.pooled.support.n+'/'+A.pooled.n+' → '+B.pooled.support.n+'/'+B.pooled.n+'</b></div><div class="yc-card-fact"><span>Recorded subject failures</span><b>'+A.pooled.belowPass.recorded+' → '+B.pooled.belowPass.recorded+'</b></div>';
+        facts='<div class="yc-card-fact"><span>Needing support</span><b>'+A.pooled.support.n+'/'+A.pooled.n+' → '+B.pooled.support.n+'/'+B.pooled.n+'</b></div><div class="yc-card-fact"><span>Failed a subject</span><b>'+A.pooled.belowPass.recorded+' → '+B.pooled.belowPass.recorded+'</b></div>';
         action='<button class="ghost small" data-view="support">See support patterns</button>';
       }else if(f.id==='achievement'){
-        metric=pct(B.pooled.excellence.share);caption=B.pooled.excellence.n+' of '+B.pooled.n+' at '+s.excellence+'%+';
+        metric=pct(B.pooled.excellence.share);caption=B.pooled.excellence.n+' of '+B.pooled.n+' scored '+s.excellence+'% or more';
         visual=meters([{label:A.label,v:A.pooled.excellence.share},{label:B.label,v:B.pooled.excellence.share}]);
-        facts='<div class="yc-card-fact"><span>High achievers</span><b>'+A.pooled.excellence.n+'/'+A.pooled.n+' → '+B.pooled.excellence.n+'/'+B.pooled.n+'</b></div><div class="yc-card-fact"><span>Share change</span><b>'+esc(pts(cmp.deltas.excellence))+'</b></div>';
-        action='<button class="ghost small" data-act="excellence">See excellence by stream</button>';
+        facts='<div class="yc-card-fact"><span>Top results</span><b>'+A.pooled.excellence.n+'/'+A.pooled.n+' → '+B.pooled.excellence.n+'/'+B.pooled.n+'</b></div><div class="yc-card-fact"><span>Share change</span><b>'+esc(pts(cmp.deltas.excellence))+'</b></div>';
+        action='<button class="ghost small" data-act="excellence">See top results by stream</button>';
       }else if(f.id==='subject'){
         var row=signalRow(cmp,f.subject||cmp.signals.priority);
         if(row){
-          metric=row.subject;caption=row.stream+' · '+pct(row.b.median)+' median';
-          visual=meters([{label:A.label,v:row.a.median},{label:B.label,v:row.b.median}]);
+          metric=row.subject;caption=row.stream+' · average '+pct(row.b.mean);
+          visual=meters([{label:A.label,v:row.a.mean},{label:B.label,v:row.b.mean}]);
           facts='<div class="yc-card-fact"><span>Below '+s.pass+'%</span><b>'+row.a.below+'/'+row.a.n+' → '+row.b.below+'/'+row.b.n+'</b></div><div class="yc-card-fact"><span>Subject position</span><b>Bottom '+Math.max(row.rankA,row.rankB)+' in both years</b></div>';
           action='<button class="ghost small" data-view="subjects">View subject patterns</button>';
         }
@@ -350,9 +355,9 @@
     if(skipShown && cmp.findings.some(function(f){return f.id==='subject';}))priority=null;
     [priority,gain].forEach(function(row,index){
       if(!row)return;
-      var growth=index===1,head=growth?'Progress beyond the top':'Subject focus';
-      var stamp=growth?'Median '+pts(row.dMedian)+' · lower quarter '+pts(row.dP25):signals.priority.reason==='recurring'?'Among the lowest two subjects in both years':'High share below the subject pass mark';
-      html+='<article class="yc-spotlight"><div class="yc-spotlight-top"><span>'+head+'</span>'+infoButton(head,growth?'The median and lower quartile both increased by at least five percentage points. This describes two cohorts; it does not establish why scores changed.':'A relative subject weakness within this stream, not an individual student ranking. Check paper comparability before deciding on an intervention.')+'</div>'+Charts.subjectEvidence(row,[cmp.A.label,cmp.B.label],growth)+'<div class="yc-spotlight-stamp">'+esc(stamp)+'</div><div class="yc-card-fact"><span>'+(growth?'Scored results':'Below '+cmp.settings.pass+'%')+'</span><b>'+(growth?row.a.n+' → '+row.b.n:row.a.below+'/'+row.a.n+' → '+row.b.below+'/'+row.b.n)+'</b></div></article>';
+      var growth=index===1,head=growth?'Higher across the group':'Subject focus';
+      var stamp=growth?'Average '+pts(row.dMean)+' · about three in four students reach '+pct(row.b.p25):signals.priority.reason==='recurring'?'Among the lowest two subjects in both years':'High share below the subject pass mark';
+      html+='<article class="yc-spotlight"><div class="yc-spotlight-top"><span>'+head+'</span>'+infoButton(head,growth?'The average rose by at least five points and so did the score that about three in four students reach, so results rose across the group, not only at the top. This describes two groups of students; it does not establish why scores changed.':'A relative subject weakness within this stream, not an individual student ranking. Check paper comparability before deciding on an intervention.')+'</div>'+Charts.subjectEvidence(row,[cmp.A.label,cmp.B.label],growth)+'<div class="yc-spotlight-stamp">'+esc(stamp)+'</div><div class="yc-card-fact"><span>'+(growth?'Scored results':'Below '+cmp.settings.pass+'%')+'</span><b>'+(growth?row.a.n+' → '+row.b.n:row.a.below+'/'+row.a.n+' → '+row.b.below+'/'+row.b.n)+'</b></div></article>';
     });
     return html?'<div class="yc-spotlights">'+html+'</div>':'';
   }
@@ -363,22 +368,22 @@
     var group=groups.filter(function(g){return g.key===state.chartStream;})[0]||groups[0],keys=[];
     analyses.forEach(function(a){var stream=a.streams.filter(function(s){return s.key===group.key;})[0];if(stream)stream.subjects.forEach(function(s){if(!keys.some(function(x){return x.key===s.key;}))keys.push({key:s.key,name:s.name});});});
     var risk=state.subjectMetric==='belowShare',blocked=cmp.findings.some(function(f){return f.id==='comparability';});
-    var head='<div class="yc-head"><h3>Subject map</h3>'+infoButton('subject map',risk?'Each cell is the percentage of scored subject results below '+state.settings.pass+'%. Hover for the count and missing/absent results.':'Each cell is the subject median, based on recorded scores. Hover for sample size and missing/absent results.')+'<span class="yc-sp"></span><div class="yc-segments"><button class="ghost small'+(!risk?' active':'')+'" data-subject-metric="median" aria-pressed="'+!risk+'">Median</button><button class="ghost small'+(risk?' active':'')+'" data-subject-metric="belowShare" aria-pressed="'+risk+'">Below pass</button></div><select data-chart-stream aria-label="Subject map stream">'+groups.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===group.key?' selected':'')+'>'+esc(s.label)+'</option>';}).join('')+'</select></div>';
+    var head='<div class="yc-head"><h3>Subject map</h3>'+infoButton('subject map',risk?'Each cell is the percentage of scored subject results below '+state.settings.pass+'%. Hover for the count and missing/absent results.':'Each cell is the average score in that subject, based on recorded scores. Hover for the number of students and missing/absent results.')+'<span class="yc-sp"></span><div class="yc-segments"><button class="ghost small'+(!risk?' active':'')+'" data-subject-metric="mean" aria-pressed="'+!risk+'">Average</button><button class="ghost small'+(risk?' active':'')+'" data-subject-metric="belowShare" aria-pressed="'+risk+'">Below pass</button></div><select data-chart-stream aria-label="Subject map stream">'+groups.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===group.key?' selected':'')+'>'+esc(s.label)+'</option>';}).join('')+'</select></div>';
     var rows=keys.map(function(k){
       var values=analyses.map(function(a){var stream=a.streams.filter(function(s){return s.key===group.key;})[0];return stream?stream.subjects.filter(function(s){return s.key===k.key;})[0]:null;});
       var cells=values.map(function(s,i){
-        var v=s?s[risk?'belowShare':'median']:null;
+        var v=s?s[risk?'belowShare':'mean']:null;
         if(v==null)return '<td><span class="yc-map-missing">—</span></td>';
-        var text=analyses[i].label+' · '+group.label+' '+k.name+' · '+(risk?'below '+state.settings.pass+'%':'median')+': '+pct(v)+' · '+(risk?s.below+' of ':'')+s.n+' scored · '+s.missing+' missing/invalid · '+s.absent+' absent';
+        var text=analyses[i].label+' · '+group.label+' '+k.name+' · '+(risk?'below '+state.settings.pass+'%':'average')+': '+pct(v)+' · '+(risk?s.below+' of ':'')+s.n+' scored · '+s.missing+' missing/invalid · '+s.absent+' absent';
         return '<td><button class="yc-map-cell" style="--yc-level:'+Math.round(10+v*.52)+'%" data-yc-tip="'+esc(text)+'" aria-label="'+esc(text)+'">'+esc(pct(v))+'</button></td>';
       }).join('');
-      var last=values[values.length-1],prev=values[values.length-2],delta=!blocked&&last&&prev&&last.max===prev.max&&last.n>=Core.DEFAULTS.minGroup&&prev.n>=Core.DEFAULTS.minGroup&&last[risk?'belowShare':'median']!=null&&prev[risk?'belowShare':'median']!=null?last[risk?'belowShare':'median']-prev[risk?'belowShare':'median']:null;
+      var last=values[values.length-1],prev=values[values.length-2],delta=!blocked&&last&&prev&&last.max===prev.max&&last.n>=Core.DEFAULTS.minGroup&&prev.n>=Core.DEFAULTS.minGroup&&last[risk?'belowShare':'mean']!=null&&prev[risk?'belowShare':'mean']!=null?last[risk?'belowShare':'mean']-prev[risk?'belowShare':'mean']:null;
       return '<tr><th scope="row">'+esc(k.name)+'</th>'+cells+'<td class="yc-map-change">'+esc(pts(delta))+'</td></tr>';
     }).join('');
     return '<section class="yc-card">'+head+'<div class="yc-wrap"><table class="yc-map"><thead><tr><th>Subject</th>'+analyses.map(function(a){return '<th>'+esc(a.label)+'</th>';}).join('')+'<th>Latest change</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="yc-map-key"><span>0%</span>'+[10,25,40,55,70].map(function(v){return '<i style="--yc-level:'+v+'%"></i>';}).join('')+'<span>100%</span></div></section>'+subjectSpotlights(cmp)+'<div class="yc-charts">'+Charts.movers(cmp)+'</div>';
   }
   function supportView(analyses,cmp){
-    return '<div class="yc-scope-tags"><span>Support: eligible overall results '+infoButton('support denominator','Support percentages use '+(state.settings.basis==='complete'?'complete':'available-subject')+' overall results. The pass-outcome bars below use all listed students.')+'</span><span>Pass outcomes: all listed students</span></div><div class="yc-charts">'+Charts.outcomes(analyses)+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.streams(cmp,'support')+Charts.supportLimits(analyses)+'</div>';
+    return '<div class="yc-scope-tags"><span>Needs support: counted students '+infoButton('support denominator','Needs-support percentages use '+(state.settings.basis==='complete'?'students with complete results':'available-subject results')+'. The pass-outcome bars below use all listed students.')+'</span><span>Pass outcomes: all listed students</span></div><div class="yc-charts">'+Charts.outcomes(analyses)+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.streams(cmp,'support')+Charts.supportLimits(analyses)+'</div>';
   }
   function qualityView(analyses,cmp){
     var checks='<section class="yc-card"><div class="yc-head"><h3>Comparison checks</h3><span class="yc-sp"></span><span class="yc-mode-pill">'+esc(cmp.A.label)+' vs '+esc(cmp.B.label)+'</span></div><div class="yc-check-grid">'+cmp.checks.map(function(c){return '<button class="yc-check-tile '+c.status+'" data-yc-tip="'+esc(c.detail)+'" aria-label="'+esc(c.label+': '+c.status+'. '+c.detail)+'"><i></i><b>'+esc(c.label)+'</b><span>'+(c.status==='review'?'Review':'Match')+'</span></button>';}).join('')+'</div></section>';
@@ -388,10 +393,10 @@
   function settingsContent(){
     var s=state.settings;
     return '<div class="yc-head"><h3>Comparison settings</h3><span class="yc-sp"></span><button class="ghost small" data-act="close-settings" aria-label="Close settings">Close</button></div><div class="yc-settings-fields">'+
-      '<label>Support threshold (%)<input type="number" min="0" max="100" data-set="support" value="'+s.support+'"><span>Overall below this level needs support.</span></label>'+
+      '<label>Needs-support threshold (%)<input type="number" min="0" max="100" data-set="support" value="'+s.support+'"><span>Overall below this level needs support.</span></label>'+
       '<label>Subject pass mark (%)<input type="number" min="0" max="100" data-set="pass" value="'+s.pass+'"><span>A recorded subject score below this mark counts as below pass.</span></label>'+
-      '<label>Excellence threshold (%)<input type="number" min="0" max="100" data-set="excellence" value="'+s.excellence+'"><span>Overall at or above this level counts as excellence.</span></label>'+
-      '<label>Overall results included<select data-set="basis"><option value="complete"'+(s.basis==='complete'?' selected':'')+'>Complete results only</option><option value="marked"'+(s.basis==='marked'?' selected':'')+'>Available-subject results</option></select><span>Missing and absent scores stay separate, never zero.</span></label></div><div class="yc-settings-footer"><span>Saved on this device</span><button class="ghost small" data-act="reset">Reset defaults</button></div>';
+      '<label>Top-results threshold (%)<input type="number" min="0" max="100" data-set="excellence" value="'+s.excellence+'"><span>Overall at or above this level counts as a top result.</span></label>'+
+      '<label>Students counted<select data-set="basis"><option value="complete"'+(s.basis==='complete'?' selected':'')+'>Complete results only</option><option value="marked"'+(s.basis==='marked'?' selected':'')+'>Available-subject results</option></select><span>Missing and absent scores stay separate, never zero.</span></label><label>Marks bands for the school tables<input type="text" data-set="marksBands" value="'+esc(s.marksBands.join(', '))+'"><span>Total marks, highest first, for the marks-wise table.</span></label></div><div class="yc-settings-footer"><span>Saved on this device</span><button class="ghost small" data-act="reset">Reset defaults</button></div>';
   }
   function openSettings(){
     var dialog=$('ycSettings');
@@ -412,17 +417,29 @@
   function meetingReportsView(){
     var ctx=reportContext();if(!ctx||!Reports)return '';
     var d=ctx.current,entry=namedEntry(d);
-    var html='<section class="yc-card"><div class="yc-head"><h3>Meeting reports</h3><span class="yc-sp"></span><button class="ghost small" data-act="print-meeting">Print meeting report</button></div><div class="yc-report-controls"><label>Report year<select data-report-year>'+ctx.years.map(function(y){return '<option value="'+esc(y.id)+'"'+(y.id===d.id?' selected':'')+'>'+esc(y.label)+'</option>';}).join('')+'</select></label><label>Stream<select data-report-stream><option value="">All streams</option>'+ctx.groups.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportStream?' selected':'')+'>'+esc(s.label)+'</option>';}).join('')+'</select></label><span class="yc-report-caption">'+(ctx.previous?'Comparison: '+esc(ctx.previous.label)+' → '+esc(d.label):'Select an earlier year above to add a comparison.')+'</span></div><nav class="yc-report-tabs" aria-label="Meeting report sections">'+[['subjects','Subject results & vista'],['top','Top 10'],['supplies','Supplies'],['notes','Teacher notes']].map(function(t){return '<button class="ghost small'+(state.reportTab===t[0]?' active':'')+'" data-report-tab="'+t[0]+'" aria-current="'+(state.reportTab===t[0]?'page':'false')+'">'+t[1]+'</button>';}).join('')+'</nav></section>';
+    var html='<section class="yc-card"><div class="yc-head"><h3>Meeting reports</h3><span class="yc-sp"></span><button class="ghost small" data-act="print-meeting">Print meeting report</button></div><div class="yc-report-controls"><label>Report year<select data-report-year>'+ctx.years.map(function(y){return '<option value="'+esc(y.id)+'"'+(y.id===d.id?' selected':'')+'>'+esc(y.label)+'</option>';}).join('')+'</select></label><label>Stream<select data-report-stream><option value="">All streams</option>'+ctx.groups.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportStream?' selected':'')+'>'+esc(s.label)+'</option>';}).join('')+'</select></label><span class="yc-report-caption">'+(ctx.previous?'Comparison: '+esc(ctx.previous.label)+' → '+esc(d.label):'Select an earlier year above to add a comparison.')+'</span></div><nav class="yc-report-tabs" aria-label="Meeting report sections">'+[['subjects','Subject results & vista'],['top','Top 10'],['tables','School result tables'],['supplies','Supplies'],['notes','Teacher notes']].map(function(t){return '<button class="ghost small'+(state.reportTab===t[0]?' active':'')+'" data-report-tab="'+t[0]+'" aria-current="'+(state.reportTab===t[0]?'page':'false')+'">'+t[1]+'</button>';}).join('')+'</nav></section>';
     if(state.reportTab==='top'){
+      var overall=state.reportTopMode!=='subjects';
       var subjects=[];d.streams.filter(function(s){return !state.reportStream||s.key===state.reportStream;}).forEach(function(s){s.subjects.forEach(function(sub){if(!subjects.some(function(x){return x.key===sub.key;}))subjects.push(sub);});});
       if(!subjects.some(function(s){return s.key===state.reportSubject;}))state.reportSubject='';
-      html+='<div class="yc-report-controls"><label>Subject<select data-report-subject><option value="">All subjects</option>'+subjects.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportSubject?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select></label><button class="ghost small" data-act="print-top">Print Top 10 separately</button></div>';
+      var seg=function(attr,value,current,text){return '<button class="ghost small'+(current===value?' active':'')+'" '+attr+'="'+value+'" aria-pressed="'+(current===value)+'">'+text+'</button>';};
+      html+='<div class="yc-report-controls"><div class="yc-segments" aria-label="Top 10 view">'+seg('data-top-mode','overall',overall?'overall':'subjects','Overall marks')+seg('data-top-mode','subjects',overall?'overall':'subjects','By subject')+'</div>';
+      if(overall)html+='<div class="yc-segments" aria-label="Overall marks list">'+seg('data-overall-view','top',state.reportOverallView,'Top 10')+seg('data-overall-view','list',state.reportOverallView,'Complete list')+'</div>';
+      else html+='<label>Subject<select data-report-subject><option value="">All subjects</option>'+subjects.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportSubject?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select></label>';
+      html+='<button class="ghost small" data-act="print-top">Print '+(overall&&state.reportOverallView==='list'?'complete list':'Top 10')+' separately</button></div>';
       if(!entry||!entry.data)html+='<section class="yc-card"><h3>Student names</h3><p class="yc-report-caption">'+esc(entry&&entry.error?entry.error:d.source_path?'Load names from the private workbook for this report. Saved comparison results remain anonymous.':'Attach the original workbook to this year to include names and roll numbers. An administrator can use Attach workbook above.')+'</p>'+(d.source_path?'<button class="ghost small" data-act="report-names"'+(entry&&entry.loading?' disabled':'')+'>'+(entry&&entry.loading?'Loading names…':'Load student names')+'</button>':'')+'</section>';
-      html+=Reports.topsHtml(entry&&entry.data||d,state.reportStream,state.reportSubject);
+      html+=overall?Reports.overallHtml(entry&&entry.data||d,ctx.previous,state.settings,state.reportStream,state.reportOverallView):Reports.topsHtml(entry&&entry.data||d,state.reportStream,state.reportSubject);
+    }else if(state.reportTab==='tables'){
+      html+='<div class="yc-report-controls"><button class="primary small" data-act="download-tables">Download Excel</button><span class="yc-report-caption">Counts for the selected stream scope in '+esc(d.label)+', laid out like the school’s printed result tables. The pass mark and who is counted come from Settings.</span></div>'+Reports.resultTablesHtml(d,state.settings,state.reportStream);
     }else if(state.reportTab==='supplies')html+=Reports.suppliesHtml(d,ctx.previous,state.settings,state.reportStream);
     else if(state.reportTab==='notes')html+=Reports.notesHtml(d,state.reportNotes[d.id],true);
     else html+=Reports.subjectsHtml(d,ctx.previous,state.settings,state.reportStream);
     return '<div class="yc-meeting-reports">'+html+'</div>';
+  }
+  function downloadTables(){
+    var ctx=reportContext();if(!ctx||!Export||!Reports)return;
+    try{var name=Export.download(Reports.resultTables(ctx.current,state.settings,state.reportStream));toast('Downloaded '+name+'.','success');}
+    catch(error){toast('Could not create the Excel file: '+error.message,'warning');}
   }
   async function loadReportNames(){
     var ctx=reportContext();if(!ctx)return;var d=ctx.current,old=namedEntry(d);if(old&&old.loading)return;
@@ -445,14 +462,16 @@
       if(!named){state.reportTab='top';render();toast('Resolve the workbook issue shown under Student names before printing.','warning');return;}
       if(!latest||latest.current.id!==d.id||reportSignature(latest.current)!==signature){toast('The selected year changed. Press Print for the new selection.','info');return;}
     }
-    var html=topOnly?'':Reports.subjectsHtml(d,ctx.previous,state.settings,state.reportStream)+Reports.suppliesHtml(d,ctx.previous,state.settings,state.reportStream);
+    var source=named||d,overall=state.reportTopMode!=='subjects';
+    var html=topOnly?'':Reports.subjectsHtml(d,ctx.previous,state.settings,state.reportStream)+Reports.suppliesHtml(d,ctx.previous,state.settings,state.reportStream)+Reports.resultTablesHtml(d,state.settings,state.reportStream);
     if(!named)html+='<p>Student names are unavailable: attach the original workbook to this year. Anonymous result rankings follow.</p>';
-    html+=Reports.topsHtml(named||d,state.reportStream,topOnly?state.reportSubject:'');
+    if(topOnly)html+=overall?Reports.overallHtml(source,ctx.previous,state.settings,state.reportStream,state.reportOverallView):Reports.topsHtml(source,state.reportStream,state.reportSubject);
+    else html+=Reports.overallHtml(source,ctx.previous,state.settings,state.reportStream,'top')+Reports.topsHtml(source,state.reportStream,'');
     if(!topOnly)html+=Reports.notesHtml(d,state.reportNotes[d.id],false);
     var scope=ctx.groups.find(function(s){return s.key===state.reportStream;});
     var subtitle=(scope?scope.label:'All streams')+' · '+(d.assessment||'Assessment not recorded')+' · '+(d.grade_level||'Grade not recorded')+' · '+(ctx.previous?'Compared with '+ctx.previous.label:'Current year only')+' · Subject pass ≥ '+state.settings.pass+'%';
     html='<div class="yc-meeting-print">'+html+'</div>';
-    printReport('Year Comparison · '+(topOnly?'Subject Top 10':'Meeting report')+' · '+d.label,subtitle,html,{compact:true});
+    printReport('Year Comparison · '+(topOnly?(overall?(state.reportOverallView==='list'?'Overall complete list':'Overall Top 10'):'Subject Top 10'):'Meeting report')+' · '+d.label,subtitle,html,{compact:true});
   }
   function body(){
     var sel=selectedDatasets();
@@ -491,6 +510,10 @@
     }
     var subjectMetric=e.target.closest?e.target.closest('[data-subject-metric]'):null;
     if(subjectMetric){state.subjectMetric=subjectMetric.getAttribute('data-subject-metric');render();return;}
+    var topMode=e.target.closest?e.target.closest('[data-top-mode]'):null;
+    if(topMode){state.reportTopMode=topMode.getAttribute('data-top-mode')==='subjects'?'subjects':'overall';render();return;}
+    var overallView=e.target.closest?e.target.closest('[data-overall-view]'):null;
+    if(overallView){state.reportOverallView=overallView.getAttribute('data-overall-view')==='list'?'list':'top';render();return;}
     var reportTab=e.target.closest?e.target.closest('[data-report-tab]'):null;
     if(reportTab){state.reportTab=reportTab.getAttribute('data-report-tab');render();return;}
     var metricButton=e.target.closest?e.target.closest('[data-chart-metric]'):null;
@@ -502,6 +525,7 @@
     if(state.loading && ['add','attach','reload-file','del'].indexOf(act)>=0)return;
     if (act === 'add') { e.preventDefault(); state.attachTarget=null; var fi = $('ycFileInput'); if (fi) fi.click(); }
     else if (act === 'report-names') loadReportNames();
+    else if (act === 'download-tables') downloadTables();
     else if (act === 'print-meeting' || act === 'print-top') printMeetingReport(act==='print-top');
     else if (act === 'refresh' && !state.busy) loadDatasets();
     else if (act === 'checks') {state.view='quality';render();}
@@ -561,7 +585,7 @@
       state.selected.sort(function (a, b) { return order[a] - order[b]; });
       render();
     } else if (t.getAttribute && t.getAttribute('data-set')) {
-      var key = t.getAttribute('data-set'), v = key === 'basis' ? t.value : parseFloat(t.value);
+      var key = t.getAttribute('data-set'), v = key === 'basis' || key === 'marksBands' ? t.value : parseFloat(t.value);
       var next = Object.assign({}, state.settings); next[key] = v;
       state.settings = Core.settingsFrom(next);t.value=state.settings[key];saveSettings();render();
     }
@@ -696,9 +720,11 @@
     var html = P('Each year holds different students. Differences describe the groups, not individual progress, and no cause is implied.') + P(c.headline);
     html += reportSectionHtml('Headline', reportTableHtml(['Measure'].concat(a.map(function (x) { return x.label; })), [
       ['Students with marks, of those listed'].concat(a.map(function (x) { return x.pooled.withMarks + ' of ' + x.pooled.listed + ' (' + pct(x.pooled.coverage) + ')'; })),
-      ['Typical result (median)'].concat(a.map(function (x) { return pct(x.pooled.median); })),
-      ['Below ' + st.support + '% overall'].concat(a.map(function (x) { return pct(x.pooled.support.share) + ' (' + x.pooled.support.n + ' of ' + x.pooled.n + ')'; })),
-      [st.excellence + '% or above'].concat(a.map(function (x) { return pct(x.pooled.excellence.share) + ' (' + x.pooled.excellence.n + ' of ' + x.pooled.n + ')'; }))
+      ['Average result'].concat(a.map(function (x) { return pct(x.pooled.mean); })),
+      ['Pass percentage (passed every subject, of known results)'].concat(a.map(function (x) { return pct(Core.passRate(x.pooled)); })),
+      ['Needs support (below ' + st.support + '%)'].concat(a.map(function (x) { return pct(x.pooled.support.share) + ' (' + x.pooled.support.n + ' of ' + x.pooled.n + ')'; })),
+      ['Top results (' + st.excellence + '% or more)'].concat(a.map(function (x) { return pct(x.pooled.excellence.share) + ' (' + x.pooled.excellence.n + ' of ' + x.pooled.n + ')'; })),
+      ['Highest result'].concat(a.map(function (x) { return pct(x.pooled.highest); }))
     ]));
     html += reportSectionHtml('Findings', c.findings.map(function (f) {
       return '<div style="margin:0 0 10px;"><div style="font-weight:700;font-size:11.5px;">' + esc(f.title) + '. ' + esc(f.observation) + '</div>' +
@@ -707,8 +733,8 @@
         '<div style="font-size:10.5px;line-height:1.5;"><b>Next question:</b> ' + esc(f.next) + '</div></div>';
     }).join(''));
     html += reportSectionHtml('Comparison checks', reportTableHtml(['Check', 'Status', 'Detail'], c.checks.map(function (k) { return [k.label, k.status === 'ok' ? 'OK' : k.status === 'review' ? 'Review' : 'Note', k.detail]; })));
-    html += reportSectionHtml('By stream, ' + c.A.label + ' to ' + c.B.label, reportTableHtml(['Stream', 'Students', 'Median', 'Below ' + st.support + '%', st.excellence + '% or above'], c.streams.map(function (r) {
-      return [r.label, (r.a ? r.a.n : '—') + ' / ' + (r.b ? r.b.n : '—'), r.a && r.b ? pct(r.a.median) + ' → ' + pct(r.b.median) : '—', r.a && r.b ? pct(r.a.support.share) + ' → ' + pct(r.b.support.share) : '—', r.a && r.b ? pct(r.a.excellence.share) + ' → ' + pct(r.b.excellence.share) : '—'];
+    html += reportSectionHtml('By stream, ' + c.A.label + ' to ' + c.B.label, reportTableHtml(['Stream', 'Students counted', 'Average result', 'Needs support (below ' + st.support + '%)', 'Top results (' + st.excellence + '%+)'], c.streams.map(function (r) {
+      return [r.label, (r.a ? r.a.n : '—') + ' / ' + (r.b ? r.b.n : '—'), r.a && r.b ? pct(r.a.mean) + ' → ' + pct(r.b.mean) : '—', r.a && r.b ? pct(r.a.support.share) + ' → ' + pct(r.b.support.share) : '—', r.a && r.b ? pct(r.a.excellence.share) + ' → ' + pct(r.b.excellence.share) : '—'];
     })));
     printReport('Year Comparison: ' + a.map(function (x) { return x.label; }).join(', '), 'Cohort comparison · ' + (st.basis === 'complete' ? 'students with every subject scored' : 'students with marks, available-subject percentages'), html, { compact: true });
   }

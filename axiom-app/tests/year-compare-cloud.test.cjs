@@ -66,8 +66,8 @@ test('cleanup failures are surfaced rather than reported as fully cleaned',async
 function analysis(label,score){return Core.analyseDataset({label,assessment:'Annual',grade_level:'First year',streams:[{key:'PM',label:'PM',subjects:[{key:'M',name:'Math',max:100}]}],records:Array.from({length:12},(_,i)=>({i:String(i),st:'PM',c:[['s',score]]}))});}
 test('charts expose units, accessible data points and exact status counts',()=>{
   const a=analysis('2025',65),b=analysis('2026',85),cmp=Core.compareDatasets(a,b);
-  const html=Charts.trend([a,b],'median',Core.DEFAULTS)+Charts.distribution([a,b],Core.BAND_LABELS)+Charts.status(b)+Charts.streams(cmp)+Charts.subjects(cmp,'PM');
-  assert.equal((html.match(/<svg /g)||[]).length,5);assert.match(html,/0–100%/);assert.match(html,/data-yc-tip/);assert.match(html,/Pass confirmed/);assert.match(html,/12\/12/);
+  const html=Charts.trend([a,b],'mean',Core.DEFAULTS)+Charts.distribution([a,b],Core.BAND_LABELS)+Charts.status(b)+Charts.streams(cmp)+Charts.subjects(cmp,'PM');
+  assert.equal((html.match(/<svg /g)||[]).length,5);assert.match(html,/0–100%/);assert.match(html,/data-yc-tip/);assert.match(html,/Passed every subject/);assert.match(html,/12\/12/);
   assert.doesNotMatch(html,/NaN|Infinity/);
 });
 test('many years keep chart dimensions valid and labels are escaped',()=>{

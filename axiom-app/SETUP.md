@@ -263,8 +263,8 @@ Going live (parents)
 
 ## Year Comparison (compare yearly results as groups)
 
-Compares any number of years side by side: typical result, support need,
-breadth across streams, subject priorities and achievement. Each year holds
+Compares any number of years side by side: average result, pass percentage,
+students needing support, top results, breadth across streams and subject priorities. Each year holds
 different students, so every statement describes **groups**, never individual
 progress, and no cause is implied.
 
@@ -296,11 +296,13 @@ students do not see it.
    from cloud; saving that reimport reuses the original object, not a duplicate.
    Existing years without a source file show **Attach workbook**; attach the
    local original once. Their calculated results remain available meanwhile.
-4. The overview shows complete-result counts, median, support and excellence.
+4. The overview shows complete-result counts, average result, pass percentage,
+   needs support, top results and highest result.
    Purple comparison notes open the checks; they indicate differences in exam,
    subject, grade or coverage, not an application failure. Up to three insight
-   cards show a short metric; **Details** expands evidence and qualifications.
-   Charts include a year trend (median/support/excellence toggle), stacked score
+   cards show short metrics with visual evidence and hover definitions.
+   Charts include a year trend (average / needs support / top results; small
+   shares use a labelled zoomed scale such as 0–15%), stacked score
    bands, result-status donut, stream bars and subject bars with a stream filter.
    Hover or keyboard-focus data points for exact counts. Phone layouts adapt
    chart dimensions and reduced-motion preferences disable chart animation.
@@ -338,8 +340,11 @@ private and separate from the broader roster-files permissions.
   means not applicable. Marks above a paper's maximum are invalid and reported.
 - **Students listed with no marks at all** are counted separately (coverage),
   never as failures.
-- **Typical result** = median overall percentage of students with every applicable
-  subject scored. Incomplete results do not enter overall support, excellence
+- **Average result** = average overall percentage of students with every applicable
+  subject scored (a few very high or low results can pull an average). **Pass
+  percentage** = students who passed every subject, out of students whose result
+  is known; students with a missing or absent mark are not guessed at.
+  **Highest result** = best overall percentage among students counted. Incomplete results do not enter overall support, excellence
   or distribution by default. Available-subject mode instead uses earned / max
   over scored subjects and is explicitly labelled as exploratory.
 - **Support need** = overall percentage below the support threshold (default
@@ -369,8 +374,8 @@ email alerts. Storage access is enforced by migration 014's bucket policies.
 
 **Tests:** `node --test axiom-app/tests/*.test.cjs`
 
-**Reading the dashboard:** hover or focus the information buttons beside Typical
-result, Support need and Excellence for short definitions. Current thresholds
+**Reading the dashboard:** hover or focus the information buttons beside Average
+result, Pass percentage, Needs support, Top results and Highest result for short definitions. Current thresholds
 appear above the years; use **Settings** to change them. **Overview** shows the
 main changes with visual evidence, **Subjects** contains the subject map and
 paired evidence charts, **Support** shows pass outcomes and missing-result
@@ -386,12 +391,26 @@ preceding selected year. One selected year is enough for current-year reporting.
   pass/fail counts and percentages, absent/missing/exempt counts; previous/current
   subject comparison; and visual outcome and score-distribution cards. “Vista”
   is treated as a visual overview, not a separate board-defined formula.
-- **Top 10:** separate rankings for each subject within its stream. Competition
+- **Top 10 → Overall marks:** every subject added together, ranked within each
+  stream out of that stream's total marks (for example 555). **Top 10** or
+  **Complete list**, with a comparison to the previous year (highest result,
+  top-10 average including ties, 10th place when at least ten results exist, and average of everyone ranked). Only complete results
+  are ranked; students with a missing or absent subject are listed afterwards
+  without a rank. **By subject** keeps the per-subject rankings below.
+- **Top 10 → By subject:** separate rankings for each subject within its stream. Competition
   ranks include all students tied at rank 10, so a list can exceed ten rows.
   Use **Load student names** to read the private cloud workbook. Its sheet mapping,
   subject maxima and marks must match the saved snapshot before identities appear.
   Names/roll numbers remain in memory, never in anonymous `year_datasets` records.
   Old years without an attached workbook need an administrator to attach it first.
+- **School result tables:** your school's printed tables (%-age wise, marks-wise,
+  grade-wise) for the selected stream scope, with a Total column and Total Appeared in Exams.
+  **Download Excel** saves them as a formatted .xlsx (one sheet per table).
+  Marks bands (default 500, 450, 400, 350) are editable in Settings. Grades: A+ 80%+,
+  A 70–79, B 60–69, C 50–59, D 40–49, E 33–39; **F = any subject below the pass
+  mark** (inferred from the school's counts; confirm with the admin). With complete
+  results only, students with a missing subject are shown in an extra "not counted"
+  row so the total still equals students appeared.
 - **Supplies:** subject failures in both years plus distinct students with one,
   two, or three-plus recorded failed subjects. A student counts once in the total
   with any failure. Failure-count groups are minimum recorded counts when other
@@ -400,9 +419,10 @@ preceding selected year. One selected year is enough for current-year reporting.
   staff, never inferred. Drafts last for this browser tab only; include them in
   the printed report to retain a copy. They are not cloud-saved.
 
-**Print meeting report** includes the six numerical reports plus teacher notes.
+**Print meeting report** includes the numerical reports, the school result tables,
+the overall Top 10 and teacher notes.
 **Print Top 10 separately** respects its subject filter. The full report includes
-all subjects in the selected stream scope. If names are not loaded, printing reads
+all subjects and school tables in the selected stream scope; Excel uses the same scope. If names are not loaded, printing reads
 the workbook first. A source mismatch blocks named printing and asks for a reload.
 No new migrations, API keys or Edge Functions are required. Subject rates use
 scored subject results; student supplies rates use all listed students. Missing
@@ -415,3 +435,8 @@ workbooks and a local page with mocked Supabase storage, never production
 credentials or real student records. It covers import validation, confirmation,
 anonymous save/reload, denominators, settings, print inputs and role controls.
 Database RLS and real workbook compatibility still require a staging check.
+
+**Plain wording (this revision):** median, lower quarter and middle 50% no longer
+appear anywhere. Narrow chart segments always have their number written out.
+Tests: `node --test axiom-app/tests/*.test.cjs`; browser:
+`PLAYWRIGHT_CHANNEL=chromium node axiom-app/tests/year-compare-browser.cjs`.

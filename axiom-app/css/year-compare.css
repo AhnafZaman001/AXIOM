@@ -175,3 +175,13 @@
  .yc-meeting-print .yc-vista,.yc-meeting-print .yc-vista-grid>.yc-card{break-inside:avoid}.yc-meeting-print .yc-report-caption{font-size:9px}
  .yc-meeting-print .yc-report-stack{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 }
+/* School-format result tables (screen, print and Excel use the same layout) */
+.yc-school{max-width:640px;margin-left:auto;margin-right:auto}
+.yc-school th,.yc-school td{text-align:center;border:1px solid var(--line);padding:8px 10px}
+.yc-school th:first-child,.yc-school td:first-child{text-align:left;font-weight:700}
+.yc-school .yc-school-total{font-weight:700}
+.yc-school .yc-school-foot th,.yc-school .yc-school-foot td{font-weight:700;background:color-mix(in srgb,var(--line) 60%,transparent)}
+.yc-chart-note,.yc-svg .yc-stack-counts{font-size:.74rem;color:var(--muted);line-height:1.5}
+.yc-chart-note{margin:8px 4px 0}
+.yc-svg .yc-stack-counts{font-size:12px}
+@media print{.yc-school{max-width:none}}

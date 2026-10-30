@@ -43,9 +43,9 @@ const server=http.createServer((req,res)=>{
         maybeSingle(){return Promise.resolve({data:null});},
         then(resolve){if(op==='delete')yearStore=yearStore.filter(d=>d.id!==id);return Promise.resolve({data:structuredClone(yearStore)}).then(resolve);}
       };return q;}};
-      </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare-storage.js"></script><script src="/js/year-compare-charts.js"></script><script src="/js/year-compare-reports.js"></script><script src="/js/year-compare.js"></script></body></html>`);
+      </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare-storage.js"></script><script src="/js/year-compare-charts.js"></script><script src="/js/year-compare-reports.js"></script><script src="/js/year-compare-export.js"></script><script src="/js/year-compare.js"></script></body></html>`);
   }
-  const files={'/js/year-compare-reports.js':'js/year-compare-reports.js','/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare-storage.js':'js/year-compare-storage.js','/js/year-compare-charts.js':'js/year-compare-charts.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/css/year-compare.css':'css/year-compare.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
+  const files={'/js/year-compare-reports.js':'js/year-compare-reports.js','/js/year-compare-export.js':'js/year-compare-export.js','/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare-storage.js':'js/year-compare-storage.js','/js/year-compare-charts.js':'js/year-compare-charts.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/css/year-compare.css':'css/year-compare.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
   if(!files[url.pathname]){res.writeHead(404);return res.end();}
   res.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');
   res.end(fs.readFileSync(path.join(root,files[url.pathname])));
@@ -58,6 +58,8 @@ const server=http.createServer((req,res)=>{
     browser=await chromium.launch({channel:process.env.PLAYWRIGHT_CHANNEL||'chrome',headless:true});
     const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
+    const JARGON=/median|quartile|lower quarter|middle 50|typical result|eligible overall/i;
+    const assertPlain=async label=>assert.doesNotMatch(await page.locator('#ycBody').innerText(),JARGON,'plain wording: '+label);
     const origin='http://127.0.0.1:'+server.address().port;
     await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
     await page.goto(origin);
@@ -99,24 +101,30 @@ const server=http.createServer((req,res)=>{
     assert.match(await page.locator('.yc-overview').innerText(),/9 \/ 12/);
     assert.doesNotMatch(await page.locator('.section-title').innerText(),/results compared as groups/);
     assert.equal(await page.locator('.yc-trend').count(),1);
+    await assertPlain('overview');
+    assert.match(await page.locator('.yc-overview').innerText(),/Average result[\s\S]*Pass percentage[\s\S]*Needs support[\s\S]*Top results[\s\S]*Highest result/);
     assert.equal(await page.locator('#ycBody details').count(),0,'no FAQ-style drawers or hidden narrative findings');
-    assert.match(await page.locator('.yc-terms').innerText(),/Support < 50%/);
-    await page.getByRole('button',{name:'Define typical result',exact:true}).hover();
-    assert.match(await page.locator('#ycChartTooltip').innerText(),/median overall percentage/);
-    await page.getByRole('button',{name:'Define support need',exact:true}).focus();
+    assert.match(await page.locator('.yc-terms').innerText(),/Needs support: below 50%/);
+    await page.getByRole('button',{name:'Define average result',exact:true}).hover();
+    assert.match(await page.locator('#ycChartTooltip').innerText(),/average overall percentage/);
+    await page.getByRole('button',{name:'Define needs support',exact:true}).focus();
     assert.match(await page.locator('#ycChartTooltip').innerText(),/below 50%/);
     await page.locator('[data-chart-metric="support"]').click();
     assert.equal(await page.locator('[data-chart-metric="support"]').getAttribute('aria-pressed'),'true');
     await page.locator('.yc-point').first().focus();
     assert.match(await page.locator('#ycChartTooltip').innerText(),/2025/);
     await page.locator('.yc-view-nav [data-view="support"]').click();
-    assert.equal(await page.locator('[data-yc-tip*="Recorded below pass: 1 of 12"]').count(),1);
+    await assertPlain('support');
+    assert.match(await page.locator('.yc-chart:has-text("Subject pass outcomes") .yc-stack-counts').first().textContent(),/failed at least one subject/,'every pass-outcome count is written out, even for narrow segments');
+    assert.equal(await page.locator('[data-yc-tip*="Failed at least one subject: 1 of 12"]').count(),1);
     assert.equal(await page.locator('[data-yc-tip*="3 incomplete overall results"]').count(),1);
     await page.locator('.yc-view-nav [data-view="subjects"]').click();
+    await assertPlain('subjects');
     assert.equal(await page.locator('.yc-map tbody tr').count(),2);
     await page.locator('[data-subject-metric="belowShare"]').click();
     assert.match(await page.locator('.yc-map-cell[data-yc-tip*="2026 · PM Math"]').getAttribute('data-yc-tip'),/1 of 11 scored/);
     await page.locator('.yc-view-nav [data-view="quality"]').click();
+    await assertPlain('quality');
     assert.equal(await page.locator('[data-yc-tip*="Partial: 2 of 12"]').count(),1);
     assert.equal(await page.locator('.yc-check-grid').count(),1);
     await page.locator('.yc-view-nav [data-view="overview"]').click();
@@ -131,11 +139,34 @@ const server=http.createServer((req,res)=>{
     await page.locator('[data-act="report-names"]').click();
     await page.waitForFunction(()=>document.querySelector('.yc-meeting-reports').textContent.includes('Synthetic'));
     assert.doesNotMatch(await page.evaluate(()=>JSON.stringify(yearStore)),/Synthetic/,'named reports must not modify snapshots');
+    const topText=await page.locator('.yc-meeting-reports').innerText();
+    assert.match(topText,/Overall marks/);assert.match(topText,/overall marks · Top 10/);assert.match(topText,/Marks \(out of \d+\)/);
+    assert.match(topText,/Synthetic/,'overall Top 10 shows the loaded names');
+    await assertPlain('top 10 overall');
+    await page.locator('[data-overall-view="list"]').click();
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/overall marks · complete list/);
+    assert.match(await page.locator('.yc-meeting-reports').innerText(),/Incomplete: \d+ of \d+ subjects/,'incomplete students are listed after the ranked ones, without a rank');
+    await page.locator('[data-act="print-top"]').click();
+    assert.match(await page.evaluate(()=>printed.title),/Overall complete list/);
+    assert.match(await page.evaluate(()=>printed.html),/Synthetic/);
+    await page.locator('[data-overall-view="top"]').click();
+    await page.locator('[data-act="print-top"]').click();
+    assert.match(await page.evaluate(()=>printed.title),/Overall Top 10/);
+    await page.locator('[data-top-mode="subjects"]').click();
     await page.locator('[data-report-subject]').selectOption({label:'Math'});
     await page.locator('[data-act="print-top"]').click();
     assert.match(await page.evaluate(()=>printed.title),/Subject Top 10/);
     assert.match(await page.evaluate(()=>printed.html),/Synthetic/);
     assert.doesNotMatch(await page.evaluate(()=>printed.html),/Teacher observations/);
+    await page.locator('[data-report-tab="tables"]').click();
+    const tablesText=await page.locator('.yc-meeting-reports').innerText();
+    for(const value of ['%AGE WISE RESULT','MARKS WISE RESULT','GRADE WISE RESULT','Total Appeared in Exams','90% -> 100%','A+'])assert.ok(tablesText.includes(value),value);
+    await assertPlain('school tables');
+    const [tablesDownload]=await Promise.all([page.waitForEvent('download'),page.locator('[data-act="download-tables"]').click()]);
+    assert.match(tablesDownload.suggestedFilename(),/^Result-tables-.*\.xlsx$/);
+    const savedPath=await tablesDownload.path(),xlsx=fs.readFileSync(savedPath);
+    assert.equal(xlsx.slice(0,2).toString(),'PK','a real zip container');assert.ok(xlsx.length>1500);
+    fs.copyFileSync(savedPath,process.env.AXIOM_XLSX_OUT||path.join(require('node:os').tmpdir(),'axiom-result-tables.xlsx'));
     await page.locator('[data-report-tab="supplies"]').click();
     assert.match(await page.locator('.yc-meeting-reports').innerText(),/1 \/ 12 \(8.3%\)/);
     await page.locator('[data-report-tab="notes"]').click();
@@ -145,7 +176,8 @@ const server=http.createServer((req,res)=>{
     await page.locator('[data-act="print-meeting"]').click();
     const meeting=await page.evaluate(()=>printed);
     assert.match(meeting.title,/Meeting report/);
-    for(const value of ['Subject vista','subject supplies','Synthetic','Teacher-entered faculty observation','Teacher-entered subject explanation'])assert.ok(meeting.html.includes(value),value);
+    for(const value of ['Subject vista','subject supplies','Synthetic','Teacher-entered faculty observation','Teacher-entered subject explanation','GRADE WISE RESULT','overall marks'])assert.ok(meeting.html.includes(value),value);
+    assert.doesNotMatch(meeting.html,JARGON,'printed meeting report uses plain wording');
     await page.evaluate(()=>{AxiomYearCompare._state.namedYears={};window.printed=null;});
     await page.locator('[data-act="print-meeting"]').click();
     await page.waitForFunction(()=>window.printed&&printed.html.includes('Synthetic'));
@@ -155,7 +187,9 @@ const server=http.createServer((req,res)=>{
       await page.locator('[data-report-tab="top"]').click();
       await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-top10.png'),fullPage:true});
       await page.setViewportSize({width:390,height:844});
-      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-meeting-mobile.png'),fullPage:true});
+      await page.waitForFunction(()=>AxiomYearCompare._state.compact===true);
+      await page.locator('[data-top-mode="subjects"]').waitFor({state:'visible'});
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-meeting-mobile.png'),fullPage:true,animations:'disabled'});
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'meeting reports must not overflow mobile');
       await page.setViewportSize({width:1440,height:1000});
       await page.locator('[data-report-tab="subjects"]').click();
@@ -171,11 +205,11 @@ const server=http.createServer((req,res)=>{
     await page.locator('[data-act="settings"]').click();
     await page.locator('#ycSettings [data-set="support"]').fill('60');
     await page.locator('#ycSettings [data-set="support"]').press('Tab');
-    assert.match(await page.locator('.yc-terms').innerText(),/Support < 60%/);
+    assert.match(await page.locator('.yc-terms').innerText(),/Needs support: below 60%/);
     await page.locator('#ycSettings [data-act="reset"]').click();
     await page.locator('#ycSettings [data-set="basis"]').selectOption('marked');
     await page.locator('[data-act="close-settings"]').click();
-    assert.equal(await page.locator('.yc-overview [title="11 of 12 listed students"]').count(),1);
+    assert.equal(await page.locator('.yc-overview [title="11 of 12 listed students counted"]').count(),1);
     // Reopen from saved data, not the current screen's in-memory selection.
     await page.evaluate(()=>{AxiomYearCompare._state.loaded=false;AxiomYearCompare.open();});
     await page.waitForFunction(()=>AxiomYearCompare._state.loaded);
@@ -230,7 +264,7 @@ const server=http.createServer((req,res)=>{
           }));
           return {id:'preview-'+year,label:year+'-'+String(year+1).slice(-2),assessment:'Annual exam',grade_level:'First year',streams,records,source_file:'Synthetic results.xlsx',source_path:'preview/'+year+'.xlsx'};
         });
-        yearStore=ds;AxiomYearCompare._state.datasets=ds;AxiomYearCompare._state.selected=ds.map(d=>d.id);AxiomYearCompare._state.chartMetric='median';AxiomYearCompare._state.view='overview';AxiomYearCompare._state.loaded=false;AxiomYearCompare.open();
+        yearStore=ds;AxiomYearCompare._state.datasets=ds;AxiomYearCompare._state.selected=ds.map(d=>d.id);AxiomYearCompare._state.chartMetric='mean';AxiomYearCompare._state.view='overview';AxiomYearCompare._state.loaded=false;AxiomYearCompare.open();
       });
       await page.waitForFunction(()=>AxiomYearCompare._state.loaded);
       await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-preview.png'),fullPage:true});
@@ -243,6 +277,12 @@ const server=http.createServer((req,res)=>{
       await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-support.png'),fullPage:true});
       await page.locator('.yc-view-nav [data-view="quality"]').click();
       await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-quality.png'),fullPage:true});
+      await page.locator('.yc-view-nav [data-view="reports"]').click();
+      await page.locator('[data-report-tab="tables"]').click();
+      await page.locator('[data-report-stream]').selectOption('ICS');
+      const headers=await page.locator('.yc-school').first().locator('thead').innerText();
+      assert.match(headers,/ICS/);assert.doesNotMatch(headers,/PM|PE/);
+      await page.screenshot({path:process.env.AXIOM_SCREENSHOT.replace('.png','-school-tables.png'),fullPage:true,animations:'disabled'});
     }
     for(const role of ['hod','teacher','student']){
       await page.goto(origin+'/?role='+role);
