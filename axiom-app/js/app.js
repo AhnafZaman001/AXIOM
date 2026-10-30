@@ -1376,14 +1376,18 @@ function rosterTestHeadHtml(store, subj, testNames, sortState){
     return sortableThHtml(tn, `__test|${subj}|${tn}`, sortState, extra);
   }).join('');
 }
+function axPillHtml(t, z){
+  if(!t) return '<span class="zone-pill none" title="No result">&mdash;</span>';
+  if(t.absent) return `<span class="zone-pill grey" title="Absent">A</span>`;
+  const tip = `${escapeHtml(t.test||'')}: ${(t.obtained!=null&&t.max!=null)?t.obtained+'/'+t.max+' · ':''}${t.percent}%`;
+  return `<span class="zone-pill ${z||'none'}" title="${tip}">${t.percent==null?'&mdash;':Math.round(t.percent)}</span>`;
+}
 function rosterTestCellsHtml(st, subj, testNames){
   const arr = (st.tests||{})[subj] || [];
   return testNames.map(tn=>{
     const t = arr.find(x=>x.test===tn) || null;
     const z = t ? zoneOf(t.percent, t.absent) : null;
-    const marks = (t && t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max} ` : '';
-    const label = t ? (t.absent ? 'Absent' : `${marks}(${t.percent}%)`) : '—';
-    return `<td class="zone-cell"><span class="zone-pill ${z||'none'}">${zoneDotHtml(z)}${label}</span></td>`;
+    return `<td class="zone-cell">${axPillHtml(t, z)}</td>`;
   }).join('');
 }
 // Printed-roster table (headers + rows) that mirrors the on-screen roster exactly.
@@ -1505,6 +1509,57 @@ function subjectClassAverage(store, subj){
   return vals.length ? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : null;
 }
 
+
+/* ---- Roster (mockup): Change column, class-average row, zone chips with counts ---- */
+function axDeltaHtml(d){
+  if(d==null || Number.isNaN(d)) return '<td class="ax-change flat">&mdash;</td>';
+  const r = Math.round(d);
+  return `<td class="ax-change ${d>0?'up':d<0?'down':'flat'}">${d>0?'&#9650;':d<0?'&#9660;':'&bull;'} ${Math.abs(r)}</td>`;
+}
+function axChangeCellHtml(st, def, subjFilter, perTest){
+  if(perTest){
+    const att = ((st.tests||{})[subjFilter]||[]).filter(t=>t && !t.absent && t.percent!=null);
+    return axDeltaHtml(att.length>=2 ? att[att.length-1].percent - att[att.length-2].percent : null);
+  }
+  return axDeltaHtml(studentOverallTrend(st, def));
+}
+function axAverageRowHtml(store, def, subjFilter, perTest, subjectsShown, testNames){
+  const extra = showExtra ? '<td class="extra-detail"></td><td class="extra-detail"></td><td class="extra-detail"></td>' : '';
+  let cells = '', change = '<td class="ax-change flat">&mdash;</td>';
+  if(perTest){
+    const avgs = testNames.map(tn=>rosterTestAverage(store, subjFilter, tn));
+    cells = avgs.map(a=>`<td>${a==null?'&mdash;':Math.round(a)}</td>`).join('');
+    const known = avgs.filter(a=>a!=null);
+    if(known.length>=2) change = axDeltaHtml(known[known.length-1]-known[known.length-2]);
+  } else {
+    cells = subjectsShown.map(sj=>{ const a = subjectClassAverage(store, sj); return `<td>${a==null?'&mdash;':Math.round(a)}</td>`; }).join('');
+  }
+  return `<tr class="ax-avg-row"><td class="name-cell">Class average</td>${extra}${cells}${change}</tr>`;
+}
+function axRenderZoneSeg(def, store, subjFilter){
+  const seg = document.getElementById('svZoneSeg'); if(!seg) return;
+  const zoneSel = document.getElementById('zoneFilter').value;
+  const counts = {green:0, blue:0, yellow:0, pink:0, red:0, grey:0};
+  store.students.forEach(st=>{
+    if(searchQuery && !st.name.toLowerCase().includes(searchQuery)) return;
+    if(quickFilter && !studentMatchesQuick(st, def, quickFilter)) return;
+    const seen = new Set();
+    (subjFilter ? [subjFilter] : def.subjects).forEach(sj=>{
+      const t = latestTest(st, sj); if(!t) return;
+      const z = zoneOf(t.percent, t.absent); if(z && counts.hasOwnProperty(z)) seen.add(z);
+    });
+    seen.forEach(z=>counts[z]++);
+  });
+  const chip = (val, label, n, dot) => `<button type="button" class="ax-zchip${zoneSel===val?' active':''}" data-zone="${val}" aria-pressed="${zoneSel===val}">${dot?`<i class="ax-dot" style="background:${axZoneColor(dot)}"></i>`:''}${label}${n==null?'':` <span>${n}</span>`}</button>`;
+  seg.innerHTML = chip('', 'All zones', null, '') + chip('green','90+',counts.green,'green') + chip('blue','80\u201389',counts.blue,'blue') + chip('yellow','70\u201379',counts.yellow,'yellow') + chip('pink','60\u201369',counts.pink,'pink') + chip('red','Below 60',counts.red,'red') + chip('grey','Absent',counts.grey,'grey');
+}
+document.getElementById('svZoneSeg').addEventListener('click', (e)=>{
+  const b = e.target.closest('[data-zone]'); if(!b) return;
+  const sel = document.getElementById('zoneFilter');
+  sel.value = b.getAttribute('data-zone');
+  sel.dispatchEvent(new Event('change', {bubbles:true}));
+});
+
 let mainTableSort = { key: null, dir: 'desc' };
 function renderTable(){
   const def = currentSectionDef();
@@ -1531,9 +1586,13 @@ function renderTable(){
       headHtml += sortableThHtml(s, s, mainTableSort, extra);
     });
   }
+  headHtml += '<th class="ax-th-change">Change</th>';
   head.innerHTML = headHtml;
 
   const students = sortStudentsBy(store.students.filter(s=>studentPassesFilters(s, def)), def, mainTableSort, {positionSubject: subjFilter});
+  const svSub = document.getElementById('svSubtitle');
+  if(svSub) svSub.textContent = `${def.label} · ${subjFilter||'All subjects'} · ${students.length} of ${store.students.length} student${store.students.length===1?'':'s'} shown`;
+  axRenderZoneSeg(def, store, subjFilter);
 
   renderHeroMetrics(def, store);
 
@@ -1555,7 +1614,7 @@ function renderTable(){
   }
 
   body.innerHTML = students.map(st=>{
-    let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}${escapeHtml(st.name)}</td>`;
+    let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}<span class="ax-who"><b>${escapeHtml(st.name)}</b>${st.rollNo!=null&&st.rollNo!==''?`<small>Roll ${escapeHtml(st.rollNo)}</small>`:''}</span></td>`;
     row += rosterExtraCellsHtml(st, def, subjFilter);
     if(perTest) row += rosterTestCellsHtml(st, subjFilter, testNames);
     (perTest ? [] : subjectsShown).forEach(subj=>{
@@ -1585,29 +1644,11 @@ function renderTable(){
         row += `<td class="zone-cell"><span class="zone-pill none">—</span></td>`;
         return;
       }
-      const marksPart = (t && t.obtained!=null && t.max!=null) ? `${t.obtained}/${t.max} ` : '';
-      const pillLabel = t ? (t.absent ? 'Absent' : `${marksPart}(${t.percent}%)`) : '—';
-      let trendTag = '';
-      if(arr.length >= 2){
-        const prev = arr[arr.length-2];
-        if(t && !t.absent && prev && !prev.absent && t.percent!=null && prev.percent!=null){
-          const d = Math.round((t.percent - prev.percent)*10)/10;
-          if(d > 0) trendTag = `<span class="delta-tag up">▲+${d}</span>`;
-          else if(d < 0) trendTag = `<span class="delta-tag down">▼${d}</span>`;
-          else trendTag = `<span class="delta-tag flat">·0</span>`;
-        }
-      }
-      const dots = arr.map(tt=>{
-        const zz = zoneOf(tt.percent, tt.absent);
-        return `<span class="d ${zz||'none'}" title="${escapeHtml(tt.test)}: ${tt.absent?'Absent':(tt.percent+'%')}"></span>`;
-      }).join('');
-      row += `<td class="zone-cell">
-        <span class="zone-pill ${z||'none'}">${zoneDotHtml(z)}${pillLabel}</span>${trendTag}
-        <div class="trend-dots">${dots}</div>
-      </td>`;
+      row += `<td class="zone-cell">${axPillHtml(t, z)}</td>`;
     });
+    row += axChangeCellHtml(st, def, subjFilter, perTest);
     return `<tr data-sid="${st.id}">${row}</tr>`;
-  }).join('');
+  }).join('') + axAverageRowHtml(store, def, subjFilter, perTest, subjectsShown, testNames);
 
   renderTransitionCards(def, store);
   renderCharts(def, store);
@@ -2624,11 +2665,12 @@ function studentOverallTrend(st, def){
   return Math.round((delta/n)*10)/10;
 }
 
-function collectOverallRoster(){
+function collectOverallRoster(groupKey){
   // {students:[{name,id,sectionKey,sectionLabel,def,st,overall}], sections:[{def,store,avg,passRate,students,top}]}
   const students = [];
   const sections = [];
   SECTION_DEFS.forEach(def=>{
+    if(groupKey && def.group!==groupKey) return;
     const store = workspace.sections[def.key];
     if(!store || !store.students.length) return;
     let sumAvg=0, cntAvg=0, passCount=0, passTotal=0, top=null;
@@ -2655,10 +2697,11 @@ function collectOverallRoster(){
   return {students, sections};
 }
 
-function subjectWiseToppers(){
+function subjectWiseToppers(groupKey){
   // subject name -> best {name, score, percent, sectionLabel}
   const bySubject = {};
   SECTION_DEFS.forEach(def=>{
+    if(groupKey && def.group!==groupKey) return;
     const store = workspace.sections[def.key];
     if(!store) return;
     def.subjects.forEach(subj=>{
@@ -2674,54 +2717,115 @@ function subjectWiseToppers(){
   return bySubject;
 }
 
-function renderOverallSummary(){
-  const {students, sections} = collectOverallRoster();
-  const totalStudents = students.length;
-  const totalSubjects = new Set(SECTION_DEFS.flatMap(d=>d.subjects)).size;
-  const overallAvgAll = totalStudents ? Math.round((students.reduce((a,b)=>a+b.overall,0)/totalStudents)*10)/10 : null;
-  const highest = students.reduce((m,s)=>(!m||s.overall>m.overall)?s:m, null);
-  const critical = students.filter(s=>s.overall!=null && s.overall<50);
-  const exceptional = students.filter(s=>s.overall!=null && s.overall>=90);
-  const passCount = students.filter(s=>s.overall!=null && s.overall>=50).length;
-  const passRateAll = totalStudents ? Math.round((passCount/totalStudents)*1000)/10 : null;
+/* ===================== MOCKUP-STYLE SUMMARY SCREENS =====================
+   Overall Summary + Section Summary follow the approved mockups: figures in a
+   single row, plain lists instead of boxed tiles, one donut, simple charts.
+   Colour tokens (--ax-*) live in css/refresh.css. Year Comparison is untouched. */
+const AX_GROUP_LABEL = {PM:'Pre-Medical', PE:'Pre-Engineering', ICS:'ICS', ICOM:'I.Com'};
+const AX_ZONE_TEXT = {green:'90%+', blue:'80–89%', yellow:'70–79%', pink:'60–69%', red:'below 60%'};
+const AX_SUBJECT_COLORS = ['var(--ax-cyan)','var(--ax-lilac)','var(--ax-blue)','var(--ax-green)','var(--ax-pink)','var(--ax-yellow)','var(--ax-orange)'];
+let OS_GROUP = 'all';
+let SS_METRIC = 'avg';
+let AX_SS_CTX = null;
+function axZoneColor(key){ return {green:'var(--ax-green)',blue:'var(--ax-blue)',yellow:'var(--ax-yellow)',pink:'var(--ax-pink)',red:'var(--ax-red)',grey:'var(--muted)'}[key] || 'var(--muted)'; }
+function axRound1(x){ return Math.round(x*10)/10; }
+function axShortSection(label){ return String(label||'').replace(/\s+—\s+/g,' '); }
+// The test most students' latest result belongs to, e.g. "Test 6".
+function axLatestTestLabel(defs){
+  const tally = {};
+  defs.forEach(def=>{
+    const store = workspace.sections[def.key]; if(!store) return;
+    store.students.forEach(st=>def.subjects.forEach(subj=>{
+      const t = latestTest(st, subj); if(t && t.test!=null) tally[t.test] = (tally[t.test]||0)+1;
+    }));
+  });
+  const keys = Object.keys(tally).sort((a,b)=>tally[b]-tally[a]);
+  return keys.length ? keys[0] : null;
+}
+function axDonutSvg(parts, total){
+  const r = 62, c = 2*Math.PI*r; let offset = 0, body = '';
+  parts.forEach(p=>{
+    if(!p.count || !total) return;
+    const len = p.count/total*c, dur = (len/c*0.9).toFixed(3), delay = (offset/c*0.9 + 0.15).toFixed(3);
+    body += `<circle class="ax-arc" cx="100" cy="100" r="${r}" fill="none" stroke="${p.color}" stroke-width="20" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 100 100)" style="--len:${len};--rest:${c-len};--c:${c};--dur:${dur}s;--delay:${delay}s"><title>${escapeHtml(p.label)}: ${p.count}</title></circle>`;
+    offset += len;
+  });
+  if(!total) body = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="var(--line)" stroke-width="20"/>`;
+  return `<svg class="ax-donut" viewBox="0 0 200 200" role="img" aria-label="Students by performance zone">${body}<text x="100" y="98" text-anchor="middle" class="ax-donut-n">${total}</text><text x="100" y="118" text-anchor="middle" class="ax-donut-l">students</text></svg>`;
+}
 
-  document.getElementById('osQuickStats').innerHTML = totalStudents === 0 ? `
-    <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value">0</div></div>
-  ` : `
-    <div class="hero-metric"><div class="hm-label">Total Students</div><div class="hm-value" data-count="${totalStudents}">0</div></div>
-    <div class="hero-metric"><div class="hm-label">Total Subjects</div><div class="hm-value" data-count="${totalSubjects}">0</div></div>
-    <div class="hero-metric accent"><div class="hm-label">Overall Average</div><div class="hm-value" data-count="${overallAvgAll}" data-suffix="%">0%</div></div>
-    <div class="hero-metric gold"><div class="hm-label">Highest Percentage</div><div class="hm-value small">${highest?`${escapeHtml(highest.name)} (${highest.overall}%)${rollSectionTag(highest.rollNo, highest.sectionLabel)}`:'—'}</div></div>
-    <div class="hero-metric warn clickable" data-filter="critical"><div class="hm-label">Critical Students</div><div class="hm-value" data-count="${critical.length}">0</div></div>
-    <div class="hero-metric good clickable" data-filter="exceptional"><div class="hm-label">Exceptional Students</div><div class="hm-value" data-count="${exceptional.length}">0</div></div>
-    <div class="hero-metric good"><div class="hm-label">Pass Rate</div><div class="hm-value" ${passRateAll!=null?`data-count="${passRateAll}" data-suffix="%"`:''}>${passRateAll!=null?'0%':'—'}</div></div>
-    <div class="hero-metric warn"><div class="hm-label">Failure Rate</div><div class="hm-value" ${passRateAll!=null?`data-count="${Math.round((100-passRateAll)*10)/10}" data-suffix="%"`:''}>${passRateAll!=null?'0%':'—'}</div></div>
-  `;
+function renderOverallSummary(){
+  const defsWithData = SECTION_DEFS.filter(d=>workspace.sections[d.key] && workspace.sections[d.key].students.length);
+  const groupsPresent = ['PM','PE','ICS','ICOM'].filter(g=>defsWithData.some(d=>d.group===g));
+  if(OS_GROUP!=='all' && !groupsPresent.includes(OS_GROUP)) OS_GROUP = 'all';
+  const seg = document.getElementById('osGroupSeg');
+  seg.style.display = groupsPresent.length>1 ? '' : 'none';
+  seg.innerHTML = [['all','All sections']].concat(groupsPresent.map(g=>[g, AX_GROUP_LABEL[g]||g])).map(([k,l])=>
+    `<button type="button" data-os-group="${k}" class="${OS_GROUP===k?'active':''}">${escapeHtml(l)}</button>`).join('');
+  const groupKey = OS_GROUP==='all' ? null : OS_GROUP;
+
+  const {students, sections} = collectOverallRoster(groupKey);
+  const totalStudents = students.length;
+  const defsShown = groupKey ? defsWithData.filter(d=>d.group===groupKey) : defsWithData;
+  const totalSubjects = new Set(defsShown.flatMap(d=>d.subjects)).size;
+  const overallAvgAll = totalStudents ? axRound1(students.reduce((a,b)=>a+b.overall,0)/totalStudents) : null;
+  const highest = students.reduce((m,s)=>(!m||s.overall>m.overall)?s:m, null);
+  const exceptional = students.filter(s=>s.overall>=90);
+  const passCount = students.filter(s=>s.overall>=50).length;
+  const passRateAll = totalStudents ? axRound1(passCount/totalStudents*100) : null;
+  const attention = students.filter(s=>s.overall<60 || (s.trend!=null && s.trend<=-10));
+  const trends = students.map(s=>s.trend).filter(t=>t!=null);
+  const avgTrend = trends.length ? axRound1(trends.reduce((a,b)=>a+b,0)/trends.length) : null;
+  const rankedSections = sections.slice().filter(s=>s.avg!=null).sort((a,b)=>b.avg-a.avg);
+  const latest = axLatestTestLabel(defsShown);
+
+  document.getElementById('osSubtitle').textContent =
+    `${groupKey ? (AX_GROUP_LABEL[groupKey]||groupKey)+' · ' : 'All '}${sections.length} section${sections.length===1?'':'s'}${latest?` · results through ${latest}`:''}`;
+
+  const kpi = (label, value, desc, note, extra='') => `<div class="ax-kpi ${extra}"><div class="ax-kpi-label">${label}</div><div class="ax-kpi-value">${value}</div><div class="ax-kpi-desc">${desc}</div>${note||''}</div>`;
+  document.getElementById('osQuickStats').innerHTML = totalStudents===0 ? kpi('Students tracked','0','Import results to see the overall dashboard.','') : [
+    kpi('Overall average', `<span data-count="${overallAvgAll}" data-suffix="%">0%</span>`, groupKey?'Across the selected stream':'Across all active sections',
+      avgTrend==null ? '<div class="ax-kpi-note muted">—</div>' : `<div class="ax-kpi-note ${avgTrend>=0?'up':'down'}">${avgTrend>=0?'+':'−'}${Math.abs(avgTrend)} pts since last test</div>`),
+    kpi('Students tracked', `<span data-count="${totalStudents}">0</span>`, 'With at least one result', `<div class="ax-kpi-note lilac">${sections.length} section${sections.length===1?'':'s'} active</div>`),
+    kpi('Need attention', `<span data-count="${attention.length}">0</span>`, 'Below 60% or down 10+ points', '<div class="ax-kpi-note warn">Review list</div>', 'clickable" data-filter="attention'),
+    kpi('Top section', rankedSections[0]?escapeHtml(axShortSection(rankedSections[0].def.label)):'—', rankedSections[0]?`${rankedSections[0].avg}% average`:'No section data yet', rankedSections[0]?`<div class="ax-kpi-note up">Highest of ${rankedSections.length}</div>`:'', 'text')
+  ].join('');
   animateCounters(document.getElementById('osQuickStats'));
 
-  // Top 10 overall
+  document.getElementById('osFacts').innerHTML = totalStudents ? [
+    passRateAll!=null?`Pass rate <b>${passRateAll}%</b>`:'', passRateAll!=null?`Failure rate <b>${axRound1(100-passRateAll)}%</b>`:'',
+    `<b>${totalSubjects}</b> subject${totalSubjects===1?'':'s'}`,
+    highest?`Highest: <b>${escapeHtml(highest.name)}</b> (${highest.overall}%)`:'',
+    `<b>${exceptional.length}</b> with 90%+`
+  ].filter(Boolean).join(' <span class="ax-sep">·</span> ') : '';
+
+  // Top students: a plain list, not a card
   const ranked = students.slice().sort((a,b)=>b.overall-a.overall).slice(0,10);
-  document.getElementById('osTopStudentsBody').innerHTML = ranked.length ? ranked.map((s,i)=>{
-    const trendTag = s.trend==null ? '<span class="delta-tag flat">—</span>' :
-      s.trend>0 ? `<span class="delta-tag up">▲+${s.trend}</span>` :
-      s.trend<0 ? `<span class="delta-tag down">▼${s.trend}</span>` : `<span class="delta-tag flat">·0</span>`;
-    return `<tr data-sid="${s.id}" data-skey="${s.sectionKey}"><td>${i+1}</td><td class="name-cell">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` <span class="extra-detail">(Roll ${escapeHtml(s.rollNo)})</span>`:''}</td><td>${escapeHtml(s.sectionLabel)}</td>
-      <td><span class="zone-pill ${zoneOf(s.overall,false)}">${s.overall}%</span></td><td>${s.obtained!=null&&s.max!=null?`${s.obtained} / ${s.max}`:'—'}</td><td>${gradeFor(s.overall)}</td><td>${trendTag}</td></tr>`;
-  }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">No data yet — import results to see the overall dashboard.</td></tr>`;
+  document.getElementById('osTopList').innerHTML = ranked.length ? ranked.map((s,i)=>{
+    const z = zoneOf(s.overall,false);
+    return `<div class="ax-top-row" style="--i:${i}"><span class="ax-rank">${i+1}</span>
+      <div class="ax-top-name person-link" data-sid="${s.id}" data-skey="${s.sectionKey}"><b>${escapeHtml(s.name)}</b><small>${escapeHtml(axShortSection(s.sectionLabel))}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}${s.obtained!=null&&s.max!=null?` · ${s.obtained}/${s.max}`:''}</small></div>
+      <div class="ax-bar"><i style="width:${Math.max(2,Math.min(100,s.overall))}%;background:${axZoneColor(z)}"></i></div>
+      <b class="ax-pct">${s.overall}%</b><span class="ax-badge z-${z}">${gradeFor(s.overall)}</span></div>`;
+  }).join('') : `<div class="ax-empty">No data yet — import results to see the overall dashboard.</div>`;
+
+  // Performance zones: one donut + legend (legend rows open the student list drawer)
+  const zoneParts = OVERALL_ZONE_ORDER.map(z=>({key:z.key, label:z.label, color:axZoneColor(z.key),
+    count: students.filter(s=>s.overall>=z.min && s.overall<z.max).length}));
+  document.getElementById('osZoneDonut').innerHTML = axDonutSvg(zoneParts, totalStudents);
+  document.getElementById('osZoneCardsWrap').innerHTML = zoneParts.map((z,zi)=>
+    `<button type="button" class="ax-legend-row" style="--i:${zi}" data-filter="zone:${z.key}"><i class="ax-dot" style="background:${z.color}"></i><span>${z.label} · ${AX_ZONE_TEXT[z.key]}</span><b>${z.count}</b></button>`).join('');
 
   // Subject-wise toppers
-  const toppers = subjectWiseToppers();
+  const toppers = subjectWiseToppers(groupKey);
   const subjNames = Object.keys(toppers).sort();
-  document.getElementById('osSubjectToppersWrap').innerHTML = subjNames.length ? subjNames.map(subj=>{
+  document.getElementById('osSubjectToppersWrap').innerHTML = subjNames.length ? subjNames.map((subj,si)=>{
     const t = toppers[subj];
-    return `<div class="card"><h4>${escapeHtml(subj)}</h4>
-      <div class="count">${t.percent}%</div>
-      <ul><li>${escapeHtml(t.name)}</li><li class="extra-detail">${t.rollNo!=null&&t.rollNo!==''?`Roll ${escapeHtml(t.rollNo)} · `:''}${t.sectionLabel}${t.obtained!=null&&t.max!=null?` · ${t.obtained}/${t.max}`:''}</li></ul>
-    </div>`;
-  }).join('') : `<div class="card"><div class="empty">No subject data yet.</div></div>`;
+    return `<div class="ax-topper" style="--i:${si}"><div class="ax-topper-subj">${escapeHtml(subj)}</div><div class="ax-topper-pct">${axRound1(t.percent)}%</div>
+      <div class="ax-topper-name">${escapeHtml(t.name)}</div><div class="ax-topper-meta">${t.rollNo!=null&&t.rollNo!==''?`Roll ${escapeHtml(t.rollNo)} · `:''}${escapeHtml(axShortSection(t.sectionLabel))}${t.obtained!=null&&t.max!=null?` · ${t.obtained}/${t.max}`:''}</div></div>`;
+  }).join('') : `<div class="ax-empty">No subject data yet.</div>`;
 
   // Section ranking
-  const rankedSections = sections.slice().filter(s=>s.avg!=null).sort((a,b)=>b.avg-a.avg);
   document.getElementById('osSectionRankBody').innerHTML = rankedSections.length ? rankedSections.map((s,i)=>`
     <tr><td>${i+1}</td><td class="name-cell">${escapeHtml(s.def.label)}</td>
     <td><span class="zone-pill ${zoneOf(s.avg,false)}">${s.avg}%</span></td>
@@ -2729,65 +2833,50 @@ function renderOverallSummary(){
     <td>${s.top?`${escapeHtml(s.top.name)}${s.top.rollNo!=null&&s.top.rollNo!==''?` <span class="extra-detail">(Roll ${escapeHtml(s.top.rollNo)})</span>`:''}`:'—'}</td><td>${s.studentCount}</td></tr>
   `).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">No section data yet.</td></tr>`;
 
-  // Performance zone cards (all sections combined)
-  const zoneOrder = OVERALL_ZONE_ORDER;
-  document.getElementById('osZoneCardsWrap').innerHTML = zoneOrder.map(z=>{
-    const count = students.filter(s=>s.overall!=null && s.overall>=z.min && s.overall<z.max).length;
-    const pct = totalStudents ? Math.round((count/totalStudents)*1000)/10 : 0;
-    return `<div class="card clickable" data-filter="zone:${z.key}"><h4>${zoneDotHtml(z.key)}${z.label}</h4>
-      <div class="count">${count}</div>
-      <ul><li>${z.range}</li><li class="extra-detail">${pct}% of all students</li></ul>
-    </div>`;
-  }).join('');
-
-  // Smart insights
+  // Insights (same facts as before)
   const insights = [];
   if(rankedSections.length){
     insights.push(`<b>${escapeHtml(rankedSections[0].def.label)}</b> leads all sections with a ${rankedSections[0].avg}% average.`);
     const hardest = rankedSections.slice().sort((a,b)=>a.avg-b.avg)[0];
-    if(hardest && hardest.def.key !== rankedSections[0].def.key){
-      insights.push(`<b>${escapeHtml(hardest.def.label)}</b> has the lowest section average at ${hardest.avg}%.`);
-    }
+    if(hardest && hardest.def.key !== rankedSections[0].def.key) insights.push(`<b>${escapeHtml(hardest.def.label)}</b> has the lowest section average at ${hardest.avg}%.`);
   }
   const subjAverages = {};
   Object.keys(toppers).forEach(subj=>{
     const vals = [];
-    SECTION_DEFS.forEach(def=>{
+    defsShown.forEach(def=>{
       const store = workspace.sections[def.key];
       if(!store || !def.subjects.includes(subj)) return;
-      store.students.forEach(st=>{
-        const t = latestTest(st, subj);
-        if(t && !t.absent && t.percent!=null) vals.push(t.percent);
-      });
+      store.students.forEach(st=>{ const t = latestTest(st, subj); if(t && !t.absent && t.percent!=null) vals.push(t.percent); });
     });
-    if(vals.length) subjAverages[subj] = Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10;
+    if(vals.length) subjAverages[subj] = axRound1(vals.reduce((a,b)=>a+b,0)/vals.length);
   });
   const subjEntries = Object.entries(subjAverages);
   if(subjEntries.length){
     const easiest = subjEntries.slice().sort((a,b)=>b[1]-a[1])[0];
     const hardestSubj = subjEntries.slice().sort((a,b)=>a[1]-b[1])[0];
-    insights.push(`<b>${escapeHtml(hardestSubj[0])}</b> has the highest failure risk with a ${hardestSubj[1]}% average across all sections.`);
+    insights.push(`<b>${escapeHtml(hardestSubj[0])}</b> has the highest failure risk with a ${hardestSubj[1]}% average across ${groupKey?'these':'all'} sections.`);
     insights.push(`<b>${escapeHtml(easiest[0])}</b> is the strongest-performing subject with a ${easiest[1]}% average.`);
   }
   if(totalStudents){
-    insights.push(`${critical.length} student${critical.length===1?'':'s'} (${Math.round((critical.length/totalStudents)*1000)/10}%) require academic intervention.`);
+    insights.push(`${attention.length} student${attention.length===1?'':'s'} (${axRound1(attention.length/totalStudents*100)}%) need attention: below 60% or down 10+ points.`);
     insights.push(`${exceptional.length} student${exceptional.length===1?'':'s'} achieved distinction (90%+ overall).`);
   }
-  document.getElementById('osInsightsWrap').innerHTML = insights.length ? insights.map(t=>`<li>${t}</li>`).join('') : `<li class="empty">Import results across sections to generate insights.</li>`;
+  document.getElementById('osInsightsWrap').innerHTML = insights.length ? insights.map((t,ii)=>`<li style="--i:${ii}">${t}</li>`).join('') : `<li class="empty">Import results across sections to generate insights.</li>`;
 
   triggerEntranceAnimations();
 }
 
 const OVERALL_ZONE_ORDER = [
-  {key:'green', label:'Exceptional', range:'90–100%', min:90, max:101},
-  {key:'blue', label:'Good', range:'80–89%', min:80, max:90},
-  {key:'yellow', label:'Average', range:'70–79%', min:70, max:80},
-  {key:'pink', label:'Weak', range:'60–69%', min:60, max:70},
+  {key:'green', label:'Excellent', range:'90–100%', min:90, max:101},
+  {key:'blue', label:'Very good', range:'80–89%', min:80, max:90},
+  {key:'yellow', label:'Good', range:'70–79%', min:70, max:80},
+  {key:'pink', label:'Fair', range:'60–69%', min:60, max:70},
   {key:'red', label:'Critical', range:'Below 60%', min:-1, max:60},
 ];
 
 function getOverallFilteredStudents(filterKey){
-  const {students} = collectOverallRoster();
+  const {students} = collectOverallRoster(OS_GROUP==='all' ? null : OS_GROUP);
+  if(filterKey === 'attention') return students.filter(s=>s.overall<60 || (s.trend!=null && s.trend<=-10)).sort((a,b)=>a.overall-b.overall);
   if(filterKey === 'critical') return students.filter(s=>s.overall!=null && s.overall<50).sort((a,b)=>a.overall-b.overall);
   if(filterKey === 'exceptional') return students.filter(s=>s.overall!=null && s.overall>=90).sort((a,b)=>b.overall-a.overall);
   if(filterKey.startsWith('zone:')){
@@ -2799,14 +2888,20 @@ function getOverallFilteredStudents(filterKey){
   return [];
 }
 
+document.getElementById('osGroupSeg').addEventListener('click', (e)=>{
+  const b = e.target.closest('[data-os-group]'); if(!b) return;
+  OS_GROUP = b.getAttribute('data-os-group');
+  renderOverallSummary();
+});
 document.getElementById('osQuickStats').addEventListener('click', (e)=>{
   const el = e.target.closest('[data-filter]');
   if(!el) return;
   const key = el.getAttribute('data-filter');
   const list = getOverallFilteredStudents(key);
-  const title = key==='critical' ? 'Critical Students (below 50%)' : 'Exceptional Students (90%+)';
-  openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across all sections`, list);
+  const title = key==='attention' ? 'Students needing attention' : key==='critical' ? 'Critical Students (below 50%)' : 'Exceptional Students (90%+)';
+  openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across ${OS_GROUP==='all'?'all sections':(AX_GROUP_LABEL[OS_GROUP]||OS_GROUP)}`, list);
 });
+
 document.getElementById('osZoneCardsWrap').addEventListener('click', (e)=>{
   const el = e.target.closest('[data-filter]');
   if(!el) return;
@@ -2863,10 +2958,145 @@ function getSectionFilteredStudents(sectionKey, filterKey){
   return [];
 }
 
+/* ---- Section Summary visuals (mockup): class trend, score distribution, subjects, needs attention ---- */
+function axTestSeries(def, store){
+  const order = [], bucket = {};
+  (store.students||[]).forEach(st=>def.subjects.forEach(subj=>((st.tests||{})[subj]||[]).forEach(t=>{
+    if(!t || t.test==null) return;
+    if(!order.includes(t.test)) order.push(t.test);
+    if(!bucket[t.test]) bucket[t.test] = [];
+    if(!t.absent && t.percent!=null) bucket[t.test].push(t.percent);
+  })));
+  return order.map(name=>{
+    const v = bucket[name] || [];
+    return {
+      name, n:v.length,
+      avg: v.length ? v.reduce((a,b)=>a+b,0)/v.length : null,
+      pass: v.length ? v.filter(x=>x>=50).length/v.length*100 : null,
+      top: v.length ? Math.max.apply(null, v) : null
+    };
+  });
+}
+function axShortTest(name){ const m = String(name).match(/(\d+)\s*$/); return m ? 'T'+m[1] : String(name).slice(0,4); }
+const AX_METRIC_TEXT = {avg:'Class average by test', pass:'Pass rate by test', top:'Top score by test'};
+function axTrendNote(vals, metric){
+  const v = vals.filter(x=>x!=null);
+  if(v.length < 2) return 'Needs at least two tests to show a trend';
+  let up = 0, down = 0;
+  for(let i=v.length-1;i>0;i--){ if(v[i]>v[i-1]) up++; else break; }
+  for(let i=v.length-1;i>0;i--){ if(v[i]<v[i-1]) down++; else break; }
+  if(up>=2) return `Rising for ${up} tests in a row`;
+  if(down>=2) return `Falling for ${down} tests in a row`;
+  const d = axRound1(v[v.length-1]-v[v.length-2]);
+  return d>0 ? `Up ${d} points on the previous test` : d<0 ? `Down ${Math.abs(d)} points on the previous test` : 'Level with the previous test';
+}
+function axTrendChartHtml(series, metric){
+  const pts = series.map(s=>({name:s.name, v:s[metric]}));
+  const have = pts.filter(p=>p.v!=null);
+  const title = AX_METRIC_TEXT[metric];
+  if(!have.length) return `<h3 class="ax-h3">${title}</h3><div class="ax-empty">No test results yet.</div>`;
+  const W=520, H=250, L=40, R=24, T=38, B=40, pw=W-L-R, ph=H-T-B;
+  let lo = Math.min.apply(null, have.map(p=>p.v)), hi = Math.max.apply(null, have.map(p=>p.v));
+  lo = Math.max(0, Math.floor((lo-6)/10)*10); hi = Math.min(100, Math.ceil((hi+4)/10)*10);
+  if(hi-lo < 30){ lo = Math.max(0, hi-30); if(hi-lo<30) hi = Math.min(100, lo+30); }
+  const y = v => T + ph - (v-lo)/(hi-lo)*ph;
+  const x = i => L + (pts.length===1 ? pw/2 : i*pw/(pts.length-1));
+  let body = '';
+  for(let g=lo; g<=hi; g+=10){ body += `<line class="ax-grid" x1="${L}" x2="${W-R}" y1="${y(g)}" y2="${y(g)}"/><text x="${L-10}" y="${y(g)+4}" text-anchor="end" class="ax-axis">${g}</text>`; }
+  let d = '', started = false;
+  pts.forEach((p,i)=>{ if(p.v==null){ started=false; return; } d += `${started?' L':' M'}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`; started = true; });
+  const firstIdx = pts.findIndex(p=>p.v!=null), lastIdx = pts.length-1-pts.slice().reverse().findIndex(p=>p.v!=null);
+  const area = have.length>1 ? `<path d="${d.trim()} L${x(lastIdx).toFixed(1)} ${T+ph} L${x(firstIdx).toFixed(1)} ${T+ph} Z" class="ax-area"/>` : '';
+  body = `<defs><linearGradient id="axAreaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#B8A4F0" stop-opacity=".42"/><stop offset="100%" stop-color="#B8A4F0" stop-opacity="0"/></linearGradient></defs>` + body + area + `<path d="${d.trim()}" class="ax-line" pathLength="1" fill="none"/>`;
+  pts.forEach((p,i)=>{
+    body += `<text x="${x(i)}" y="${H-14}" text-anchor="middle" class="ax-axis">${escapeHtml(axShortTest(p.name))}</text>`;
+    if(p.v==null) return;
+    const isLast = i===lastIdx;
+    if(isLast) body += `<circle cx="${x(i)}" cy="${y(p.v)}" r="5.5" class="ax-ring"/>`;
+    body += `<circle cx="${x(i)}" cy="${y(p.v)}" r="${isLast?5.5:4.5}" class="${isLast?'ax-pt ax-pt-last':'ax-pt'}" style="--i:${i}"><title>${escapeHtml(p.name)}: ${axRound1(p.v)}%</title></circle>`;
+  });
+  if(lastIdx>=0){
+    const lx = x(lastIdx), ly = y(pts[lastIdx].v), bw = 84, bh = 40, bx = Math.min(W-R-bw+8, Math.max(L, lx-bw+14)), by = Math.max(4, ly-bh-14);
+    body += `<g class="ax-tip"><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="10"/><text x="${bx+12}" y="${by+16}" class="ax-tip-s">${escapeHtml(pts[lastIdx].name)}</text><text x="${bx+12}" y="${by+33}" class="ax-tip-b">${axRound1(pts[lastIdx].v)}%</text></g>`;
+  }
+  return `<h3 class="ax-h3">${title}</h3><p class="ax-card-sub">${escapeHtml(axTrendNote(pts.map(p=>p.v), metric))}</p>
+    <svg class="ax-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(title)}">${body}</svg>`;
+}
+function axDistChartHtml(scored){
+  const bins = new Array(10).fill(0);
+  scored.forEach(s=>{ const i = Math.min(9, Math.max(0, Math.floor(s.overall/10))); bins[i]++; });
+  const total = scored.length;
+  if(!total) return `<h3 class="ax-h3">Score distribution</h3><div class="ax-empty">No scored students yet.</div>`;
+  let best = 0; bins.forEach((n,i)=>{ if(n>bins[best]) best = i; });
+  let lo = best, hi = best;
+  const left = best>0 ? bins[best-1] : -1, right = best<9 ? bins[best+1] : -1;
+  if(right>=left && right>0) hi = best+1; else if(left>0) lo = best-1;
+  const note = lo===hi ? `Most students sit between ${lo*10} and ${lo*10+9}` : `Most students sit between ${lo*10} and ${hi*10+9}`;
+  const W=360, H=250, L=14, R=14, T=34, B=34, pw=W-L-R, ph=H-T-B, bw=pw/10, max = Math.max.apply(null, bins);
+  let body = '';
+  bins.forEach((n,i)=>{
+    const h = n ? Math.max(5, n/max*ph) : 3, x = L+i*bw+4, w = bw-8, yy = T+ph-h;
+    const z = zoneOf(i*10, false) || 'red';
+    body += `<rect class="ax-vbar" style="--i:${i}" x="${x}" y="${yy}" width="${w}" height="${h}" rx="5" fill="${axZoneColor(z)}" opacity="${n?1:.35}"><title>${i*10}–${i===9?100:i*10+9}%: ${n} student${n===1?'':'s'}</title></rect>`;
+    if(n) body += `<text x="${x+w/2}" y="${yy-6}" text-anchor="middle" class="ax-val ax-vlabel" style="--i:${i}">${n}</text>`;
+  });
+  [0,2,4,6,8,10].forEach(k=>{ body += `<text x="${L+k*bw}" y="${H-12}" text-anchor="${k===0?'start':k===10?'end':'middle'}" class="ax-axis">${k*10}</text>`; });
+  return `<h3 class="ax-h3">Score distribution</h3><p class="ax-card-sub">${note}</p><svg class="ax-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Score distribution">${body}</svg>`;
+}
+function axSubjectsCardHtml(def, subjAvgs){
+  if(!subjAvgs.length) return `<h3 class="ax-h3">Subjects</h3><div class="ax-empty">No subject data yet.</div>`;
+  return `<h3 class="ax-h3">Subjects</h3><p class="ax-card-sub">Latest test average per subject</p>` + subjAvgs.map((sa,i)=>{
+    const teacher = lookupTeacher(sa.subject, def);
+    return `<div class="ax-subj-row" style="--i:${i}"><div class="ax-subj-name"><b>${escapeHtml(sa.subject)}</b><small>${teacher?escapeHtml(teacher):'No teacher on record'}</small></div>
+      <div class="ax-bar thick"><i style="width:${Math.max(2,Math.min(100,sa.avg))}%;background:${AX_SUBJECT_COLORS[i%AX_SUBJECT_COLORS.length]}"></i></div><b class="ax-pct small">${Math.round(sa.avg)}%</b></div>`;
+  }).join('');
+}
+function axAttentionHtml(def, sectionStudents, canMessage){
+  const reasonsFor = st=>{
+    const r = [];
+    if(st.overall<60) r.push({cls:'red', text:`Critical zone · ${Math.round(st.overall)}%`});
+    if(st.trend!=null && st.trend<=-10) r.push({cls:'yellow', text:`Down ${Math.abs(Math.round(st.trend))} points`});
+    return r;
+  };
+  const list = sectionStudents.filter(s=>s.overall!=null).map(s=>({s, r:reasonsFor(s)})).filter(x=>x.r.length).sort((a,b)=>a.s.overall-b.s.overall);
+  const shown = list.slice(0, 8);
+  const rows = shown.map(({s,r},ri)=>`<div class="ax-attn-row" style="--i:${ri}"><div class="ax-attn-who"><b class="person-link" data-sid="${s.id}" data-skey="${s.sectionKey}">${escapeHtml(s.name)}</b><span class="ax-chips">${r.map(c=>`<span class="ax-chip ${c.cls}">${escapeHtml(c.text)}</span>`).join('')}</span></div>${canMessage?`<button type="button" class="ghost small ax-msg" data-msg-sid="${s.id}">Message parent</button>`:''}</div>`).join('');
+  const more = list.length>shown.length ? `<button type="button" class="ax-more" data-attn-more="1">+ ${list.length-shown.length} more</button>` : '';
+  return `<h3 class="ax-h3">Needs attention</h3><p class="ax-card-sub">Critical zone or a sharp drop</p>${rows || '<div class="ax-empty">No student needs attention right now.</div>'}${more}`;
+}
+function axRenderTrend(){
+  if(!AX_SS_CTX) return;
+  document.getElementById('ssTrendCard').innerHTML = axTrendChartHtml(AX_SS_CTX.series, SS_METRIC);
+  document.querySelectorAll('#ssMetricSeg [data-ss-metric]').forEach(b=>b.classList.toggle('active', b.getAttribute('data-ss-metric')===SS_METRIC));
+}
+function axRenderSectionVisuals(def, store, scored, subjAvgs, sectionStudents){
+  const canMessage = typeof window.axRole==='string' ? window.axRole!=='student' : true;
+  AX_SS_CTX = {def, key:def.key, series: axTestSeries(def, store||{students:[]}), sectionStudents};
+  axRenderTrend();
+  document.getElementById('ssDistCard').innerHTML = axDistChartHtml(scored);
+  document.getElementById('ssSubjectsCard').innerHTML = axSubjectsCardHtml(def, subjAvgs);
+  document.getElementById('ssAttentionCol').innerHTML = axAttentionHtml(def, sectionStudents, canMessage);
+}
+document.getElementById('ssMetricSeg').addEventListener('click', (e)=>{
+  const b = e.target.closest('[data-ss-metric]'); if(!b) return;
+  SS_METRIC = b.getAttribute('data-ss-metric'); axRenderTrend();
+});
+document.getElementById('ssAttentionCol').addEventListener('click', (e)=>{
+  const msg = e.target.closest('[data-msg-sid]');
+  if(msg){
+    if(window.axParentComms && typeof window.axParentComms.openSingle==='function') window.axParentComms.openSingle(msg.getAttribute('data-msg-sid'), currentSectionKey());
+    else showToast('Parent messaging is not available yet.', 'warning');
+    return;
+  }
+  if(e.target.closest('[data-attn-more]') && AX_SS_CTX){
+    const list = AX_SS_CTX.sectionStudents.filter(s=>s.overall!=null && (s.overall<60 || (s.trend!=null && s.trend<=-10))).sort((a,b)=>a.overall-b.overall);
+    openStatListDrawer('Needs attention', `${list.length} student${list.length===1?'':'s'} in ${AX_SS_CTX.def.label}`, list);
+  }
+});
+
 function renderSectionSummary(){
   const def = currentSectionDef();
   const key = currentSectionKey();
-  document.getElementById('ssSectionLabelTag').textContent = `— ${def.label}`;
 
   const {students: allStudents, sections} = collectOverallRoster();
   const sectionStudents = allStudents.filter(s=>s.sectionKey===key);
@@ -2889,17 +3119,11 @@ function renderSectionSummary(){
   const schoolAvgAll = rankedSections.length ? Math.round((rankedSections.reduce((a,s)=>a+s.avg,0)/rankedSections.length)*10)/10 : null;
   const deltaVsSchool = (avg!=null && schoolAvgAll!=null) ? Math.round((avg-schoolAvgAll)*10)/10 : null;
 
-  document.getElementById('ssQuickStats').innerHTML = totalInSection===0 ? `
-    <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value">0</div></div>
-  ` : `
-    <div class="hero-metric"><div class="hm-label">Students</div><div class="hm-value" data-count="${totalInSection}">0</div></div>
-    <div class="hero-metric accent"><div class="hm-label">Section Average</div><div class="hm-value" ${avg!=null?`data-count="${avg}" data-suffix="%"`:''}>${avg!=null?'0%':'—'}</div></div>
-    <div class="hero-metric warn clickable" data-filter="red"><div class="hm-label"><span class="dot red"></span>Red Zone</div><div class="hm-value" data-count="${redStudents.length}">0</div></div>
-    <div class="hero-metric good clickable" data-filter="green"><div class="hm-label"><span class="dot green"></span>Green Zone</div><div class="hm-value" data-count="${greenStudents.length}">0</div></div>
-    <div class="hero-metric good"><div class="hm-label">Pass Rate</div><div class="hm-value" ${passRate!=null?`data-count="${passRate}" data-suffix="%"`:''}>${passRate!=null?'0%':'—'}</div></div>
-    <div class="hero-metric gold"><div class="hm-label">Rank</div><div class="hm-value small">${rank!=null?`#${rank} of ${totalRankedSections}`:'—'}</div></div>
-  `;
-  animateCounters(document.getElementById('ssQuickStats'));
+  document.getElementById('ssSectionLabelTag').textContent = `${def.label} · ${totalInSection} student${totalInSection===1?'':'s'}${rank!=null?` · Rank #${rank} of ${totalRankedSections}`:''}${passRate!=null?` · Pass rate ${passRate}%`:''}`;
+  document.getElementById('ssQuickStats').innerHTML = totalInSection===0 ? '' : [
+    avg!=null?`Section average <b>${avg}%</b>`:'', passRate!=null?`Pass rate <b>${passRate}%</b>`:'', rank!=null?`Rank <b>#${rank} of ${totalRankedSections}</b>`:'',
+    `<b>${greenStudents.length}</b> in the Green Zone`, `<b>${redStudents.length}</b> in the Red Zone`
+  ].filter(Boolean).join(' <span class="ax-sep">·</span> ');
 
   const subjAvgs = def.subjects.map(subj=>{
     const vals = [];
@@ -2961,6 +3185,7 @@ function renderSectionSummary(){
     <td><span class="zone-pill ${zoneOf(s.avg,false)}">${s.avg}%</span></td><td>${s.studentCount}</td></tr>
   `).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No section data yet.</td></tr>`;
 
+  axRenderSectionVisuals(def, store, scored, subjAvgs, sectionStudents);
   triggerEntranceAnimations();
 }
 document.getElementById('ssQuickStats').addEventListener('click', (e)=>{
@@ -3504,10 +3729,8 @@ document.getElementById('addMenuDropdown').addEventListener('click', ()=>documen
 document.getElementById('moreMenuDropdown').addEventListener('click', ()=>document.getElementById('moreMenuDropdown').classList.remove('open'));
 
 document.getElementById('extraDetailsBtn').addEventListener('click', (e)=>{
-  showExtra = !showExtra;
-  e.target.textContent = showExtra ? 'Hide Details' : 'Show Details';
-  renderTable();
-  if(typeof renderTRRoster === 'function') renderTRRoster();
+  const on = document.body.classList.toggle('ax-details');
+  e.target.textContent = on ? 'Hide Details' : 'Show Details';
 });
 
 function togglePanel(id){

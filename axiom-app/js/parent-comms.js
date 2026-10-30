@@ -793,5 +793,5 @@ function wire(){
   updateBadge();
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire();
-window.axParentComms = { snapshot, buildMessage, waNumber, attentionReasons, cardHtml, printCards }; // exposed for testing/debug
+window.axParentComms = { snapshot, buildMessage, waNumber, attentionReasons, cardHtml, printCards, openSingle }; // exposed for testing/debug
 })();
