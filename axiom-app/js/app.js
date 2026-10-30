@@ -1404,8 +1404,10 @@ function rosterTestHeadHtml(store, subj, testNames, sortState){
 function axPillHtml(t, z){
   if(!t) return '<span class="zone-pill none" title="No result">&mdash;</span>';
   if(t.absent) return `<span class="zone-pill grey" title="Absent">A</span>`;
-  const tip = `${escapeHtml(t.test||'')}: ${(t.obtained!=null&&t.max!=null)?t.obtained+'/'+t.max+' · ':''}${t.percent}%`;
-  return `<span class="zone-pill ${z||'none'}" title="${tip}">${t.percent==null?'&mdash;':Math.round(t.percent)}</span>`;
+  const marks = t.obtained!=null && t.max!=null ? `${escapeHtml(t.obtained)}/${escapeHtml(t.max)}` : '';
+  const percent = t.percent==null ? '&mdash;' : `${escapeHtml(t.percent)}%`;
+  const tip = escapeHtml(t.test || 'Result');
+  return `<span class="zone-pill ${z||'none'}" title="${tip}">${percent}${marks ? ` · ${marks}` : ''}</span>`;
 }
 function rosterTestCellsHtml(st, subj, testNames){
   const arr = (st.tests||{})[subj] || [];
@@ -1553,11 +1555,11 @@ function axAverageRowHtml(store, def, subjFilter, perTest, subjectsShown, testNa
   let cells = '', change = '<td class="ax-change flat">&mdash;</td>';
   if(perTest){
     const avgs = testNames.map(tn=>rosterTestAverage(store, subjFilter, tn));
-    cells = avgs.map(a=>`<td>${a==null?'&mdash;':Math.round(a)}</td>`).join('');
+    cells = avgs.map(a=>`<td>${a==null?'&mdash;':Math.round(a)+'%'}</td>`).join('');
     const known = avgs.filter(a=>a!=null);
     if(known.length>=2) change = axDeltaHtml(known[known.length-1]-known[known.length-2]);
   } else {
-    cells = subjectsShown.map(sj=>{ const a = subjectClassAverage(store, sj); return `<td>${a==null?'&mdash;':Math.round(a)}</td>`; }).join('');
+    cells = subjectsShown.map(sj=>{ const a = subjectClassAverage(store, sj); return `<td>${a==null?'&mdash;':Math.round(a)+'%'}</td>`; }).join('');
   }
   return `<tr class="ax-avg-row"><td class="name-cell">Class average</td>${extra}${cells}${change}</tr>`;
 }
