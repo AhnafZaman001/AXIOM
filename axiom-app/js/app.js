@@ -1187,22 +1187,47 @@ function runImport(workbook, testName, testDate){
   return {matched, unmatched, testName, testDate};
 }
 
-function applyImport(parsed){
+function applyImport(parsed, deferSave = false){
   parsed.matched.forEach(sec=>{
     const store = ensureSection(sec.sectionKey);
+    // Index once per section instead of scanning the whole roster per row.
+    // First matches win, preserving the existing duplicate/name fallback rules.
+    const byName = new Map();
+    const byRoll = new Map();
+    const indexRolls = ()=>{
+      byRoll.clear();
+      store.students.forEach(st=>{
+        if(st.rollNo){
+          const key = String(st.rollNo).trim();
+          if(!byRoll.has(key)) byRoll.set(key, st);
+        }
+      });
+    };
+    indexRolls();
+    store.students.forEach(st=>{
+      const key = st.name.trim().toLowerCase();
+      if(!byName.has(key)) byName.set(key, st);
+    });
     sec.students.forEach(s=>{
       let student = null;
       if(s.rollNo){
-        student = store.students.find(x=>x.rollNo && String(x.rollNo).trim()===String(s.rollNo).trim());
+        student = byRoll.get(String(s.rollNo).trim());
       }
       if(!student){
-        student = store.students.find(x=>x.name.trim().toLowerCase()===s.name.trim().toLowerCase());
+        student = byName.get(s.name.trim().toLowerCase());
       }
       if(!student){
         student = {id:uid(), name:s.name, rollNo:s.rollNo, matric:s.matric, tests:{}};
         store.students.push(student);
+        byName.set(s.name.trim().toLowerCase(), student);
+        if(s.rollNo) byRoll.set(String(s.rollNo).trim(), student);
       } else {
-        if(s.rollNo) student.rollNo = s.rollNo;
+        if(s.rollNo){
+          const changed = String(student.rollNo || '').trim() !== String(s.rollNo).trim();
+          student.rollNo = s.rollNo;
+          // A corrected roll number must remove the old key immediately.
+          if(changed) indexRolls();
+        }
         if(s.matric!=null) student.matric = s.matric;
       }
       sec.subjects.forEach(subj=>{
@@ -1220,7 +1245,7 @@ function applyImport(parsed){
       });
     });
   });
-  markDirty();
+  if(!deferSave) markDirty();
 }
 
 /* ---- 008_render-toolbar-selects.js ---- */
@@ -3990,7 +4015,8 @@ function applyPendingImportList(list, auto){
     : (list[0].testName || 'last import');
   document.getElementById('undoImportBtn').disabled = false;
   document.getElementById('undoImportBtn').title = `Undo "${lastImportLabel}" and restore the workspace to how it was before this import`;
-  list.forEach(p=>applyImport(p));
+  list.forEach(p=>applyImport(p, true));
+  markDirty();
   document.getElementById('importPanel').classList.remove('open');
   document.getElementById('importPreviewArea').innerHTML='';
   document.getElementById('applyImportBtn').disabled = true;
