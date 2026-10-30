@@ -1767,7 +1767,7 @@ function lineChartSVG(labels, values, color, stats){
     return `<text x="${x}" y="${h-8}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="sans-serif">${escapeHtml(l).slice(0,14)}</text>`;
   }).join('');
   const legend = hasBand
-    ? `<div class="chart-legend"><span><i class="lg-swatch lg-line" style="background:${color}"></i>Class average</span><span><i class="lg-swatch lg-band" style="background:${color}"></i>High–low spread</span></div>`
+    ? `<div class="chart-legend"><span><i class="lg-swatch lg-line" style="background:${color}"></i>Class average</span><span><i class="lg-swatch lg-band" style="background:${color}"></i>Highest to lowest scores</span></div>`
     : '';
   return `${legend}<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
     ${bandPath}
@@ -1857,18 +1857,17 @@ function histogramSVG(store, subj, testName){
   // stats
   const sorted = percents.slice().sort((a,b)=>a-b);
   const mid = Math.floor(sorted.length/2);
-  const median = sorted.length%2 ? sorted[mid] : Math.round(((sorted[mid-1]+sorted[mid])/2)*10)/10;
-  const mean = Math.round((sorted.reduce((a,b)=>a+b,0)/sorted.length)*10)/10;
-  const variance = sorted.reduce((a,b)=>a+Math.pow(b-mean,2),0)/sorted.length;
-  const std = Math.round(Math.sqrt(variance)*10)/10;
+  // Middle score: half the students scored above it, half below.
+  const middle = sorted.length%2 ? sorted[mid] : Math.round(((sorted[mid-1]+sorted[mid])/2)*10)/10;
+  const lowest = Math.round(sorted[0]*10)/10, highest = Math.round(sorted[sorted.length-1]*10)/10;
   const modeIdx = bins.reduce((best,v,i)=> v>bins[best]?i:best, 0);
   const modeLabel = modeIdx===9 ? '90-100' : `${modeIdx*10}-${modeIdx*10+9}`;
 
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">${bars}</svg>
     <div class="hist-stats">
-      <div><span>Median</span><b class="mono">${median}%</b></div>
-      <div><span>Mode band</span><b class="mono">${modeLabel}</b></div>
-      <div><span>Std. dev</span><b class="mono">±${std}</b></div>
+      <div title="Half of the students scored above this mark and half scored below it."><span>Middle score</span><b class="mono">${middle}%</b></div>
+      <div title="The score range where the most students landed."><span>Most students scored</span><b class="mono">${modeLabel}</b></div>
+      <div title="The lowest and the highest score in this test."><span>Lowest – Highest</span><b class="mono">${lowest}% – ${highest}%</b></div>
     </div>`;
 }
 
@@ -3026,7 +3025,7 @@ function axDistChartHtml(scored){
   const bins = new Array(10).fill(0);
   scored.forEach(s=>{ const i = Math.min(9, Math.max(0, Math.floor(s.overall/10))); bins[i]++; });
   const total = scored.length;
-  if(!total) return `<h3 class="ax-h3">Score distribution</h3><div class="ax-empty">No scored students yet.</div>`;
+  if(!total) return `<h3 class="ax-h3">How students scored</h3><div class="ax-empty">No scored students yet.</div>`;
   let best = 0; bins.forEach((n,i)=>{ if(n>bins[best]) best = i; });
   let lo = best, hi = best;
   const left = best>0 ? bins[best-1] : -1, right = best<9 ? bins[best+1] : -1;
@@ -3041,7 +3040,7 @@ function axDistChartHtml(scored){
     if(n) body += `<text x="${x+w/2}" y="${yy-6}" text-anchor="middle" class="ax-val ax-vlabel" style="--i:${i}">${n}</text>`;
   });
   [0,2,4,6,8,10].forEach(k=>{ body += `<text x="${L+k*bw}" y="${H-12}" text-anchor="${k===0?'start':k===10?'end':'middle'}" class="ax-axis">${k*10}</text>`; });
-  return `<h3 class="ax-h3">Score distribution</h3><p class="ax-card-sub">${note}</p><svg class="ax-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Score distribution">${body}</svg>`;
+  return `<h3 class="ax-h3">How students scored</h3><p class="ax-card-sub">${note}</p><svg class="ax-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="How students scored">${body}</svg>`;
 }
 function axSubjectsCardHtml(def, subjAvgs){
   if(!subjAvgs.length) return `<h3 class="ax-h3">Subjects</h3><div class="ax-empty">No subject data yet.</div>`;
@@ -3342,7 +3341,7 @@ function renderTeacherReport(){
       html += `<div class="chart-card" style="margin-bottom:10px;">
         <b>${escapeHtml(a.subject)}</b> across ${escapeHtml(teacherName)}'s sections ranges from
         <b>${worst.avg}%</b> (${escapeHtml(worst.def.label)}) to <b>${best.avg}%</b> (${escapeHtml(best.def.label)}) —
-        a spread of <b>${spread} point${spread===1?'':'s'}</b>.
+        a gap of <b>${spread} point${spread===1?'':'s'}</b>.
       </div>`;
     }
 

@@ -604,7 +604,7 @@
       id: 'comparability', title: 'Comparability not established',
       observation: 'Review the assessment, grade and subject rules before interpreting a year-to-year change.',
       evidence: blockers.map(function (c) { return c.detail; }),
-      qualification: ['The figures describe separate cohorts and remain visible for inspection; the mismatched inputs do not establish an improvement or decline.'],
+      qualification: ['The figures describe two different groups of students and remain visible for inspection; the mismatched inputs do not establish an improvement or decline.'],
       next: 'Can the same assessment stage, grade and subject basket be selected for both years?', strength: 0
     }];
 
@@ -634,12 +634,12 @@
       ],
       qualification: [], next: '', strength: 1 + Math.min(Math.abs(dMed) / 5, 3)
     };
-    if (covGap && worseM.noMarks > 0) typical.qualification.push(plural(worseM.noMarks, 'listed student in ' + worse.label + ' has', 'listed students in ' + worse.label + ' have') + ' no marks, so this describes students with marks only, not the whole cohort.');
+    if (covGap && worseM.noMarks > 0) typical.qualification.push(plural(worseM.noMarks, 'listed student in ' + worse.label + ' has', 'listed students in ' + worse.label + ' have') + ' no marks, so this describes students with marks only, not all the students.');
     if ((pA.partial > 0 || pB.partial > 0)) typical.qualification.push(st.basis === 'complete'
-      ? (pA.partial + pB.partial) + ' students across the two cohorts have partial results and are excluded from the overall comparison. Recorded subject failures and missing/absence counts still include them.'
-      : 'Available-subject results include ' + (pA.partial + pB.partial) + ' students across the two cohorts with incomplete subject coverage. Their percentages may not be comparable.');
+      ? (pA.partial + pB.partial) + ' students across the two groups have partial results and are excluded from the overall comparison. Recorded subject failures and missing/absence counts still include them.'
+      : 'Available-subject results include ' + (pA.partial + pB.partial) + ' students across the two groups with incomplete subject coverage. Their percentages may not be comparable.');
     if (chk('basket').status === 'review' || chk('maxima').status === 'review') typical.qualification.push('Subject lists or maximum marks differ between the years (see Comparison checks), so the two percentages are not built from identical papers.');
-    if (mix && (mix.reversal || mix.material)) typical.qualification.push(mix.reversal ? 'Stream mix reverses the picture: the pooled mean moves ' + pts(mix.pooled) + ' but within streams it moves ' + pts(mix.within) + '.' : 'Stream mix differs between the years; the pooled mean moves ' + pts(mix.pooled) + ' against ' + pts(mix.within) + ' with stream weights held fixed.');
+    if (mix && (mix.reversal || mix.material)) typical.qualification.push(mix.reversal ? 'Stream mix reverses the picture: the overall average moves ' + pts(mix.pooled) + ' but inside each stream it moves ' + pts(mix.within) + '.' : 'Stream mix differs between the years; the overall average moves ' + pts(mix.pooled) + ' against ' + pts(mix.within) + ' when the stream sizes are kept the same.');
     if (!typical.qualification.length) typical.qualification.push('These are different student groups; a difference of ' + pts(dMed) + ' can reflect who was in each group as well as how they performed. An average can also be pulled by a few very high or very low results.');
     typical.next = covGap && worseM.noMarks > 0 ? 'Are the ' + worseM.noMarks + ' listed students in ' + worse.label + ' without marks absent, withdrawn or not yet entered?'
       : mix && (mix.reversal || mix.material) ? 'Does the same direction hold inside each stream?'
@@ -776,7 +776,7 @@
     if (cov) {
       var w = pB.coverage < pA.coverage ? B : A;
       s += ', but ' + plural(w.pooled.noMarks, 'listed student', 'listed students') + ' in ' + w.label + ' ' + (w.pooled.noMarks === 1 ? 'has' : 'have') + ' no marks, so this is not yet a confident whole-cohort comparison.';
-    } else s += '. The groups are different cohorts, so this describes the groups, not individual progress.';
+    } else s += '. The groups are different groups of students, so this describes the groups, not individual progress.';
     if (ctx.checks.some(function (c) { return c.status === 'review'; })) s = 'Provisional comparison. ' + s;
     return s;
   }

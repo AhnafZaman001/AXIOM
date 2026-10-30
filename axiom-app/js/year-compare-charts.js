@@ -113,12 +113,12 @@
   function ranges(analyses){
     var w=compact?320:350,h=analyses.length*34+18,l=75,r=20,pw=w-l-r,body='';
     analyses.forEach(function(a,i){var m=a.pooled,y=i*34+17;if(m.mean==null)return;
-      var text=a.label+' · the central half of scores span '+value(m.p25)+'–'+value(m.p75)+' · average '+value(m.mean)+' · '+m.n+' students counted';
+      var text=a.label+' · half of the students scored between '+value(m.p25)+' and '+value(m.p75)+' · average '+value(m.mean)+' · '+m.n+' students counted';
       body+=label(0,y+4,short(a.label))+'<line x1="'+l+'" x2="'+(w-r)+'" y1="'+y+'" y2="'+y+'"/>'+
         '<rect x="'+(l+pw*m.p25/100)+'" y="'+(y-5)+'" width="'+Math.max(1,pw*(m.p75-m.p25)/100)+'" height="10" rx="5" fill="'+color(i)+'" opacity=".55"'+tip(text)+'><title>'+esc(text)+'</title></rect>'+
         '<circle cx="'+(l+pw*m.mean/100)+'" cy="'+y+'" r="5" fill="'+color(i)+'"'+tip(text)+'><title>'+esc(text)+'</title></circle>';
     });
-    return svg('Range of the central half of scores and the average by year; percentage scale 0–100%',body,w,h);
+    return svg('Where half of the students scored, and the average, by year; percentage scale 0–100%',body,w,h);
   }
   function subjectEvidence(row,years,gain){
     var rows=[{label:'Average',values:[{v:row.a.mean,n:row.a.n},{v:row.b.mean,n:row.b.n}]}];
@@ -154,12 +154,12 @@
     var rows=analyses.filter(function(a){return a.pooled.supportBounds;});if(!rows.length)return '';
     var w=compact?400:680,l=compact?80:120,r=80,pw=w-l-r,h=rows.length*58+30,body='';
     rows.forEach(function(a,i){var b=a.pooled.supportBounds,y=i*58+18,x=l+pw*b.low/100,end=l+pw*b.high/100;
-      var text=a.label+' · possible whole-cohort support share '+value(b.low)+'–'+value(b.high)+' · '+b.unknown+' incomplete overall results. Limits, not an estimate.';
+      var text=a.label+' · possible share of all listed students needing support: '+value(b.low)+' to '+value(b.high)+' · '+b.unknown+' incomplete overall results. This is a possible range, not an estimate.';
       body+=label(0,y+5,short(a.label))+'<line x1="'+l+'" x2="'+(w-r)+'" y1="'+y+'" y2="'+y+'"/>'+
         '<rect x="'+x+'" y="'+(y-6)+'" width="'+Math.max(1,end-x)+'" height="12" rx="6" fill="var(--accent)" opacity=".7"'+tip(text)+'><title>'+esc(text)+'</title></rect>'+label(w-r+8,y+4,b.low.toFixed(0)+'–'+b.high.toFixed(0)+'%');
     });
     body+=label(l,h-3,'0%')+label(w-r,h-3,'100%','end');
-    return panel('What missing results could change',svg('Possible support share across all listed students; lower and upper percentage limits from missing outcomes, not statistical confidence intervals',body,w,h),'','yc-support-limits');
+    return panel('What missing results could change',svg('Possible support share across all listed students; lowest and highest possible percentages depending on the missing results, not an estimate',body,w,h),'','yc-support-limits');
   }
   function movers(cmp){
     if(cmp.findings.some(function(f){return f.id==='comparability'||f.id==='insufficient';}))return '';

@@ -652,7 +652,7 @@
             '<td class="n">' + s.listed + '</td><td class="n">' + s.withMarks + '</td><td>' + esc(s.subjects.map(function (x) { return x.name + ' (' + x.max + ')'; }).join(', ')) + '<span class="yc-small">Maximum marks read from Excel row ' + s.maxRowNumber + '.</span>' +
             (s.warnings.length ? '<span class="yc-small">' + s.warnings.map(esc).join(' ') + '</span>' : '') + '<span class="yc-small">' + cnt(s.stats.padding, 'empty row', 'empty rows') + ' ignored' + (s.stats.duplicates ? ', ' + cnt(s.stats.duplicates, 'duplicate', 'duplicates') + ' excluded' : '') + (s.stats.summaryRows ? ', ' + cnt(s.stats.summaryRows, 'summary row', 'summary rows') + ' skipped' : '') + '</span></td></tr>';
         }).join('') + '</tbody></table></div>';
-      h += '<p class="yc-sub" style="margin-top:8px;">Sheets may share a stream only when their subjects and maximum marks match. Do not combine different exams into one cohort. Blank or dash cells mean missing; only explicit N/A or exempt means not applicable. Absence remains separate.</p>' +
+      h += '<p class="yc-sub" style="margin-top:8px;">Sheets may share a stream only when their subjects and maximum marks match. Do not combine different exams into one group. Blank or dash cells mean missing; only explicit N/A or exempt means not applicable. Absence remains separate.</p>' +
         '<label class="yc-sub"><input type="checkbox" data-imp-confirm' + (imp.confirmed ? ' checked' : '') + '> I checked the listed students, subject maximum marks and stream labels against this workbook.</label>';
     }
     h += '<div id="ycReplaceNotice">' + (p.sheets.length ? replaceNoticeHtml(imp) : '') + '</div>';
@@ -687,7 +687,7 @@
     if (!canManage() || state.busy) return;
     var imp = state.imp, p = imp.parsed;
     if (!norm(imp.label)) { imp.error = 'Enter the year, for example 2025-26.'; refreshModal(); return; }
-    if (!norm(imp.assessment) || !norm(imp.grade)) { imp.error = 'Enter the assessment and class or grade so the same cohort stage can be compared across years.'; refreshModal(); return; }
+    if (!norm(imp.assessment) || !norm(imp.grade)) { imp.error = 'Enter the assessment and class or grade so the same class level can be compared across years.'; refreshModal(); return; }
     if (!imp.confirmed) { imp.error = 'Check the imported students, subject maxima and streams, then tick the confirmation before saving.'; refreshModal(); return; }
     var inc = [];
     p.sheets.forEach(function (s, i) { if (imp.include[i]) inc.push({ parsed: s, streamLabel: imp.streams[i] }); });
@@ -736,7 +736,7 @@
     html += reportSectionHtml('By stream, ' + c.A.label + ' to ' + c.B.label, reportTableHtml(['Stream', 'Students counted', 'Average result', 'Needs support (below ' + st.support + '%)', 'Top results (' + st.excellence + '%+)'], c.streams.map(function (r) {
       return [r.label, (r.a ? r.a.n : '—') + ' / ' + (r.b ? r.b.n : '—'), r.a && r.b ? pct(r.a.mean) + ' → ' + pct(r.b.mean) : '—', r.a && r.b ? pct(r.a.support.share) + ' → ' + pct(r.b.support.share) : '—', r.a && r.b ? pct(r.a.excellence.share) + ' → ' + pct(r.b.excellence.share) : '—'];
     })));
-    printReport('Year Comparison: ' + a.map(function (x) { return x.label; }).join(', '), 'Cohort comparison · ' + (st.basis === 'complete' ? 'students with every subject scored' : 'students with marks, available-subject percentages'), html, { compact: true });
+    printReport('Year Comparison: ' + a.map(function (x) { return x.label; }).join(', '), 'Group comparison · ' + (st.basis === 'complete' ? 'students with every subject scored' : 'students with marks, available-subject percentages'), html, { compact: true });
   }
 
   /* ------------------------------------- start ------------------------------------- */
