@@ -59,7 +59,7 @@ body:not([data-ax-page="yearCompare"]) .loading-bar-fill{background:var(--accent
    Figures in one row, plain lists, one donut, simple charts. Scoped away from Year Comparison.
    ===================================================================== */
 :root{--ax-green:#6BCBA6;--ax-blue:#7BABE8;--ax-yellow:#D8B870;--ax-pink:#E08FB0;--ax-red:#E27B6B;--ax-orange:#F0A084;--ax-lilac:#B8A4F0;--ax-cyan:#38C8BF}
-:root[data-theme="light"]{--ax-green:#1F9E73;--ax-blue:#3C78CC;--ax-yellow:#B08A24;--ax-pink:#C95C8A;--ax-red:#CF5340;--ax-orange:#D3693F;--ax-lilac:#7A5CD0;--ax-cyan:#12A39B}
+:root[data-theme="light"]{--ax-green:#167A5A;--ax-blue:#2F63B3;--ax-yellow:#8A6A14;--ax-pink:#B04A78;--ax-red:#B8412F;--ax-orange:#B5551F;--ax-lilac:#6847C0;--ax-cyan:#0E8A83}
 body:not([data-ax-page="yearCompare"]) .ax-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:10px 0 20px}
 body:not([data-ax-page="yearCompare"]) #overallSummaryPage .ax-head{padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:0}
 body:not([data-ax-page="yearCompare"]) .ax-title{margin:0;font-size:1.75rem;font-weight:600;letter-spacing:-.015em;color:var(--ink)}
@@ -236,7 +236,7 @@ body:not([data-ax-page="yearCompare"]) .ax-filter-card{background:var(--paper-ra
 body:not([data-ax-page="yearCompare"]) .ax-filter-row{display:grid;grid-template-columns:minmax(190px,260px) minmax(130px,180px) minmax(200px,1fr);gap:14px;align-items:center}
 body:not([data-ax-page="yearCompare"]) .ax-filter-row .field{margin:0;min-width:0}
 body:not([data-ax-page="yearCompare"]) .ax-filter-row .field label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-body:not([data-ax-page="yearCompare"]) #svFilterCard select,body:not([data-ax-page="yearCompare"]) #svFilterCard input[type=text]{width:100%;height:46px;padding:0 16px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:inherit;font-size:.95rem;box-shadow:none}
+body:not([data-ax-page="yearCompare"]) #svFilterCard select,body:not([data-ax-page="yearCompare"]) #svFilterCard input[type=text]{width:100%;height:46px;padding:0 16px;background-color:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;color:var(--ink);font:inherit;font-size:.95rem;box-shadow:none}
 body:not([data-ax-page="yearCompare"]) #svFilterCard input[type=text]::placeholder{color:var(--muted)}
 body:not([data-ax-page="yearCompare"]) #svFilterCard .hint{margin:8px 2px 0;font-size:.8rem;color:var(--muted)}
 body:not([data-ax-page="yearCompare"]) #svFilterCard .hint:empty{display:none}
@@ -303,3 +303,12 @@ body:not([data-ax-page="yearCompare"]) .ax-top-marks{display:block;margin-top:3p
 body:not([data-ax-page="yearCompare"]) .roster-pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:12px 0;color:var(--muted);font-size:.85rem}
 body:not([data-ax-page="yearCompare"]) .roster-pagination[hidden]{display:none}
 @media print{.roster-pagination{display:none!important}}
+
+/* FORM CONTROLS: native dropdown lists must always be readable (solid background + matching text colour) */
+:root:not([data-theme="light"]){color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light}
+select,select option,select optgroup{background-color:var(--paper-raised);color:var(--ink)}
+:root:not([data-theme="light"]) select,:root:not([data-theme="light"]) select option,:root:not([data-theme="light"]) select optgroup{background-color:#1E1436;color:#F4F1FB}
+select option:checked,select option:hover{background-color:#4B2E91;color:#fff}
+/* small screens: dropdown menus never push the page wider than the screen */
+@media (max-width:640px){.menu-dropdown{position:fixed!important;left:16px!important;right:16px!important;width:auto!important;max-width:none!important;min-width:0!important;overflow-wrap:anywhere}}

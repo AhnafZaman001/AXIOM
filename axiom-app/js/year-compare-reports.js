@@ -218,5 +218,39 @@
     }).join('');
   }
 
-  return {overallRows:rowsForOverall,overallRanking:overallRanking,overallSummary:overallSummary,overallHtml:overallHtml,gradeFor:gradeFor,resultTables:resultTables,resultTablesHtml:resultTablesHtml,subjectStats:subjectStats,topTen:topTen,supplies:supplies,hydrateIdentities:hydrateIdentities,subjectsHtml:subjectsHtml,topsHtml:topsHtml,suppliesHtml:suppliesHtml,notesHtml:notesHtml,esc:esc};
+
+  /* ===== Year comparison of the school-format tables (counts and share of students, previous year vs this year) ===== */
+  var FOOT_ROW=/^(Total Appeared|Counted in|Incomplete results)/;
+  function bandTotals(t){
+    var bands=t.rows.filter(function(x){return !FOOT_ROW.test(x[0]);}).map(function(x){return {label:x[0],n:Number(x[x.length-1])||0};});
+    var total=t.rows.filter(function(x){return /^Total Appeared/.test(x[0]);})[0],counted=t.rows.filter(function(x){return /^Counted in/.test(x[0]);})[0]||total;
+    return {bands:bands,appeared:total?Number(total[total.length-1])||0:0,counted:counted?Number(counted[counted.length-1])||0:0};
+  }
+  function sgn(n){return n>0?'+'+n:String(n);}
+  function resultComparison(cur,prev,settings,streamKey){
+    if(!prev)return null;
+    var allowed=comparisonAllowed(prev,cur,settings),tc=resultTables(cur,settings,streamKey).tables,tp=resultTables(prev,settings,streamKey).tables;
+    var names={percent:'%AGE WISE RESULT',marks:'MARKS WISE RESULT',grades:'GRADE WISE RESULT'},sheets={percent:'Compare %age',marks:'Compare marks',grades:'Compare grades'};
+    return {label:cur.label,allowed:allowed,tables:tc.map(function(c,i){
+      var a=bandTotals(tp[i]),b=bandTotals(c),old={};a.bands.forEach(function(x){old[x.label]=x.n;});
+      var rows=b.bands.map(function(x){
+        var an=old[x.label]==null?0:old[x.label],ash=rate(an,a.counted),bsh=rate(x.n,b.counted);
+        return [x.label,an,pct(ash),x.n,pct(bsh),allowed?sgn(x.n-an):'\u2014',delta(ash,bsh,allowed)];
+      });
+      var extra=a.appeared!==a.counted||b.appeared!==b.counted?[['Counted in this table',a.counted,'',b.counted,'','','']]:[];
+      rows=rows.concat(extra,[['Total Appeared in Exams',a.appeared,'',b.appeared,'','','']]);
+      return {id:c.id,sheet:sheets[c.id]||c.sheet,title:(names[c.id]||c.title)+' \u00b7 '+prev.label+' vs '+cur.label,subtitle:'',
+        head:['',prev.label+' students',prev.label+' share',cur.label+' students',cur.label+' share','Change (students)','Change (share)'],rows:rows,
+        notes:['Share is the percentage of counted students in each year; the two years hold different students. Changes are shown only when the two assessments are comparable.'+(allowed?'':' These assessments are not directly comparable, so change figures are withheld.')]};
+    })};
+  }
+  function resultComparisonHtml(cur,prev,settings,streamKey){
+    var res=resultComparison(cur,prev,settings,streamKey);
+    if(!res)return panel('Year comparison','<p class="yc-report-caption">Tick the previous year above to compare how many students fall in each band.</p>');
+    return res.tables.map(function(x){
+      return '<section class="yc-card yc-report-section yc-school-table yc-compare"><h3>'+esc(x.title)+'</h3>'+table(x.head,x.rows)+x.notes.map(function(n){return '<p class="yc-report-caption">'+esc(n)+'</p>';}).join('')+'</section>';
+    }).join('');
+  }
+
+  return {resultComparison:resultComparison,resultComparisonHtml:resultComparisonHtml,overallRows:rowsForOverall,overallRanking:overallRanking,overallSummary:overallSummary,overallHtml:overallHtml,gradeFor:gradeFor,resultTables:resultTables,resultTablesHtml:resultTablesHtml,subjectStats:subjectStats,topTen:topTen,supplies:supplies,hydrateIdentities:hydrateIdentities,subjectsHtml:subjectsHtml,topsHtml:topsHtml,suppliesHtml:suppliesHtml,notesHtml:notesHtml,esc:esc};
 });

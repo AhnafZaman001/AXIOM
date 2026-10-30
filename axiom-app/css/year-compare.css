@@ -185,3 +185,10 @@
 .yc-chart-note{margin:8px 4px 0}
 .yc-svg .yc-stack-counts{font-size:12px}
 @media print{.yc-school{max-width:none}}
+/* cloud file chooser + comparison tables */
+#ycCloudBack .yc-cloud-select{width:100%;margin:14px 0 4px;padding:6px;min-height:170px;background:#1E1436;color:#F4F1FB;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:.9rem}
+#ycCloudBack .yc-cloud-select option{padding:8px 10px;border-radius:8px;background:#1E1436;color:#F4F1FB}
+#ycCloudBack .yc-cloud-select option:checked{background:#4B2E91;color:#fff}
+:root[data-theme="light"] #ycCloudBack .yc-cloud-select,:root[data-theme="light"] #ycCloudBack .yc-cloud-select option{background:#fff;color:#1C2B45}
+#yearComparePage .yc-report-h{margin:22px 4px 8px;font-size:1rem}
+#yearComparePage .yc-compare td:nth-child(n+6),#yearComparePage .yc-compare th:nth-child(n+6){font-weight:700}

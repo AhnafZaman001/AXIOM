@@ -136,7 +136,7 @@ const server=http.createServer((req,res)=>{
     assert.match(await page.locator('.yc-meeting-reports').innerText(),/Subject vista/);
     assert.match(await page.locator('.yc-meeting-reports').innerText(),/Pass ≥ 33%/);
     await page.locator('[data-report-tab="top"]').click();
-    await page.locator('[data-act="report-names"]').click();
+    if(await page.locator('[data-act="report-names"]').count())await page.locator('[data-act="report-names"]').click();   // names now also load automatically when the workbook is saved in the cloud
     await page.waitForFunction(()=>document.querySelector('.yc-meeting-reports').textContent.includes('Synthetic'));
     assert.doesNotMatch(await page.evaluate(()=>JSON.stringify(yearStore)),/Synthetic/,'named reports must not modify snapshots');
     const topText=await page.locator('.yc-meeting-reports').innerText();

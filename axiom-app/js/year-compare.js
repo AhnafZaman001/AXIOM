@@ -19,7 +19,7 @@
   var state = {
     datasets: [], selected: [], settings: loadSettings(), tableMissing: false, loaded: false, loading: false,
     error: '', imp: null, busy: false, chartMetric: 'mean', chartStream: '', view: 'overview', subjectMetric: 'mean',
-    reportTab: 'subjects', reportTopMode: 'overall', reportOverallView: 'top', reportYear: '', reportStream: '', reportSubject: '', namedYears: {}, reportNotes: {}
+    reportTab: 'subjects', reportTopMode: 'overall', reportOverallView: 'top', reportYear: '', reportStream: '', reportSubject: '', namedYears: {}, reportNotes: {}, cloudPick: null, autoNames: {}
   };
 
   /* ------------------------------ small helpers ------------------------------ */
@@ -253,7 +253,7 @@
 
   function yearsPanel() {
     var h = '<div class="yc-card yc-library"><div class="yc-head"><h3>Years to compare</h3><span class="yc-cloud-label">Private cloud</span><span class="yc-sp"></span><button class="ghost small" data-act="refresh"'+(state.loading||state.busy?' disabled':'')+'>Refresh</button>';
-    if (canManage()) h += '<input type="file" id="ycFileInput" accept=".xls,.xlsx" style="display:none;"><button class="primary" data-act="add"'+(state.busy||state.loading?' disabled':'')+'>Add year</button>';
+    if (canManage()) h += '<input type="file" id="ycFileInput" accept=".xls,.xlsx" style="display:none;"><button class="primary" data-act="add"'+(state.busy||state.loading?' disabled':'')+'>Add year</button><button class="ghost small" data-act="cloud-add"'+(state.busy||state.loading?' disabled':'')+' title="Pick a workbook that is already uploaded to the cloud">Add from cloud</button>';
     h += '</div>';
     if (state.loading) h += '<div class="yc-sub">Loading saved years…</div>';
     if (state.error) h += '<div class="yc-err">' + esc(state.error) + '</div>';
@@ -263,7 +263,7 @@
       var on = state.selected.indexOf(d.id) >= 0, r = d.import_report || {}, listed = (d.records || []).length;
       return '<div class="yc-year' + (on ? ' on' : '') + '"><label class="yc-year-pick"><input type="checkbox" data-act="pick" data-id="' + esc(d.id) + '"' + (on ? ' checked' : '') + '><div><b>' + esc(d.label) + '</b><span>' + esc(d.assessment || 'Assessment not named') + (d.grade_level ? ' · ' + esc(d.grade_level) : '') + '</span><span>' + listed + ' students</span></div></label><div class="yc-year-files"><span class="yc-file-badge" title="'+esc(d.source_file||'Saved results')+'">'+(d.source_path?'Workbook saved':'Results saved')+'</span>'+
         (d.source_path?'<button class="ghost small" data-act="download" data-id="'+esc(d.id)+'" title="Download original Excel workbook">Download</button>':'')+
-        (canManage()?(d.source_path?'<button class="ghost small" data-act="reload-file" data-id="'+esc(d.id)+'" title="Reimport the original workbook from cloud">Reload file</button>':'<button class="ghost small" data-act="attach" data-id="'+esc(d.id)+'">Attach workbook</button>')+'<button class="ghost small yc-del" data-act="del" data-id="'+esc(d.id)+'" aria-label="Delete '+esc(d.label)+'">Delete</button>':'')+'</div></div>';
+        (canManage()?(d.source_path?'<button class="ghost small" data-act="reload-file" data-id="'+esc(d.id)+'" title="Reimport the original workbook from cloud">Reload file</button>':'<button class="ghost small" data-act="cloud-attach" data-id="'+esc(d.id)+'" title="Pick this year\'s workbook from the cloud - nothing needed from this computer">From cloud</button><button class="ghost small" data-act="attach" data-id="'+esc(d.id)+'">Attach workbook</button>')+'<button class="ghost small yc-del" data-act="del" data-id="'+esc(d.id)+'" aria-label="Delete '+esc(d.label)+'">Delete</button>':'')+'</div></div>';
     }).join('') + '</div></div>';
     return h;
   }
@@ -417,6 +417,7 @@
   function meetingReportsView(){
     var ctx=reportContext();if(!ctx||!Reports)return '';
     var d=ctx.current,entry=namedEntry(d);
+    if(d.source_path&&!entry&&!state.autoNames[d.id]){state.autoNames[d.id]=1;setTimeout(loadReportNames,0);}
     var html='<section class="yc-card"><div class="yc-head"><h3>Meeting reports</h3><span class="yc-sp"></span><button class="ghost small" data-act="print-meeting">Print meeting report</button></div><div class="yc-report-controls"><label>Report year<select data-report-year>'+ctx.years.map(function(y){return '<option value="'+esc(y.id)+'"'+(y.id===d.id?' selected':'')+'>'+esc(y.label)+'</option>';}).join('')+'</select></label><label>Stream<select data-report-stream><option value="">All streams</option>'+ctx.groups.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===state.reportStream?' selected':'')+'>'+esc(s.label)+'</option>';}).join('')+'</select></label><span class="yc-report-caption">'+(ctx.previous?'Comparison: '+esc(ctx.previous.label)+' → '+esc(d.label):'Select an earlier year above to add a comparison.')+'</span></div><nav class="yc-report-tabs" aria-label="Meeting report sections">'+[['subjects','Subject results & vista'],['top','Top 10'],['tables','School result tables'],['supplies','Supplies'],['notes','Teacher notes']].map(function(t){return '<button class="ghost small'+(state.reportTab===t[0]?' active':'')+'" data-report-tab="'+t[0]+'" aria-current="'+(state.reportTab===t[0]?'page':'false')+'">'+t[1]+'</button>';}).join('')+'</nav></section>';
     if(state.reportTab==='top'){
       // Restore identities automatically from the private source workbook.
@@ -436,7 +437,7 @@
       if(!entry||!entry.data)html+='<section class="yc-card"><h3>Student names</h3><p class="yc-report-caption">'+esc(entry&&entry.error?entry.error:d.source_path?'Student names are loaded automatically from the private workbook. If loading fails, use the button below to retry.':'Attach the original workbook to this year to include names and roll numbers. An administrator can use Attach workbook above.')+'</p>'+(d.source_path?'<button class="ghost small" data-act="report-names"'+(entry&&entry.loading?' disabled':'')+'>'+(entry&&entry.loading?'Loading names…':'Load student names')+'</button>':'')+'</section>';
       if(entry&&entry.data) html+=overall?Reports.overallHtml(entry.data,ctx.previous,state.settings,state.reportStream,state.reportOverallView):Reports.topsHtml(entry.data,state.reportStream,state.reportSubject);
     }else if(state.reportTab==='tables'){
-      html+='<div class="yc-report-controls"><button class="primary small" data-act="download-tables">Download Excel</button><span class="yc-report-caption">Counts for the selected stream scope in '+esc(d.label)+', laid out like the school’s printed result tables. The pass mark and who is counted come from Settings.</span></div>'+Reports.resultTablesHtml(d,state.settings,state.reportStream);
+      html+='<div class="yc-report-controls"><button class="primary small" data-act="download-tables">Download Excel</button><span class="yc-report-caption">Counts for the selected stream scope in '+esc(d.label)+', laid out like the school\'s printed result tables, with the previous year beside it. The Excel file includes the comparison sheets. The pass mark and who is counted come from Settings.</span></div>'+Reports.resultComparisonHtml(d,ctx.previous,state.settings,state.reportStream)+'<h3 class="yc-report-h">'+esc(d.label)+' school result tables</h3>'+Reports.resultTablesHtml(d,state.settings,state.reportStream);
     }else if(state.reportTab==='supplies')html+=Reports.suppliesHtml(d,ctx.previous,state.settings,state.reportStream);
     else if(state.reportTab==='notes')html+=Reports.notesHtml(d,state.reportNotes[d.id],true);
     else html+=Reports.subjectsHtml(d,ctx.previous,state.settings,state.reportStream);
@@ -444,7 +445,7 @@
   }
   function downloadTables(){
     var ctx=reportContext();if(!ctx||!Export||!Reports)return;
-    try{var name=Export.download(Reports.resultTables(ctx.current,state.settings,state.reportStream));toast('Downloaded '+name+'.','success');}
+    try{var res=Reports.resultTables(ctx.current,state.settings,state.reportStream),cmp=Reports.resultComparison(ctx.current,ctx.previous,state.settings,state.reportStream);if(cmp)res.tables=res.tables.concat(cmp.tables);var name=Export.download(res);toast('Downloaded '+name+'.','success');}
     catch(error){toast('Could not create the Excel file: '+error.message,'warning');}
   }
   async function loadReportNames(){
@@ -539,6 +540,7 @@
     else if (act === 'close-settings') {hideChartTip();$('ycSettings').close();}
     else if (act === 'distribution' || act === 'excellence') {state.view='overview';render();var chart=document.querySelector(act==='distribution'?'.yc-distribution':'.yc-streams-excellence');if(chart)chart.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});}
     else if (act === 'download' || act === 'reload-file') cloudFile(t.getAttribute('data-id'),act==='reload-file');
+    else if ((act === 'cloud-add' || act === 'cloud-attach') && canManage()) openCloudChooser(act === 'cloud-attach' ? state.datasets.filter(function(d){return d.id===t.getAttribute('data-id');})[0] : null);
     else if (act === 'attach' && canManage()) { state.attachTarget=state.datasets.filter(function(d){return d.id===t.getAttribute('data-id');})[0]; $('ycFileInput').click(); }
     else if (act === 'del') { e.preventDefault(); e.stopPropagation(); askDelete(t.getAttribute('data-id')); }
     else if (act === 'reset') { state.settings = Core.settingsFrom({}); saveSettings(); render();if($('ycSettings'))$('ycSettings').innerHTML=settingsContent(); }
@@ -571,6 +573,69 @@
     }catch(error){toast('Could not load cloud file: '+error.message,'warning');}
     finally{state.busy=false;if(state.imp)refreshModal();}
   }
+
+  /* ---- Cloud file chooser: the same cloud files the roster's "Import from Cloud" uses ---- */
+  function sizeText(n){return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
+  function cloudBackdrop(){
+    var b=$('ycCloudBack');if(b)return b;
+    b=document.createElement('div');b.id='ycCloudBack';b.className='yc-modal-back';
+    b.innerHTML='<div class="yc-modal" role="dialog" aria-modal="true" aria-labelledby="ycCloudTitle"><div id="ycCloudBody"></div></div>';
+    document.body.appendChild(b);b.addEventListener('click',onCloudClick);b.addEventListener('change',onCloudChange);
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&b.classList.contains('open')&&state.cloudPick&&!state.cloudPick.busy)closeCloudChooser();});
+    return b;
+  }
+  function cloudBodyHtml(){
+    var c=state.cloudPick,t=c.target;
+    var opts=c.files.map(function(f){var size=f.metadata&&f.metadata.size;return '<option value="'+esc(f.name)+'"'+(c.selected===f.name?' selected':'')+'>'+esc(f.name)+(size?' \u00b7 '+sizeText(size):'')+(f.created_at?' \u00b7 '+esc(String(f.created_at).slice(0,10)):'')+'</option>';}).join('');
+    return '<h3 id="ycCloudTitle">'+(t?'Attach a cloud workbook to '+esc(t.label):'Add a year from a cloud file')+'</h3>'+
+      '<div class="yc-sub">Pick a workbook that is already in the cloud. Nothing is needed from this computer, and once it is attached, student names and roll numbers load automatically.</div>'+
+      (c.loading?'<div class="yc-sub" style="margin:14px 0;">Loading cloud files...</div>':'<select id="ycCloudSelect" class="yc-cloud-select" size="7" aria-label="Cloud files">'+opts+'</select>'+(c.files.length?'':'<div class="yc-warn">No Excel files in the cloud yet. Choose "Upload a file to cloud" once, then pick it here.</div>'))+
+      (c.error?'<div class="yc-err">'+esc(c.error)+'</div>':'')+
+      '<input type="file" id="ycCloudUpload" accept=".xls,.xlsx" style="display:none;"><div class="yc-foot"><button class="ghost small" data-cloud-act="upload"'+(c.busy?' disabled':'')+'>Upload a file to cloud</button><button class="ghost small" data-cloud-act="refresh"'+(c.busy?' disabled':'')+'>Refresh</button><span style="flex:1;"></span><button class="ghost" data-cloud-act="cancel"'+(c.busy?' disabled':'')+'>Cancel</button><button class="primary" data-cloud-act="use"'+(c.busy||!c.selected?' disabled':'')+'>'+(c.busy?'Working...':'Use selected file')+'</button></div>';
+  }
+  function renderCloud(){var body=$('ycCloudBody');if(body&&state.cloudPick)body.innerHTML=cloudBodyHtml();}
+  async function loadCloudFiles(selectName){
+    var c=state.cloudPick;if(!c)return;c.loading=true;c.error='';renderCloud();
+    try{
+      if(typeof axListCloudFiles!=='function')throw new Error('Cloud files are not available in this page.');
+      var files=(await axListCloudFiles()).filter(function(f){return /\.xlsx?$/i.test(f.name||'');});
+      var keep=selectName||c.selected;
+      c.files=files;c.selected=files.some(function(f){return f.name===keep;})?keep:(files[0]&&files[0].name)||'';
+    }catch(error){c.error='Could not load cloud files: '+(error.message||error);c.files=[];c.selected='';}
+    c.loading=false;renderCloud();
+  }
+  function openCloudChooser(target){
+    if(state.busy)return;
+    cloudBackdrop().classList.add('open');state.cloudPick={target:target,files:[],selected:'',loading:true,busy:false,error:''};
+    renderCloud();loadCloudFiles();
+  }
+  function closeCloudChooser(){var b=$('ycCloudBack');if(b)b.classList.remove('open');state.cloudPick=null;}
+  function onCloudChange(e){
+    var t=e.target,c=state.cloudPick;if(!c)return;
+    if(t.id==='ycCloudSelect'){c.selected=t.value;var u=document.querySelector('#ycCloudBack [data-cloud-act="use"]');if(u)u.disabled=false;return;}
+    if(t.id==='ycCloudUpload'){
+      var f=t.files&&t.files[0];t.value='';if(!f)return;
+      try{Cloud.checkFile(f);}catch(err){c.error=err.message;renderCloud();return;}
+      c.busy=true;c.error='';renderCloud();
+      axUploadCloudFile(f).then(function(){c.busy=false;return loadCloudFiles(f.name);},function(err){c.busy=false;c.error='Upload failed: '+(err.message||err);renderCloud();});
+    }
+  }
+  async function onCloudClick(e){
+    var b=e.target.closest?e.target.closest('[data-cloud-act]'):null,c=state.cloudPick;if(!b||!c)return;
+    var act=b.getAttribute('data-cloud-act');
+    if(act==='cancel'){closeCloudChooser();return;}
+    if(act==='refresh'){loadCloudFiles();return;}
+    if(act==='upload'){$('ycCloudUpload').click();return;}
+    if(act==='use'&&c.selected){
+      c.busy=true;c.error='';renderCloud();
+      try{
+        var buf=await axDownloadCloudFile(c.selected);
+        var file=new File([buf],c.selected,{type:/\.xlsx$/i.test(c.selected)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
+        var target=c.target;closeCloudChooser();state.attachTarget=target||null;await readFile(file,target||null);
+      }catch(err){c.busy=false;c.error='Could not open that file: '+(err.message||err);renderCloud();}
+    }
+  }
+
   function onChange(e) {
     var t = e.target;
     if(t.hasAttribute('data-report-year')){state.reportYear=t.value;state.reportStream='';state.reportSubject='';render();return;}

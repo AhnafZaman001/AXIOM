@@ -440,3 +440,16 @@ Database RLS and real workbook compatibility still require a staging check.
 appear anywhere. Narrow chart segments always have their number written out.
 Tests: `node --test axiom-app/tests/*.test.cjs`; browser:
 `PLAYWRIGHT_CHANNEL=chromium node axiom-app/tests/year-compare-browser.cjs`.
+
+### Cloud files for Year Comparison (upload once, never attach from this computer again)
+
+- **Upload once:** in Year Comparison choose **Add from cloud** (or **From cloud** on a year that only has saved
+  results), then **Upload a file to cloud** to put a year's workbook in the shared cloud (the same cloud files the roster's
+  *Import from Cloud* uses). Pick it from the list and **Use selected file**: the usual review screen opens, and saving stores
+  the results **and** the original workbook privately (year card says **Workbook saved**).
+- **After that nothing is needed from your computer:** student names and roll numbers load automatically from the saved
+  workbook in Top 10 and the complete list. **Attach workbook** (local file) still works as a fallback.
+- **School result tables now compare years:** the *School result tables* tab starts with three comparison tables (%-age wise,
+  marks-wise, grade-wise) showing, for every band from 90–100% down to less than 20%, how many students were in it in the
+  previous year and this year, each year's share of counted students, and the change. Changes are withheld when the two
+  assessments are not comparable. **Download Excel** includes these as extra sheets (Compare %age / marks / grades).

@@ -244,3 +244,45 @@ test('small shares get a zoomed, labelled axis; the average keeps 0–100%',()=>
   assert.match(top,/scale 0–50%/);
   assert.doesNotMatch(support+average+top,/NaN|Infinity/);
 });
+
+/* ---------- year comparison of the school tables ---------- */
+function sch(label,streams,opts){return ds(label,streams,opts);}
+test('comparison tables list every band for both years with counts, shares and changes',()=>{
+  const prev=sch('2025-26',{PM:{subjects:FIVE,students:[...TOTALS,...TOTALS.slice(0,2)]}});          // 7 students: 4x 90%+... see below
+  const cur=sch('2026-27',{PM:{subjects:FIVE,students:TOTALS.slice(0,3)}});
+  const c=Reports.resultComparison(cur,prev,{},'');
+  assert.equal(c.allowed,true);
+  assert.deepEqual(c.tables.map(t=>t.sheet),['Compare %age','Compare marks','Compare grades']);
+  const pt=c.tables[0],top=pt.rows[0];
+  assert.deepEqual(pt.head.slice(0,5),['','2025-26 students','2025-26 share','2026-27 students','2026-27 share']);
+  assert.equal(top[0],'90% -> 100%');
+  assert.equal(top[1],4);                 // 2025-26: 500, 450, 500, 450
+  assert.equal(top[3],2);                 // 2026-27: 500, 450
+  assert.equal(top[5],'-2');
+  assert.equal(top[2],'57.1%');           // 4 of 7
+  assert.equal(top[4],'66.7%');           // 2 of 3
+  assert.equal(top[6],'+9.5 pp');
+  assert.deepEqual(pt.rows[pt.rows.length-1],['Total Appeared in Exams',7,'',3,'','','']);
+});
+test('comparison withholds changes when the two assessments are not comparable, and asks for a previous year when there is none',()=>{
+  const prev=sch('2025-26',{PM:{subjects:FIVE,students:TOTALS}},{assessment:'Mid term'});
+  const cur=sch('2026-27',{PM:{subjects:FIVE,students:TOTALS}},{assessment:'Final'});
+  const c=Reports.resultComparison(cur,prev,{},'');
+  assert.equal(c.allowed,false);
+  assert.equal(c.tables[0].rows[0][5],'\u2014');assert.equal(c.tables[0].rows[0][6],'\u2014');
+  assert.match(c.tables[0].notes[0],/not directly comparable/);
+  assert.equal(Reports.resultComparison(cur,null,{},''),null);
+  assert.match(Reports.resultComparisonHtml(cur,null,{},''),/Tick the previous year/);
+  assert.match(Reports.resultComparisonHtml(cur,prev,{},''),/GRADE WISE RESULT/);
+});
+test('comparison respects the stream scope, and the Excel export carries the comparison sheets',()=>{
+  const two={PM:{subjects:FIVE,students:TOTALS},PE:{subjects:FIVE,students:TOTALS.slice(0,2)}};
+  const prev=sch('2025-26',two),cur=sch('2026-27',two);
+  const pm=Reports.resultComparison(cur,prev,{},'PM'),all=Reports.resultComparison(cur,prev,{},'');
+  assert.equal(pm.tables[0].rows[pm.tables[0].rows.length-1][3],5);       // PM only
+  assert.equal(all.tables[0].rows[all.tables[0].rows.length-1][3],7);     // PM + PE
+  const res=Reports.resultTables(cur,{},'');res.tables=res.tables.concat(all.tables);
+  const files=unzip(Exporter.build(Exporter.fromTables(res)));
+  assert.match(files['xl/workbook.xml'],/name="Compare %age"/);assert.match(files['xl/workbook.xml'],/name="Compare grades"/);
+  assert.match(files['xl/worksheets/sheet4.xml'],/2025-26 students/);
+});
