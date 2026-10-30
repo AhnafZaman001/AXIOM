@@ -698,9 +698,9 @@ function animateCounters(host){
 function triggerEntranceAnimations(){
   if(prefersReducedMotion()) return;
   const els = document.querySelectorAll('.hero-metric, .card, .chart-card');
+  els.forEach(el=>el.classList.remove('enter-anim'));
+  if(els.length) void els[0].offsetWidth; // one layout flush for the whole group
   els.forEach((el,i)=>{
-    el.classList.remove('enter-anim');
-    void el.offsetWidth; // restart animation
     el.style.animationDelay = Math.min(i*24, 220) + 'ms';
     el.classList.add('enter-anim');
   });
@@ -1588,7 +1588,37 @@ document.getElementById('svZoneSeg').addEventListener('click', (e)=>{
 });
 
 let mainTableSort = { key: null, dir: 'desc' };
-function renderTable(){
+// Only the visible roster page becomes DOM; filtering and sorting use all students.
+function rosterPage(students, wrap, requestedPage, renderPage){
+  const size = 100;
+  const page = Math.max(0, Math.min(Number.isInteger(requestedPage) ? requestedPage : 0, Math.max(0, Math.ceil(students.length / size) - 1)));
+  const start = page * size;
+  const id = wrap.id + 'Pagination';
+  let nav = document.getElementById(id);
+  if(!nav){
+    nav = document.createElement('nav');
+    nav.id = id;
+    nav.className = 'roster-pagination';
+    nav.setAttribute('aria-label', 'Student roster pages');
+    wrap.before(nav);
+  }
+  nav.hidden = students.length <= size;
+  nav.innerHTML = `<span role="status">${start+1}–${Math.min(start+size, students.length)} of ${students.length} students</span><button type="button" data-page="${page-1}" ${page===0?'disabled':''}>Previous</button><button type="button" data-page="${page+1}" ${start+size>=students.length?'disabled':''}>Next</button>`;
+  nav.onclick = e=>{
+    const button = e.target.closest('button[data-page]');
+    if(!button || button.disabled) return;
+    const direction = button.textContent;
+    renderPage(Number(button.dataset.page));
+    const replacement = Array.from(nav.querySelectorAll('button')).find(b=>b.textContent===direction && !b.disabled) || nav.querySelector('button:not(:disabled)');
+    if(replacement) replacement.focus({preventScroll:true});
+  };
+  return students.slice(start, start + size);
+}
+function renderRosterOnly(){ renderTable({tableOnly:true}); }
+let rosterSearchTimer;
+function renderTable(options = {}){
+  clearTimeout(rosterSearchTimer);
+  const tableOnly = options.tableOnly === true;
   const def = currentSectionDef();
   const store = ensureSection(def.key);
   const head = document.getElementById('tableHeadRow');
@@ -1621,7 +1651,8 @@ function renderTable(){
   if(svSub) svSub.textContent = `${def.label} · ${subjFilter||'All subjects'} · ${students.length} of ${store.students.length} student${store.students.length===1?'':'s'} shown`;
   axRenderZoneSeg(def, store, subjFilter);
 
-  renderHeroMetrics(def, store);
+  const pageStudents = rosterPage(students, tableSection, options.page, page=>renderTable({tableOnly:true, page}));
+  if(!tableOnly) renderHeroMetrics(def, store);
 
   if(store.students.length === 0){
     tableSection.style.display='none'; emptyState.style.display='block';
@@ -1629,7 +1660,7 @@ function renderTable(){
     document.getElementById('transitionCardsWrap').innerHTML='';
     document.getElementById('moversWrap').innerHTML='';
     document.getElementById('insightsWrap').innerHTML='';
-    renderCharts(def, store);
+    if(!tableOnly) renderCharts(def, store);
     return;
   }
 
@@ -1640,7 +1671,7 @@ function renderTable(){
     tableSection.style.display='block'; emptyState.style.display='none';
   }
 
-  body.innerHTML = students.map(st=>{
+  body.innerHTML = pageStudents.map(st=>{
     let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}<span class="ax-who"><b>${escapeHtml(st.name)}</b>${st.rollNo!=null&&st.rollNo!==''?`<small>Roll ${escapeHtml(st.rollNo)}</small>`:''}</span></td>`;
     row += rosterExtraCellsHtml(st, def, subjFilter);
     if(perTest) row += rosterTestCellsHtml(st, subjFilter, testNames);
@@ -1677,13 +1708,15 @@ function renderTable(){
     return `<tr data-sid="${st.id}">${row}</tr>`;
   }).join('') + axAverageRowHtml(store, def, subjFilter, perTest, subjectsShown, testNames);
 
-  renderTransitionCards(def, store);
-  renderCharts(def, store);
-  renderMovers(def, store);
-  renderInsights(def, store);
+  if(!tableOnly){
+    renderTransitionCards(def, store);
+    renderCharts(def, store);
+    renderMovers(def, store);
+    renderInsights(def, store);
+  }
 }
 document.getElementById('tableHeadRow').addEventListener('click', (e)=>{
-  handleSortHeaderClick(e, mainTableSort, renderTable);
+  handleSortHeaderClick(e, mainTableSort, renderRosterOnly);
 });
 
 /* ---- 010_zone-transition-report.js ---- */
@@ -3520,6 +3553,8 @@ function renderRosterTable(cfg){
     def, sortState, {positionSubject: subjFilterVal}
   );
 
+  const pageStudents = rosterPage(students, wrapEl, cfg.page, page=>renderRosterTable({...cfg, page}));
+
   if(store.students.length === 0){
     wrapEl.style.display='none'; emptyEl.style.display='block';
     emptyEl.innerHTML = emptyHtmlNoStudents;
@@ -3532,7 +3567,7 @@ function renderRosterTable(cfg){
   }
   wrapEl.style.display='block'; emptyEl.style.display='none';
 
-  bodyEl.innerHTML = students.map(st=>{
+  bodyEl.innerHTML = pageStudents.map(st=>{
     let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" data-pin-skey="${def.key}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}${escapeHtml(st.name)}</td>`;
     row += rosterExtraCellsHtml(st, def, subjFilterVal);
     if(perTest) row += rosterTestCellsHtml(st, subjFilterVal, testNames);
@@ -3705,11 +3740,12 @@ document.getElementById('teacherSelect').addEventListener('change', renderTeache
 document.getElementById('homeBtn').addEventListener('click', ()=>setActivePage('section'));
 
 document.getElementById('sectionSelect').addEventListener('change', refreshAllUI);
-document.getElementById('subjectFilter').addEventListener('change', ()=>{ updateSubjectTeacherHint(); renderTable(); });
-document.getElementById('zoneFilter').addEventListener('change', renderTable);
+document.getElementById('subjectFilter').addEventListener('change', ()=>{ updateSubjectTeacherHint(); renderRosterOnly(); });
+document.getElementById('zoneFilter').addEventListener('change', renderRosterOnly);
 document.getElementById('studentSearch').addEventListener('input', (e)=>{
   searchQuery = e.target.value.trim().toLowerCase();
-  renderTable();
+  clearTimeout(rosterSearchTimer);
+  rosterSearchTimer = setTimeout(renderRosterOnly, 100);
 });
 document.getElementById('chartSubjectSelect').addEventListener('change', ()=>renderCharts(currentSectionDef(), ensureSection(currentSectionKey())));
 document.getElementById('reportSubjectSelect').addEventListener('change', ()=>renderTransitionCards(currentSectionDef(), ensureSection(currentSectionKey())));
@@ -3728,7 +3764,7 @@ document.querySelectorAll('#quickChipRow .chip').forEach(chip=>{
       c.classList.toggle('active', isActive);
       c.setAttribute('aria-pressed', String(isActive));
     });
-    renderTable();
+    renderRosterOnly();
   };
   chip.addEventListener('click', activate);
   chip.addEventListener('keydown', (e)=>{
