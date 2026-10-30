@@ -1,0 +1,15 @@
+.axiom-logo-plate{display:inline-flex;align-items:center;justify-content:center;background:#f7f6fa;border-radius:12px;padding:6px 12px;box-sizing:border-box}
+.axiom-logo-plate img{display:block;width:180px;max-width:100%;height:auto}
+.brand-launch{position:fixed;inset:0;z-index:900;background:#121216;display:grid;place-items:center;opacity:1;transition:opacity .2s ease}
+.brand-launch[hidden]{display:none}
+.brand-launch.leaving{opacity:0;pointer-events:none}
+.brand-launch-content{text-align:center;width:min(360px,82vw)}
+.brand-launch .axiom-logo-plate{width:100%;padding:12px 18px;animation:axiom-pinch .75s cubic-bezier(.22,1,.36,1) both}
+.brand-launch .axiom-logo-plate img{width:100%}
+.brand-launch p{color:#aaa6b8;font:400 .85rem system-ui,sans-serif;margin:18px 0 0}
+.brand-launch-track{height:2px;background:#2a2833;overflow:hidden;width:140px;margin:28px auto 0;border-radius:2px}
+.brand-launch-track span{display:block;width:45%;height:100%;background:#8062d6;animation:axiom-travel .8s ease-in-out infinite}
+@keyframes axiom-pinch{0%{opacity:0;transform:scale(.88)}65%{opacity:1;transform:scale(1.025)}100%{opacity:1;transform:scale(1)}}
+@keyframes axiom-travel{from{transform:translateX(-110%)}to{transform:translateX(330%)}}
+@media(prefers-reduced-motion:reduce){.brand-launch,.brand-launch *{animation:none!important;transition:none!important}}
+@media print{.brand-launch{display:none!important}}

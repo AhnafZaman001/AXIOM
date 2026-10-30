@@ -4711,39 +4711,6 @@ renderTable();
 renderTRRoster();
 renderPinnedPanel();
 
-(function runLoadingSequence(){
-  const screen = document.getElementById('loadingScreen');
-  if(!screen) return;
-  if(prefersReducedMotion()){
-    screen.remove();
-    return;
-  }
-  const fill = document.getElementById('loadingBarFill');
-  const status = document.getElementById('loadingStatus');
-  const steps = [
-    [22, 'Loading student records…'],
-    [55, 'Calculating averages…'],
-    [82, 'Detecting trends…'],
-    [100, 'Building dashboard…']
-  ];
-  let i = 0;
-  function next(){
-    if(i >= steps.length){
-      setTimeout(()=>{
-        screen.classList.add('hide');
-        setTimeout(()=>{ if(screen.parentNode) screen.parentNode.removeChild(screen); }, 260);
-        triggerEntranceAnimations();
-      }, 70);
-      return;
-    }
-    const [pct, label] = steps[i++];
-    if(fill) fill.style.width = pct + '%';
-    if(status) status.textContent = label;
-    setTimeout(next, 70);
-  }
-  next();
-})();
-
 /* ---- 025_print-report-generation-native-browser-print-no-ex.js ---- */
 
 /* ===================== PRINT REPORT GENERATION (native browser print, no external libraries) ===================== */

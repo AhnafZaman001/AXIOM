@@ -7,9 +7,10 @@
 <link rel="stylesheet" href="css/styles.css?v=20261030b">
 <link rel="stylesheet" href="css/year-compare.css?v=20261030b">
 <link rel="stylesheet" href="css/refresh.css?v=20261030b">
+<link rel="stylesheet" href="css/brand.css?v=1">
 </head>
 <body>
-<div id="welcomeHero" class="welcome-hero" aria-hidden="true">
+<div id="welcomeHero" class="welcome-hero" aria-hidden="false">
   <div class="wh-decor" aria-hidden="true">
     <span class="wh-shard violet wh-s1"></span>
     <span class="wh-shard violet-dark wh-s2"></span>
@@ -36,37 +37,13 @@
     <div class="wh-credit">An idea by Muhammad Zaman Khan</div>
   </main>
 </div>
-<script>
-  // Welcome hero: shown fresh on every load of this already-authenticated
-  // page (first sign-in or a plain refresh). Dismiss reveals the dashboard
-  // underneath, whatever state it's in (still loading or already ready).
-  (function(){
-    var hero = document.getElementById('welcomeHero');
-    var btn = document.getElementById('welcomeHeroEnter');
-    if (!hero || !btn) return;
-    function dismiss(){
-      hero.classList.add('wh-hide');
-      hero.setAttribute('aria-hidden', 'true');
-      setTimeout(function(){ if (hero.parentNode) hero.parentNode.removeChild(hero); }, 340);
-    }
-    btn.addEventListener('click', dismiss);
-    try {
-      if (sessionStorage.getItem('axiom.switching')) {
-        sessionStorage.removeItem('axiom.switching');
-        hero.style.display = 'none';
-        if (hero.parentNode) hero.parentNode.removeChild(hero);
-      }
-    } catch (e) {}
-  })();
-</script>
+<script src="js/brand-launch.js?v=1" defer></script>
 <div class="bg-animated" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
-<div id="loadingScreen" class="loading-screen">
-  <div class="loading-inner">
-    <div class="brand-orbit"><div class="orbit-ring"><span class="orbit-dot"></span></div><div class="loading-mark"><span>L</span></div></div>
-    <div class="loading-kicker">AXIOM</div>
-    <div class="loading-title">Student Performance Tracker</div>
-    <div class="loading-sub" id="loadingStatus">Loading student records…</div>
-    <div class="loading-bar"><div class="loading-bar-fill" id="loadingBarFill"></div></div>
+<div id="brandLaunch" class="brand-launch" hidden role="status" aria-live="polite" aria-label="Opening AXIOM dashboard">
+  <div class="brand-launch-content">
+    <div class="axiom-logo-plate"><img src="assets/axiom-logo.png" alt="AXIOM" width="2172" height="724" fetchpriority="high"></div>
+    <div class="brand-launch-track" aria-hidden="true"><span></span></div>
+    <p>Opening your dashboard…</p>
   </div>
 </div>
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
