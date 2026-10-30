@@ -2828,9 +2828,9 @@ function renderOverallSummary(){
   document.getElementById('osTopList').innerHTML = ranked.length ? ranked.map((s,i)=>{
     const z = zoneOf(s.overall,false);
     return `<div class="ax-top-row" style="--i:${i}"><span class="ax-rank">${i+1}</span>
-      <div class="ax-top-name person-link" data-sid="${s.id}" data-skey="${s.sectionKey}"><b>${escapeHtml(s.name)}</b><small>${escapeHtml(axShortSection(s.sectionLabel))}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}${s.obtained!=null&&s.max!=null?` · ${s.obtained}/${s.max}`:''}</small></div>
+      <div class="ax-top-name person-link" data-sid="${s.id}" data-skey="${s.sectionKey}"><b>${escapeHtml(s.name)}</b><small>${escapeHtml(axShortSection(s.sectionLabel))}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}</small></div>
       <div class="ax-bar"><i style="width:${Math.max(2,Math.min(100,s.overall))}%;background:${axZoneColor(z)}"></i></div>
-      <b class="ax-pct">${s.overall}%</b><span class="ax-badge z-${z}">${gradeFor(s.overall)}</span></div>`;
+      <div class="ax-top-score"><b class="ax-pct">${s.overall}%</b><small class="ax-top-marks" title="Obtained marks / total marks">${s.obtained!=null&&s.max!=null?`${escapeHtml(s.obtained)} / ${escapeHtml(s.max)}`:'—'}</small></div><span class="ax-badge z-${z}">${gradeFor(s.overall)}</span></div>`;
   }).join('') : `<div class="ax-empty">No data yet — import results to see the overall dashboard.</div>`;
 
   // Performance zones: one donut + legend (legend rows open the student list drawer)

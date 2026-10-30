@@ -87,7 +87,7 @@ body:not([data-ax-page="yearCompare"]) .ax-split .ax-block,body:not([data-ax-pag
 body:not([data-ax-page="yearCompare"]) .ax-split .ax-top-block{margin-top:0}
 body:not([data-ax-page="yearCompare"]) .ax-h3{display:flex;align-items:baseline;gap:8px;margin:0 0 14px;font-size:1.02rem;font-weight:600;color:var(--ink);letter-spacing:-.005em}
 body:not([data-ax-page="yearCompare"]) .ax-muted{color:var(--muted);font-weight:400;font-size:.82rem}
-body:not([data-ax-page="yearCompare"]) .ax-top-row{display:grid;grid-template-columns:26px minmax(150px,1.25fr) minmax(110px,1fr) 62px 44px;gap:14px;align-items:center;padding:14px 0;border-top:1px solid var(--line)}
+body:not([data-ax-page="yearCompare"]) .ax-top-row{display:grid;grid-template-columns:26px minmax(150px,1.25fr) minmax(70px,1fr) minmax(96px,max-content) 44px;gap:14px;align-items:center;padding:14px 0;border-top:1px solid var(--line)}
 body:not([data-ax-page="yearCompare"]) .ax-top-row:last-child{border-bottom:1px solid var(--line)}
 body:not([data-ax-page="yearCompare"]) .ax-rank{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
 body:not([data-ax-page="yearCompare"]) .ax-top-name{min-width:0;cursor:pointer}
@@ -156,7 +156,7 @@ body:not([data-ax-page="yearCompare"]) .ax-zonecards{margin-top:0}
   body:not([data-ax-page="yearCompare"]) .ax-split,body:not([data-ax-page="yearCompare"]) .ax-grid2,body:not([data-ax-page="yearCompare"]) .ax-grid-asym{grid-template-columns:minmax(0,1fr)}
   body:not([data-ax-page="yearCompare"]) .ax-grid-asym .ax-card{margin-right:0}
   body:not([data-ax-page="yearCompare"]) .ax-attn{padding-left:0;border-left:0;margin-top:20px}
-  body:not([data-ax-page="yearCompare"]) .ax-top-row{grid-template-columns:24px minmax(0,1fr) 58px 40px}
+  body:not([data-ax-page="yearCompare"]) .ax-top-row{grid-template-columns:24px minmax(0,1fr) minmax(88px,max-content) 40px}
   body:not([data-ax-page="yearCompare"]) .ax-top-row .ax-bar{display:none}
 }
 body:not([data-ax-page="yearCompare"]) .ax-plain li{display:block;gap:0;line-height:1.55}
@@ -295,3 +295,7 @@ body:not([data-ax-page="yearCompare"]) .ax-msg:hover{background:rgba(139,92,246,
   body:not([data-ax-page="yearCompare"]) .ax-grid-asym{grid-template-columns:minmax(0,1fr)}
   body:not([data-ax-page="yearCompare"]) #tableSection .table-wrap{padding:4px 10px 12px}
 }
+
+/* Keep marks visible beside the percentage, outside truncated student metadata. */
+body:not([data-ax-page="yearCompare"]) .ax-top-score{text-align:right;font-variant-numeric:tabular-nums}
+body:not([data-ax-page="yearCompare"]) .ax-top-marks{display:block;margin-top:3px;font-size:.78rem;color:var(--muted);white-space:nowrap}
