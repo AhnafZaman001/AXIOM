@@ -216,3 +216,7 @@
 #yearComparePage .yc-report-table tbody tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 #yearComparePage .yc-report-table tr>:first-child{border-radius:9px 0 0 9px}
 #yearComparePage .yc-report-table tr>:last-child{border-radius:0 9px 9px 0}
+#ycTourControls{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:12px;padding:10px 16px;border:1px solid var(--accent);border-radius:16px;background:var(--paper-raised);color:var(--ink);box-shadow:0 8px 30px #0005;max-width:95vw}
+#ycTourControls[hidden]{display:none}
+#ycTourControls button{padding:8px 12px;border-radius:8px;cursor:pointer}
+@media print{#ycTourControls,[data-tour]{display:none!important}}
