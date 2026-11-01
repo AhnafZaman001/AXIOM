@@ -6,6 +6,7 @@ const Core=require('../js/year-compare-core.js');
 function mock(options={}){
   const files=new Map(),rows=[],events=[];
   const client={storage:{from(bucket){assert.equal(bucket,'year-result-files');return {
+    async list(prefix,{limit,offset}){assert.equal(prefix,'workbooks');return {data:[...files.keys()].filter(p=>p.startsWith(prefix+'/')).slice(offset,offset+limit).map(p=>({name:p.slice(prefix.length+1)}))};},
     async upload(path,file,config){events.push('upload');assert.equal(config.upsert,false);if(options.uploadFail)return {error:{message:'Upload denied'}};files.set(path,file);return {data:{path}};},
     async remove(paths){events.push('cleanup');if(options.cleanupFail)return {error:{message:'Delete denied'}};paths.forEach(p=>files.delete(p));return {data:[]};},
     async download(path){return files.has(path)?{data:files.get(path)}:{error:{message:'Missing file'}};}
@@ -74,4 +75,23 @@ test('many years keep chart dimensions valid and labels are escaped',()=>{
   const analyses=Array.from({length:50},(_,i)=>analysis(i===0?'<script>':'Year '+i,60));
   const html=Charts.distribution(analyses,Core.BAND_LABELS)+Charts.trend(analyses,'support',Core.DEFAULTS);
   assert.doesNotMatch(html,/<script>|width="-|NaN|Infinity/);assert.match(html,/&lt;script&gt;/);
+});
+
+test('year library uploads privately and reuses the object when saving results',async()=>{
+  const m=mock();
+  const name=await m.store.uploadFile(file);
+  const listed=await m.store.listFiles();
+  assert.equal(listed.length,1);
+  assert.equal(listed[0].displayName,file.name);
+  assert.equal(listed[0].path,'workbooks/'+name);
+  const saved=await m.store.save(ds,file,null,listed[0].path);
+  assert.equal(saved.source_path,listed[0].path);
+  assert.equal(m.files.size,1);
+  assert.deepEqual(m.events,['upload','save']);
+});
+test('failed year save preserves a previously uploaded library workbook',async()=>{
+  const m=mock({saveFail:true});
+  const name=await m.store.uploadFile(file);
+  await assert.rejects(m.store.save(ds,file,null,'workbooks/'+name),/Save failed/);
+  assert.equal(m.files.size,1);
 });

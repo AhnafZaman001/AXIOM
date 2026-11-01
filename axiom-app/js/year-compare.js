@@ -70,16 +70,15 @@
           state.datasets = res.data || [];
           state.tableMissing = false;
           sortDatasets();
-          if (!state.selected.length) state.selected = state.datasets.slice(-2).map(function (d) { return d.id; });
           state.selected = state.selected.filter(function (id) { return state.datasets.some(function (d) { return d.id === id; }); });
         }
         done();
       }, function (err) { state.error = 'Saved years could not be loaded: ' + (err && err.message || err); done(); });
   }
 
-  function persist(ds, file, previous, cloudSource) {
+  function persist(ds, file, previous, cloudSource, libraryFile) {
     if (state.tableMissing || typeof supabaseClient === 'undefined' || !Cloud) return Promise.reject(new Error('Cloud storage is unavailable. Run migrations 013 and 014, then refresh.'));
-    return cloudSource ? Cloud.create(supabaseClient).saveSnapshot(ds,cloudSource) : Cloud.create(supabaseClient).save(ds,file,previous);
+    return cloudSource ? Cloud.create(supabaseClient).saveSnapshot(ds,cloudSource) : Cloud.create(supabaseClient).save(ds,file,previous,libraryFile);
   }
   function removeFromStore(d) {
     return Cloud.create(supabaseClient).remove(d);
@@ -253,7 +252,7 @@
 
   function yearsPanel() {
     var h = '<div class="yc-card yc-library"><div class="yc-head"><h3>Years to compare</h3><span class="yc-cloud-label">Private cloud</span><span class="yc-sp"></span><button class="ghost small" data-act="refresh"'+(state.loading||state.busy?' disabled':'')+'>Refresh</button>';
-    if (canManage()) h += '<input type="file" id="ycFileInput" accept=".xls,.xlsx" style="display:none;"><button class="primary" data-act="add"'+(state.busy||state.loading?' disabled':'')+'>Add year</button><button class="ghost small" data-act="cloud-add"'+(state.busy||state.loading?' disabled':'')+' title="Pick a workbook that is already uploaded to the cloud">Add from cloud</button>';
+    if (canManage()) h += '<input type="file" id="ycFileInput" accept=".xls,.xlsx" style="display:none;"><button class="primary" data-act="add"'+(state.busy||state.loading?' disabled':'')+'>Add year</button><button class="ghost small" data-act="cloud-add"'+(state.busy||state.loading?' disabled':'')+' title="Pick a workbook that is already uploaded to the cloud">Year files in cloud</button>';
     h += '</div>';
     if (state.loading) h += '<div class="yc-sub">Loading saved years…</div>';
     if (state.error) h += '<div class="yc-err">' + esc(state.error) + '</div>';
@@ -574,7 +573,7 @@
     finally{state.busy=false;if(state.imp)refreshModal();}
   }
 
-  /* ---- Cloud file chooser: the same cloud files the roster's "Import from Cloud" uses ---- */
+  /* ---- Private Year Comparison workbook library, separate from roster imports ---- */
   function sizeText(n){return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
   function cloudBackdrop(){
     var b=$('ycCloudBack');if(b)return b;
@@ -586,9 +585,9 @@
   }
   function cloudBodyHtml(){
     var c=state.cloudPick,t=c.target;
-    var opts=c.files.map(function(f){var size=f.metadata&&f.metadata.size;return '<option value="'+esc(f.name)+'"'+(c.selected===f.name?' selected':'')+'>'+esc(f.name)+(size?' \u00b7 '+sizeText(size):'')+(f.created_at?' \u00b7 '+esc(String(f.created_at).slice(0,10)):'')+'</option>';}).join('');
+    var opts=c.files.map(function(f){var size=f.metadata&&f.metadata.size;return '<option value="'+esc(f.name)+'"'+(c.selected===f.name?' selected':'')+'>'+esc(f.displayName||f.name)+(size?' \u00b7 '+sizeText(size):'')+(f.created_at?' \u00b7 '+esc(String(f.created_at).slice(0,10)):'')+'</option>';}).join('');
     return '<h3 id="ycCloudTitle">'+(t?'Attach a cloud workbook to '+esc(t.label):'Add a year from a cloud file')+'</h3>'+
-      '<div class="yc-sub">Pick a workbook that is already in the cloud. Nothing is needed from this computer, and once it is attached, student names and roll numbers load automatically.</div>'+
+      '<div class="yc-sub">Files here belong only to Year Comparison. Upload a year workbook once and reuse it here.</div>'+
       (c.loading?'<div class="yc-sub" style="margin:14px 0;">Loading cloud files...</div>':'<select id="ycCloudSelect" class="yc-cloud-select" size="7" aria-label="Cloud files">'+opts+'</select>'+(c.files.length?'':'<div class="yc-warn">No Excel files in the cloud yet. Choose "Upload a file to cloud" once, then pick it here.</div>'))+
       (c.error?'<div class="yc-err">'+esc(c.error)+'</div>':'')+
       '<input type="file" id="ycCloudUpload" accept=".xls,.xlsx" style="display:none;"><div class="yc-foot"><button class="ghost small" data-cloud-act="upload"'+(c.busy?' disabled':'')+'>Upload a file to cloud</button><button class="ghost small" data-cloud-act="refresh"'+(c.busy?' disabled':'')+'>Refresh</button><span style="flex:1;"></span><button class="ghost" data-cloud-act="cancel"'+(c.busy?' disabled':'')+'>Cancel</button><button class="primary" data-cloud-act="use"'+(c.busy||!c.selected?' disabled':'')+'>'+(c.busy?'Working...':'Use selected file')+'</button></div>';
@@ -597,8 +596,8 @@
   async function loadCloudFiles(selectName){
     var c=state.cloudPick;if(!c)return;c.loading=true;c.error='';renderCloud();
     try{
-      if(typeof axListCloudFiles!=='function')throw new Error('Cloud files are not available in this page.');
-      var files=(await axListCloudFiles()).filter(function(f){return /\.xlsx?$/i.test(f.name||'');});
+      var files=await Cloud.create(supabaseClient).listFiles();
+      files.forEach(function(f){var ds=state.datasets.find(function(d){return d.source_path===f.path;});if(ds)f.displayName=ds.source_file||ds.label;});
       var keep=selectName||c.selected;
       c.files=files;c.selected=files.some(function(f){return f.name===keep;})?keep:(files[0]&&files[0].name)||'';
     }catch(error){c.error='Could not load cloud files: '+(error.message||error);c.files=[];c.selected='';}
@@ -617,7 +616,7 @@
       var f=t.files&&t.files[0];t.value='';if(!f)return;
       try{Cloud.checkFile(f);}catch(err){c.error=err.message;renderCloud();return;}
       c.busy=true;c.error='';renderCloud();
-      axUploadCloudFile(f).then(function(){c.busy=false;return loadCloudFiles(f.name);},function(err){c.busy=false;c.error='Upload failed: '+(err.message||err);renderCloud();});
+      Cloud.create(supabaseClient).uploadFile(f).then(function(name){c.busy=false;return loadCloudFiles(name);},function(err){c.busy=false;c.error='Upload failed: '+(err.message||err);renderCloud();});
     }
   }
   async function onCloudClick(e){
@@ -629,9 +628,16 @@
     if(act==='use'&&c.selected){
       c.busy=true;c.error='';renderCloud();
       try{
-        var buf=await axDownloadCloudFile(c.selected);
-        var file=new File([buf],c.selected,{type:/\.xlsx$/i.test(c.selected)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
-        var target=c.target;closeCloudChooser();state.attachTarget=target||null;await readFile(file,target||null);
+        var chosen=c.files.find(function(f){return f.name===c.selected;});
+        var savedYear=state.datasets.find(function(d){return d.source_path===chosen.path;});
+        if(savedYear){
+          if(c.target && c.target.id!==savedYear.id)throw new Error('This workbook already belongs to '+savedYear.label+'. Choose its year in the list.');
+          if(state.selected.indexOf(savedYear.id)<0)state.selected.push(savedYear.id);
+          closeCloudChooser();render();return;
+        }
+        var buf=await Cloud.create(supabaseClient).download({source_path:chosen.path});
+        var file=new File([buf],chosen.displayName||c.selected,{type:/\.xlsx$/i.test(c.selected)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
+        var target=c.target;closeCloudChooser();state.attachTarget=target||null;await readFile(file,target||null);if(state.imp)state.imp.libraryFile=chosen.path;
       }catch(err){c.busy=false;c.error='Could not open that file: '+(err.message||err);renderCloud();}
     }
   }
@@ -770,7 +776,7 @@
     var existing = existingFor({ label: ds.label, assessment: ds.assessment, grade: ds.grade_level });
     if(imp.cloudSource && existing && existing.id!==imp.cloudSource.id){imp.error='Those year details belong to another saved dataset. Keep this workbook attached to its own year.';refreshModal();return;}
     state.busy = true; imp.error = ''; refreshModal();
-    persist(ds,imp.file,existing,imp.cloudSource).then(function (saved) {
+    persist(ds,imp.file,existing,imp.cloudSource,imp.libraryFile).then(function (saved) {
       state.busy = false;
       state.datasets = state.datasets.filter(function (d) { return d.id !== saved.id && !(existing && d.id === existing.id); });
       state.datasets.push(saved); sortDatasets();

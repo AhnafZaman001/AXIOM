@@ -20,10 +20,31 @@
       if(res.error) throw new Error(message(res.error));
       return res.data||[];
     }
-    async function save(ds,file,previous){
+    async function listFiles(){
+      var files=[],offset=0;
+      while(true){
+        var res=await storage().list('workbooks',{limit:100,offset:offset,sortBy:{column:'name',order:'asc'}});
+        if(res.error)throw new Error(message(res.error));
+        var batch=res.data||[];
+        files=files.concat(batch.filter(function(f){return /\.xlsx?$/i.test(f.name||'');}).map(function(f){
+          return Object.assign({},f,{path:'workbooks/'+f.name,displayName:f.name.replace(/^[a-f0-9-]{36}__/, '')});
+        }));
+        if(batch.length<100)break;
+        offset+=batch.length;
+      }
+      return files;
+    }
+    async function uploadFile(file){
       checkFile(file);
-      var path='workbooks/'+crypto.randomUUID()+(/\.xlsx$/i.test(file.name)?'.xlsx':'.xls');
-      var upload=await storage().upload(path,file,{upsert:false,cacheControl:'0',contentType:/\.xlsx$/i.test(file.name)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
+      var name=crypto.randomUUID()+'__'+file.name.replace(/[^a-zA-Z0-9._ -]/g,'_');
+      var res=await storage().upload('workbooks/'+name,file,{upsert:false,cacheControl:'0',contentType:/\.xlsx$/i.test(file.name)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
+      if(res.error)throw new Error(message(res.error));
+      return name;
+    }
+    async function save(ds,file,previous,libraryFile){
+      checkFile(file);
+      var path=libraryFile||'workbooks/'+crypto.randomUUID()+(/\.xlsx$/i.test(file.name)?'.xlsx':'.xls');
+      var upload=libraryFile?{}:await storage().upload(path,file,{upsert:false,cacheControl:'0',contentType:/\.xlsx$/i.test(file.name)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
       if(upload.error) throw new Error(message(upload.error));
       var payload=Object.assign({},ds,{source_path:path,source_size:file.size,source_uploaded_at:new Date().toISOString()});
       if(previous)payload.id=previous.id;
@@ -35,7 +56,7 @@
         // Only definite transaction/validation rejections are safe to clean up.
         // A read showing no reference cannot rule out an interrupted request
         // still committing later. Retain the object when outcome is uncertain.
-        if(['23505','23514','42501','42703','42P01','23502','23503','22P02','22001','PGRST204','PGRST205'].indexOf(error.code)>=0){
+        if(!libraryFile && ['23505','23514','42501','42703','42P01','23502','23503','22P02','22001','PGRST204','PGRST205'].indexOf(error.code)>=0){
           try{await storage().remove([path]);}catch(ignore){}
         }
         throw new Error(message(error)+' Refresh cloud years before retrying if the connection was interrupted.');
@@ -73,7 +94,7 @@
       }
       return '';
     }
-    return {list:list,save:save,saveSnapshot:saveSnapshot,download:download,remove:remove};
+    return {list:list,listFiles:listFiles,uploadFile:uploadFile,save:save,saveSnapshot:saveSnapshot,download:download,remove:remove};
   }
   return {create:create,checkFile:checkFile,bucket:BUCKET,maxBytes:MAX_BYTES};
 });
