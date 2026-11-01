@@ -286,7 +286,7 @@
       [name('Complete results', 'Students with a recorded score in every subject, out of all listed students. Students with a missing or absent mark are incomplete.')].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.withMarks+' of '+a.pooled.listed+' have any marks">'+a.pooled.complete+' / '+a.pooled.listed+'</b>'};})).concat(prev?['']:[]),
       [name('Average result', 'The average overall percentage of the students counted. A few very high or very low results can pull an average up or down.')].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.n+' of '+a.pooled.listed+' listed students counted">'+pct(a.pooled.mean)+'</b>'};})).concat(prev?chg(diff(function(a){return a.pooled.mean;})):[]),
       [name('Pass percentage', 'Students who passed every subject, out of the students whose result is known. Students with a missing or absent mark cannot be confirmed either way, so they are left out of this percentage.')].concat(analyses.map(function(a){var m=a.pooled;return {html:'<b title="'+m.belowPass.confirmedPass+' of '+known(m)+' students with a known result; '+m.belowPass.unknown+' cannot be confirmed">'+pct(Core.passRate(m))+'</b>'};})).concat(prev?chg(diff(function(a){return Core.passRate(a.pooled);})):[]),
-      [name('Needs support', 'The percentage of counted students whose overall result is below '+st.support+'%. This is separate from failing a subject.')].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.support.n,a.pooled.n)+' students counted">'+pct(a.pooled.support.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.support:null)),
+      [name('Needs attention', 'The percentage of counted students whose overall result is below '+st.support+'%. This is separate from failing a subject.')].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.support.n,a.pooled.n)+' students counted">'+pct(a.pooled.support.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.support:null)),
       [name('Top results', 'The percentage of counted students whose overall result is '+st.excellence+'% or more.')].concat(analyses.map(function(a){return {html:'<b title="'+nOf(a.pooled.excellence.n,a.pooled.n)+' students counted">'+pct(a.pooled.excellence.share)+'</b>'};})).concat(chg(cmp?cmp.deltas.excellence:null)),
       [name('Highest result', 'The best overall percentage among the students counted.')].concat(analyses.map(function(a){return {html:'<b title="'+a.pooled.n+' students counted">'+pct(a.pooled.highest)+'</b>'};})).concat(prev?chg(diff(function(a){return a.pooled.highest;})):[])
     ];
@@ -298,10 +298,10 @@
   }
   function termsBar(){
     var s=state.settings;
-    return '<div class="yc-terms" aria-label="Current thresholds"><span><b>Needs support: below '+s.support+'%</b>'+infoButton('needs-support threshold','Students whose overall result is below '+s.support+'% are counted as needing support. This is separate from the subject pass mark.')+'</span><span><b>Subject pass: '+s.pass+'%</b>'+infoButton('subject pass','A subject score below '+s.pass+'% counts as a failed subject. Missing or absent scores are not counted as zero.')+'</span><span><b>Top results: '+s.excellence+'% and above</b>'+infoButton('top-results threshold','Students whose overall result is '+s.excellence+'% or more. This is not necessarily the school A+ boundary.')+'</span><button class="ghost small" data-act="settings">Settings</button></div>';
+    return '<div class="yc-terms" aria-label="Current score settings"><span><b>Needs attention: below '+s.support+'%</b>'+infoButton('when students need attention','Students whose overall result is below '+s.support+'% are counted as needing attention. This is separate from the subject pass mark.')+'</span><span><b>Subject pass: '+s.pass+'%</b>'+infoButton('subject pass','A subject score below '+s.pass+'% counts as a failed subject. Missing or absent scores are not counted as zero.')+'</span><span><b>Top results: '+s.excellence+'% and above</b>'+infoButton('minimum score for top results','Students whose overall result is '+s.excellence+'% or more. This is not necessarily the school A+ boundary.')+'</span><button class="ghost small" data-act="settings">Settings</button></div>';
   }
   function viewNavigation(){
-    var views=selectedDatasets().length===1?[['overview','Overview'],['reports','Meeting reports']]:[['overview','Overview'],['subjects','Subjects'],['support','Support'],['quality','Data quality'],['reports','Meeting reports']];
+    var views=selectedDatasets().length===1?[['overview','Overview'],['reports','Meeting reports']]:[['overview','Overview'],['subjects','Subjects'],['support','Needs attention'],['quality','Data quality'],['reports','Meeting reports']];
     return '<nav class="yc-view-nav" aria-label="Comparison views">'+views.map(function(v){return '<button class="ghost'+(state.view===v[0]?' active':'')+'" data-view="'+v[0]+'" aria-current="'+(state.view===v[0]?'page':'false')+'">'+v[1]+'</button>';}).join('')+'</nav>';
   }
   function signalRow(cmp,ref){
@@ -330,7 +330,7 @@
       }else if(f.id==='achievement'){
         metric=pct(B.pooled.excellence.share);caption=B.pooled.excellence.n+' of '+B.pooled.n+' scored '+s.excellence+'% or more';
         visual=meters([{label:A.label,v:A.pooled.excellence.share},{label:B.label,v:B.pooled.excellence.share}]);
-        facts='<div class="yc-card-fact"><span>Top results</span><b>'+A.pooled.excellence.n+'/'+A.pooled.n+' → '+B.pooled.excellence.n+'/'+B.pooled.n+'</b></div><div class="yc-card-fact"><span>Share change</span><b>'+esc(pts(cmp.deltas.excellence))+'</b></div>';
+        facts='<div class="yc-card-fact"><span>Top results</span><b>'+A.pooled.excellence.n+'/'+A.pooled.n+' → '+B.pooled.excellence.n+'/'+B.pooled.n+'</b></div><div class="yc-card-fact"><span>Change in percentage</span><b>'+esc(pts(cmp.deltas.excellence))+'</b></div>';
         action='<button class="ghost small" data-act="excellence">See top results by stream</button>';
       }else if(f.id==='subject'){
         var row=signalRow(cmp,f.subject||cmp.signals.priority);
@@ -382,7 +382,7 @@
     return '<section class="yc-card">'+head+'<div class="yc-wrap"><table class="yc-map"><thead><tr><th>Subject</th>'+analyses.map(function(a){return '<th>'+esc(a.label)+'</th>';}).join('')+'<th>Latest change</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="yc-map-key"><span>0%</span>'+[10,25,40,55,70].map(function(v){return '<i style="--yc-level:'+v+'%"></i>';}).join('')+'<span>100%</span></div></section>'+subjectSpotlights(cmp)+'<div class="yc-charts">'+Charts.movers(cmp)+'</div>';
   }
   function supportView(analyses,cmp){
-    return '<div class="yc-scope-tags"><span>Needs support: counted students '+infoButton('support denominator','Needs-support percentages use '+(state.settings.basis==='complete'?'students with complete results':'available-subject results')+'. The pass-outcome bars below use all listed students.')+'</span><span>Pass outcomes: all listed students</span></div><div class="yc-charts">'+Charts.outcomes(analyses)+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.streams(cmp,'support')+Charts.supportLimits(analyses)+'</div>';
+    return '<div class="yc-scope-tags"><span>Needs attention: counted students '+infoButton('students included in this percentage','Percentages needing attention use '+(state.settings.basis==='complete'?'students with complete results':'available-subject results')+'. The pass-outcome bars below use all listed students.')+'</span><span>Pass outcomes: all listed students</span></div><div class="yc-charts">'+Charts.outcomes(analyses)+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.streams(cmp,'support')+Charts.supportLimits(analyses)+'</div>';
   }
   function qualityView(analyses,cmp){
     var checks='<section class="yc-card"><div class="yc-head"><h3>Comparison checks</h3><span class="yc-sp"></span><span class="yc-mode-pill">'+esc(cmp.A.label)+' vs '+esc(cmp.B.label)+'</span></div><div class="yc-check-grid">'+cmp.checks.map(function(c){return '<button class="yc-check-tile '+c.status+'" data-yc-tip="'+esc(c.detail)+'" aria-label="'+esc(c.label+': '+c.status+'. '+c.detail)+'"><i></i><b>'+esc(c.label)+'</b><span>'+(c.status==='review'?'Review':'Match')+'</span></button>';}).join('')+'</div></section>';
@@ -392,9 +392,9 @@
   function settingsContent(){
     var s=state.settings;
     return '<div class="yc-head"><h3>Comparison settings</h3><span class="yc-sp"></span><button class="ghost small" data-act="close-settings" aria-label="Close settings">Close</button></div><div class="yc-settings-fields">'+
-      '<label>Needs-support threshold (%)<input type="number" min="0" max="100" data-set="support" value="'+s.support+'"><span>Overall below this level needs support.</span></label>'+
+      '<label>Flag students below (%)<input type="number" min="0" max="100" data-set="support" value="'+s.support+'"><span>Overall below this level needs attention.</span></label>'+
       '<label>Subject pass mark (%)<input type="number" min="0" max="100" data-set="pass" value="'+s.pass+'"><span>A recorded subject score below this mark counts as below pass.</span></label>'+
-      '<label>Top-results threshold (%)<input type="number" min="0" max="100" data-set="excellence" value="'+s.excellence+'"><span>Overall at or above this level counts as a top result.</span></label>'+
+      '<label>Top results start at (%)<input type="number" min="0" max="100" data-set="excellence" value="'+s.excellence+'"><span>Overall at or above this level counts as a top result.</span></label>'+
       '<label>Students counted<select data-set="basis"><option value="complete"'+(s.basis==='complete'?' selected':'')+'>Complete results only</option><option value="marked"'+(s.basis==='marked'?' selected':'')+'>Available-subject results</option></select><span>Missing and absent scores stay separate, never zero.</span></label><label>Marks bands for the school tables<input type="text" data-set="marksBands" value="'+esc(s.marksBands.join(', '))+'"><span>Total marks, highest first, for the marks-wise table.</span></label></div><div class="yc-settings-footer"><span>Saved on this device</span><button class="ghost small" data-act="reset">Reset defaults</button></div>';
   }
   function openSettings(){
@@ -799,7 +799,7 @@
       ['Students with marks, of those listed'].concat(a.map(function (x) { return x.pooled.withMarks + ' of ' + x.pooled.listed + ' (' + pct(x.pooled.coverage) + ')'; })),
       ['Average result'].concat(a.map(function (x) { return pct(x.pooled.mean); })),
       ['Pass percentage (passed every subject, of known results)'].concat(a.map(function (x) { return pct(Core.passRate(x.pooled)); })),
-      ['Needs support (below ' + st.support + '%)'].concat(a.map(function (x) { return pct(x.pooled.support.share) + ' (' + x.pooled.support.n + ' of ' + x.pooled.n + ')'; })),
+      ['Needs attention (below ' + st.support + '%)'].concat(a.map(function (x) { return pct(x.pooled.support.share) + ' (' + x.pooled.support.n + ' of ' + x.pooled.n + ')'; })),
       ['Top results (' + st.excellence + '% or more)'].concat(a.map(function (x) { return pct(x.pooled.excellence.share) + ' (' + x.pooled.excellence.n + ' of ' + x.pooled.n + ')'; })),
       ['Highest result'].concat(a.map(function (x) { return pct(x.pooled.highest); }))
     ]));
@@ -810,7 +810,7 @@
         '<div style="font-size:10.5px;line-height:1.5;"><b>Next question:</b> ' + esc(f.next) + '</div></div>';
     }).join(''));
     html += reportSectionHtml('Comparison checks', reportTableHtml(['Check', 'Status', 'Detail'], c.checks.map(function (k) { return [k.label, k.status === 'ok' ? 'OK' : k.status === 'review' ? 'Review' : 'Note', k.detail]; })));
-    html += reportSectionHtml('By stream, ' + c.A.label + ' to ' + c.B.label, reportTableHtml(['Stream', 'Students counted', 'Average result', 'Needs support (below ' + st.support + '%)', 'Top results (' + st.excellence + '%+)'], c.streams.map(function (r) {
+    html += reportSectionHtml('By stream, ' + c.A.label + ' to ' + c.B.label, reportTableHtml(['Stream', 'Students counted', 'Average result', 'Needs attention (below ' + st.support + '%)', 'Top results (' + st.excellence + '%+)'], c.streams.map(function (r) {
       return [r.label, (r.a ? r.a.n : '—') + ' / ' + (r.b ? r.b.n : '—'), r.a && r.b ? pct(r.a.mean) + ' → ' + pct(r.b.mean) : '—', r.a && r.b ? pct(r.a.support.share) + ' → ' + pct(r.b.support.share) : '—', r.a && r.b ? pct(r.a.excellence.share) + ' → ' + pct(r.b.excellence.share) : '—'];
     })));
     printReport('Year Comparison: ' + a.map(function (x) { return x.label; }).join(', '), 'Group comparison · ' + (st.basis === 'complete' ? 'students with every subject scored' : 'students with marks, available-subject percentages'), html, { compact: true });

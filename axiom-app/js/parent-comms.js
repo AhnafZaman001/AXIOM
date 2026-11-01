@@ -121,7 +121,7 @@ function performanceWord(p){
   if(p>=80) return 'Very Good';
   if(p>=70) return 'Good';
   if(p>=60) return 'Fair';
-  return 'Needs Support';
+  return 'Needs Attention';
 }
 // Why a student deserves a call/message: critical zone, or a sharp drop.
 function attentionReasons(st, def){

@@ -22,7 +22,7 @@
 
   function trend(analyses,key,settings){
     if(key==='median')key='mean';
-    var names={mean:'Average result',support:'Needs support (below '+settings.support+'%)',excellence:'Top results ('+settings.excellence+'% and above)'};
+    var names={mean:'Average result',support:'Needs attention (below '+settings.support+'%)',excellence:'Top results ('+settings.excellence+'% and above)'};
     if(!analyses.some(function(a){return metric(a,key)!=null;}))return '';
     var top=key==='mean'?100:axisTop(analyses.map(function(a){return metric(a,key);}));
     var w=compact?380:720,h=250,l=compact?40:48,r=28,t=25,b=44,pw=w-l-r,ph=h-t-b,body='';
@@ -43,7 +43,7 @@
       body+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="var(--accent-2)" class="yc-point"'+tip(text)+'><title>'+esc(text)+'</title></circle>';
       if(analyses.length<=8)body+=label(x,y-13,value(v),'middle',' class="yc-value"');
     });
-    var buttons={mean:'Average',support:'Needs support',excellence:'Top results'};
+    var buttons={mean:'Average',support:'Needs attention',excellence:'Top results'};
     var controls='<div class="yc-segments" aria-label="Trend measure">'+Object.keys(names).map(function(k){return '<button class="ghost small'+(key===k?' active':'')+'" data-chart-metric="'+k+'" aria-pressed="'+(key===k)+'">'+esc(buttons[k])+'</button>';}).join('')+'</div>';
     var scale=top<100?'<p class="yc-chart-note">Scale 0–'+top+'% so small values are readable.</p>':'';
     return panel('Yearly trend',svg(names[key]+' by year, percent of counted students (scale 0–'+top+'%)',body,w,h)+scale,controls,'yc-trend');
@@ -84,11 +84,11 @@
   }
   function streams(cmp,key){
     key=key||'mean';if(key==='median')key='mean';
-    var titles={mean:'Average result by stream',support:'Needs support by stream',excellence:'Top results by stream'};
+    var titles={mean:'Average result by stream',support:'Needs attention by stream',excellence:'Top results by stream'};
     function point(m){if(!m)return null;var sh=key==='mean'?null:m[key];return {v:key==='mean'?m.mean:sh.share,n:m.n,c:key==='mean'?null:sh.n};}
     var rows=cmp.streams.map(function(row){return {label:row.label,values:[point(row.a),point(row.b)]};});
     var foot='<p class="yc-chart-note">Students counted, of those listed: '+cmp.streams.map(function(row){return esc(row.label)+' '+(row.a?row.a.n+' of '+row.a.listed:'—')+' ('+esc(cmp.A.label)+'), '+(row.b?row.b.n+' of '+row.b.listed:'—')+' ('+esc(cmp.B.label)+')';}).join(' · ')+'. A bar at 0% means none of the counted students. '+(cmp.settings.basis==='marked'?'Available-subject results include incomplete records with marks.':'Students whose result is incomplete are not in these bars.')+'</p>';
-    return bars(titles[key],rows,[cmp.A.label,cmp.B.label],'','yc-streams yc-streams-'+key,key==='mean'?'average result':key==='support'?'share below the support threshold':'share at or above the top-results threshold',key==='mean'?'':foot);
+    return bars(titles[key],rows,[cmp.A.label,cmp.B.label],'','yc-streams yc-streams-'+key,key==='mean'?'average result':key==='support'?'share below the score used to flag students':'share at or above the minimum score for top results',key==='mean'?'':foot);
   }
   function subjects(cmp,stream){
     var groups=cmp.streams.filter(function(r){return cmp.subjects.some(function(s){return s.streamKey===r.key;});});
@@ -154,12 +154,12 @@
     var rows=analyses.filter(function(a){return a.pooled.supportBounds;});if(!rows.length)return '';
     var w=compact?400:680,l=compact?80:120,r=80,pw=w-l-r,h=rows.length*58+30,body='';
     rows.forEach(function(a,i){var b=a.pooled.supportBounds,y=i*58+18,x=l+pw*b.low/100,end=l+pw*b.high/100;
-      var text=a.label+' · possible share of all listed students needing support: '+value(b.low)+' to '+value(b.high)+' · '+b.unknown+' incomplete overall results. This is a possible range, not an estimate.';
+      var text=a.label+' · possible share of all listed students needing attention: '+value(b.low)+' to '+value(b.high)+' · '+b.unknown+' incomplete overall results. This is a possible range, not an estimate.';
       body+=label(0,y+5,short(a.label))+'<line x1="'+l+'" x2="'+(w-r)+'" y1="'+y+'" y2="'+y+'"/>'+
         '<rect x="'+x+'" y="'+(y-6)+'" width="'+Math.max(1,end-x)+'" height="12" rx="6" fill="var(--accent)" opacity=".7"'+tip(text)+'><title>'+esc(text)+'</title></rect>'+label(w-r+8,y+4,b.low.toFixed(0)+'–'+b.high.toFixed(0)+'%');
     });
     body+=label(l,h-3,'0%')+label(w-r,h-3,'100%','end');
-    return panel('What missing results could change',svg('Possible support share across all listed students; lowest and highest possible percentages depending on the missing results, not an estimate',body,w,h),'','yc-support-limits');
+    return panel('What missing results could change',svg('Possible percentage needing attention across all listed students; lowest and highest possible percentages depending on the missing results, not an estimate',body,w,h),'','yc-support-limits');
   }
   function movers(cmp){
     if(cmp.findings.some(function(f){return f.id==='comparability'||f.id==='insufficient';}))return '';

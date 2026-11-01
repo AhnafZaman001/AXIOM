@@ -218,7 +218,7 @@
       {id:'percent',sheet:'%age wise',title:'%AGE WISE RESULT '+ds.label,subtitle:'',head:head,rows:pctRows.concat(footer()),notes:[note]},
       {id:'marks',sheet:'Marks wise',title:'MARKS WISE RESULT '+ds.label,subtitle:'',head:head,rows:marksRows.concat(footer()),notes:[note,'Marks bands: '+mb.join(', ')+' (total marks obtained).']},
       {id:'grades',sheet:'Grade wise',title:assessment+' '+ds.label,subtitle:'GRADE WISE RESULT',head:['Grades'].concat(cols).concat(['Total']),rows:gradeRows.concat(footer()),
-        notes:[note,'Calculated grade bands: A+ 80% and above · A 70–79% · B 60–69% · C 50–59% · D 40–49% · E below 40%, provided the pass threshold is met. F = any recorded subject below '+st.pass+'% (or overall below '+st.pass+'%).',st.basis==='marked'?'Available-subject grades are provisional; incomplete results cannot confirm a pass.':'Check these calculated grade bands against your school’s grading rules.']}
+        notes:[note,'Calculated grade bands: A+ 80% and above · A 70–79% · B 60–69% · C 50–59% · D 40–49% · E below 40%, provided the pass mark is met. F = any recorded subject below '+st.pass+'% (or overall below '+st.pass+'%).',st.basis==='marked'?'Available-subject grades are provisional; incomplete results cannot confirm a pass.':'Check these calculated grade bands against your school’s grading rules.']}
     ]};
   }
   function resultTablesHtml(ds,settings,streamKey){

@@ -26,7 +26,7 @@
   'use strict';
 
   var DEFAULTS = {
-    support: 50,      // overall % below which a student is counted as needing support
+    support: 50,      // overall % below which a student is counted as needing attention
     pass: 33,         // per-subject pass mark (%)
     excellence: 90,   // overall % at or above which a result counts as excellent
     basis: 'complete', // use complete results by default; available-subject mode must be explicitly selected
@@ -657,7 +657,7 @@
       });
       var concentrated = br && br.kind === 'mixed' && streams.filter(function (r) { return r.enough; }).length > 1;
       var sup = {
-        id: 'support', title: 'Needs support',
+        id: 'support', title: 'Needs attention',
         observation: 'The share of students below ' + st.support + '% is ' + dirWord(dSup, 1, 'higher', 'lower') + ' in ' + B.label + ': ' + f1(pB.support.share) + ' (' + pB.support.n + ' of ' + pB.n + ') against ' + f1(pA.support.share) + ' (' + pA.support.n + ' of ' + pA.n + ') in ' + A.label + '.',
         evidence: [],
         qualification: bound.slice(), next: '',
@@ -666,11 +666,11 @@
       if (br) sup.evidence.push('Across streams: ' + br.text + '.');
       sup.evidence.push('A recorded score below ' + st.pass + '% in at least one subject: ' + pB.belowPass.recorded + ' of ' + pB.belowPass.n + ' listed students (' + f1(pB.belowPass.share) + ') in ' + B.label + ' against ' + pA.belowPass.recorded + ' of ' + pA.belowPass.n + ' (' + f1(pA.belowPass.share) + ') in ' + A.label + '.');
       if (pB.belowPass.unknown > 0) sup.evidence.push('In ' + B.label + ', all-subject pass is confirmed for ' + pB.belowPass.confirmedPass + ' students; ' + pB.belowPass.unknown + ' cannot be confirmed because a subject is blank or absent.');
-      sup.qualification.push('The ' + st.support + '% support threshold is a school setting; the ' + st.pass + '% below-pass rule is separate and applies per subject.');
+      sup.qualification.push('The ' + st.support + '% score used to flag students is a school setting; the ' + st.pass + '% below-pass rule is separate and applies per subject.');
       var smallest = Math.min(pA.n, pB.n);
       if (pA.support.n < 5 || pB.support.n < 5) sup.qualification.push('Counts are small (' + pA.support.n + ' and ' + pB.support.n + ' students), and one student moves the share by about ' + (100 / smallest).toFixed(1) + ' points.');
       sup.next = pB.support.n > 0 ? 'Which stream and subjects account for the ' + pB.support.n + (pB.support.n === 1 ? ' student' : ' students') + ' below ' + st.support + '% in ' + B.label + '?'
-        : (pB.noMarks > 0 ? 'Would the ' + pB.noMarks + ' unmarked students in ' + B.label + ' change this once their results are entered?' : 'Is the support need now concentrated in particular subjects rather than particular streams?');
+        : (pB.noMarks > 0 ? 'Would the ' + pB.noMarks + ' unmarked students in ' + B.label + ' change this once their results are entered?' : 'Is the need for attention now concentrated in particular subjects rather than particular streams?');
       findings.push(sup);
     }
 
@@ -736,7 +736,7 @@
       };
       if (bre) ach.evidence.push('Across streams: ' + bre.text + '.');
       if (improved) ach.evidence.push(improved.stream + ' ' + improved.subject + ': the average rose from ' + f1(improved.a.mean) + ' to ' + f1(improved.b.mean) + ' (' + pts(improved.dMean) + '), and about three in four students scored at least ' + f1(improved.b.p25) + ' (it was ' + f1(improved.a.p25) + '). Results rose across the group, not only at the top; this does not establish why.');
-      ach.qualification.push(st.excellence + '% is the excellence threshold set here; the school’s own A+ grade boundary is a different measure.');
+      ach.qualification.push(st.excellence + '% is the minimum score for top results here; the school’s own A+ grade boundary is a different measure.');
       if (covGap && worseM.noMarks > 0) ach.qualification.push('Shares are of students with marks; ' + worseM.noMarks + ' listed students in ' + worse.label + ' have none.');
       if (improved) ach.qualification.push('Subject results do not remove differences in paper difficulty or marking between the years.');
       ach.next = improved ? 'Were the ' + improved.stream + ' ' + improved.subject + ' papers and marking comparable across years, and if so, what about this subject is worth understanding?'
@@ -755,7 +755,7 @@
     var shown = {};
     kept.forEach(function (f) { shown[f.id] = 1; });
     kept.alsoChecked = findings.filter(function (f) { return !shown[f.id]; }).map(function (f) { return { id: f.id, title: f.title, summary: f.observation }; });
-    if (!shown.support && !findings.some(function (f) { return f.id === 'support'; })) kept.alsoChecked.push({ id: 'support', title: 'Support need', summary: 'No counted student is below ' + st.support + '% in either year. Incomplete results may remain outside this measure.' });
+    if (!shown.support && !findings.some(function (f) { return f.id === 'support'; })) kept.alsoChecked.push({ id: 'support', title: 'Students needing attention', summary: 'No counted student is below ' + st.support + '% in either year. Incomplete results may remain outside this measure.' });
     return kept;
   }
 
