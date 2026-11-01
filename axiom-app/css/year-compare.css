@@ -192,3 +192,21 @@
 :root[data-theme="light"] #ycCloudBack .yc-cloud-select,:root[data-theme="light"] #ycCloudBack .yc-cloud-select option{background:#fff;color:#1C2B45}
 #yearComparePage .yc-report-h{margin:22px 4px 8px;font-size:1rem}
 #yearComparePage .yc-compare td:nth-child(n+6),#yearComparePage .yc-compare th:nth-child(n+6){font-weight:700}
+
+/* Meeting reports: readable figures and semantic accents, without zone badges. */
+#yearComparePage .yc-report-table{font-size:.92rem}
+#yearComparePage .yc-report-table th,#yearComparePage .yc-report-table td{padding:13px 12px}
+#yearComparePage .yc-report-table thead th{font-size:.78rem;background:color-mix(in srgb,var(--accent) 7%,transparent)}
+#yearComparePage .yc-report-table tbody th{font-weight:650}
+#yearComparePage .yc-report-table .yc-number{font-size:1rem;font-weight:650;background:color-mix(in srgb,currentColor 5%,transparent)}
+#yearComparePage .yc-number-positive{color:#6ed8b5}
+#yearComparePage .yc-number-negative{color:#f0a0b9}
+#yearComparePage .yc-number-warning{color:#edc478}
+#yearComparePage .yc-number-violet{color:#c9b5ff}
+#yearComparePage .yc-number-blue{color:#94c7ff}
+#yearComparePage .yc-report-table .yc-number-muted{color:var(--muted);background:transparent;font-weight:500}
+:root[data-theme="light"] #yearComparePage .yc-number-positive{color:#12694e}
+:root[data-theme="light"] #yearComparePage .yc-number-negative{color:#a02f50}
+:root[data-theme="light"] #yearComparePage .yc-number-warning{color:#805b12}
+:root[data-theme="light"] #yearComparePage .yc-number-violet{color:#6941b2}
+:root[data-theme="light"] #yearComparePage .yc-number-blue{color:#245f9b}

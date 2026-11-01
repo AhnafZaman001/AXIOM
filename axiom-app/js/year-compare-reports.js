@@ -8,7 +8,19 @@
   function pct(v){return v==null?'—':v.toFixed(1)+'%';}
   function rate(n,d){return d?100*n/d:null;}
   function cell(r,i,max){var c=(r.c||[])[i];return c&&c[0]==='s'&&typeof c[1]==='number'&&isFinite(c[1])&&c[1]>=0&&c[1]<=max?c:null;}
-  function table(headers,rows){return '<div class="yc-wrap"><table class="yc-report-table"><thead><tr>'+headers.map(function(h){return '<th scope="col">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c,i){return '<'+(i?'td':'th scope="row"')+'>'+esc(c)+'</'+(i?'td':'th')+'>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';}
+  // Colour by meaning, not score bands; retain the original values and labels.
+  function reportCellTone(header,value){
+    var h=String(header).toLowerCase(),v=String(value==null?'':value);
+    if(!v || v==='—')return '';
+    if(/pass change/.test(h))return parseFloat(v)>0?'positive':parseFloat(v)<0?'negative':'muted';
+    if(/fail/.test(h))return parseFloat(v)===0&&!/→/.test(v)?'muted':'negative';
+    if(/absent|missing|invalid|incomplete/.test(h))return parseFloat(v)===0?'muted':'warning';
+    if(/pass/.test(h))return 'positive';
+    if(/highest|marks|percentage|average/.test(h))return 'violet';
+    if(/scored|students|share|rank|count/.test(h))return 'blue';
+    return '';
+  }
+  function table(headers,rows){return '<div class="yc-wrap"><table class="yc-report-table"><thead><tr>'+headers.map(function(h){return '<th scope="col">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c,i){var tone=i?reportCellTone(headers[i],c):'';return '<'+(i?'td':'th scope="row"')+(tone?' class="yc-number yc-number-'+tone+'"':'')+'>'+esc(c)+'</'+(i?'td':'th')+'>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';}
   function panel(title,content){return '<section class="yc-card yc-report-section"><h3>'+esc(title)+'</h3>'+content+'</section>';}
   function subjectStats(ds,settings){
     var pass=Core.settingsFrom(settings).pass;
