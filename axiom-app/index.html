@@ -345,6 +345,7 @@
     <div class="ax-head-text"><h2 class="ax-title">Student Roster</h2><p class="ax-sub" id="svSubtitle"></p></div>
   </div>
   <div class="ax-filter-card" id="svFilterCard">
+    <div class="sv-filter-status" id="svFilterStatus" aria-live="polite"></div>
     <div class="ax-filter-row">
       <select id="sectionSelect" aria-label="Section"></select>
       <div class="field ax-f-subject"><label>Subject Filter</label><select id="subjectFilter"></select></div>
@@ -368,6 +369,7 @@
     <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>Declining</span>
     <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="dot grey"></span>Absent</span>
   </div>
+    <div class="sv-filter-actions"><span id="svResultCount" role="status"></span><button type="button" class="ghost small" id="clearRosterFiltersBtn" hidden>Clear filters</button></div>
   </div>
   <div class="toolbar ax-section-tools" id="filtersToolbar">
       <button class="ghost small" id="addSectionBtn" title="Add a new class section" aria-label="Add new section">

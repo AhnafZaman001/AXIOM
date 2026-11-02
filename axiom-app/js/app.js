@@ -1527,6 +1527,32 @@ function studentPassesFilters(student, def){
   });
 }
 
+function updateRosterFilterStatus(total, shown, def){
+  const count = document.getElementById('svResultCount');
+  const clear = document.getElementById('clearRosterFiltersBtn');
+  const status = document.getElementById('svFilterStatus');
+  if(!count || !clear || !status) return;
+  const subject = document.getElementById('subjectFilter').value;
+  const zone = document.getElementById('zoneFilter').value;
+  const terms = [];
+  if(subject) terms.push(subject);
+  if(zone) terms.push(`${zone[0].toUpperCase()}${zone.slice(1)} zone`);
+  if(searchQuery) terms.push(`“${searchQuery}”`);
+  if(quickFilter) terms.push(({atrisk:'At Risk',improving:'Improving',declining:'Declining',absent:'Absent'})[quickFilter] || quickFilter);
+  count.textContent = `${shown} of ${total} students`;
+  status.textContent = terms.length ? `Filtered by ${terms.join(' · ')}` : `${def.label} · All students`;
+  clear.hidden = !terms.length;
+}
+document.getElementById('clearRosterFiltersBtn')?.addEventListener('click', ()=>{
+  document.getElementById('subjectFilter').value = '';
+  document.getElementById('zoneFilter').value = '';
+  document.getElementById('studentSearch').value = '';
+  searchQuery = '';
+  quickFilter = null;
+  document.querySelectorAll('#quickChipRow .chip').forEach(c=>c.setAttribute('aria-pressed','false'));
+  renderRosterOnly();
+});
+
 function subjectClassAverage(store, subj){
   const vals = [];
   store.students.forEach(st=>{
@@ -1647,6 +1673,7 @@ function renderTable(options = {}){
   head.innerHTML = headHtml;
 
   const students = sortStudentsBy(store.students.filter(s=>studentPassesFilters(s, def)), def, mainTableSort, {positionSubject: subjFilter});
+  updateRosterFilterStatus(store.students.length, students.length, def);
   const svSub = document.getElementById('svSubtitle');
   if(svSub) svSub.textContent = `${def.label} · ${subjFilter||'All subjects'} · ${students.length} of ${store.students.length} student${store.students.length===1?'':'s'} shown`;
   axRenderZoneSeg(def, store, subjFilter);
