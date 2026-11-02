@@ -1,18 +1,20 @@
 /* Short visual replay for the current Year Comparison view. */
 (function(){
 'use strict';
-var animations=[],endTimer=null;
-function cancel(){
+var animations=[],endTimer=null,stepTimer=null,running=false;
+function clearVisuals(){
   clearTimeout(endTimer);
+  clearTimeout(stepTimer);
   animations.forEach(function(a){a.cancel();});animations=[];
   document.body.classList.remove('yc-presenting');
   document.querySelectorAll('.yc-tour-active').forEach(function(el){el.classList.remove('yc-tour-active');});
 }
+function cancel(){clearVisuals();running=false;}
 function play(node,frames,duration,delay){
   animations.push(node.animate(frames,{duration:duration,delay:delay||0,easing:'cubic-bezier(.18,.8,.22,1)',fill:'none'}));
 }
 function replay(){
-  cancel();
+  clearVisuals();
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   var view=document.getElementById('ycActiveView');if(!view)return;
   document.body.classList.add('yc-presenting');
@@ -30,14 +32,32 @@ function replay(){
   view.querySelectorAll('.yc-trace').forEach(function(node){play(node,[{strokeDasharray:'1',strokeDashoffset:1},{strokeDasharray:'1',strokeDashoffset:0}],1050,120);});
   view.querySelectorAll('.yc-point').forEach(function(node,i){play(node,[{opacity:0,transform:'scale(.3)'},{opacity:1,transform:'scale(1.15)'},{opacity:1,transform:'scale(1)'}],650,420+i*60);});
   view.querySelectorAll('circle[stroke-dasharray],path:not(.yc-trace)').forEach(function(node){node.style.transformBox='fill-box';node.style.transformOrigin='center';play(node,[{transform:'scale(.7)',opacity:.3},{transform:'scale(1.08)',opacity:1},{transform:'scale(1)',opacity:1}],850,180);});
-  endTimer=setTimeout(cancel,1900);
+  endTimer=setTimeout(function(){
+    document.body.classList.remove('yc-presenting');
+    document.querySelectorAll('.yc-tour-active').forEach(function(el){el.classList.remove('yc-tour-active');});
+  },1450);
+}
+function present(){
+  cancel();
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var sections=Array.from(document.querySelectorAll('#yearComparePage .yc-view-nav [data-view]')).map(function(button){return button.dataset.view;});
+  if(!sections.length)return;
+  var index=0;running=true;
+  function next(){
+    if(!running||index>=sections.length){running=false;return;}
+    var button=document.querySelector('#yearComparePage .yc-view-nav [data-view="'+sections[index++]+'"]');
+    if(button)button.click();
+    replay();
+    stepTimer=setTimeout(next,1550);
+  }
+  next();
 }
 function mount(){
   var nav=document.querySelector('#yearComparePage .yc-view-nav');
   if(!nav||nav.querySelector('[data-tour]'))return;
-  var b=document.createElement('button');b.className='primary';b.dataset.tour='play';b.textContent='▶ Replay visuals';nav.appendChild(b);
+  var b=document.createElement('button');b.className='primary';b.dataset.tour='play';b.textContent='▶ Play presentation';nav.appendChild(b);
 }
-document.addEventListener('click',function(e){var b=e.target.closest('[data-tour="play"]');if(b){e.preventDefault();replay();}},true);
+document.addEventListener('click',function(e){var b=e.target.closest('[data-tour="play"]');if(b){e.preventDefault();present();}},true);
 document.addEventListener('keydown',function(e){if(e.key==='Escape')cancel();});
 window.AxiomYearPresentation={mount:mount,stop:cancel};
 mount();
