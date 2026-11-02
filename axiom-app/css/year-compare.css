@@ -220,3 +220,8 @@
 #ycTourControls[hidden]{display:none}
 #ycTourControls button{padding:8px 12px;border-radius:8px;cursor:pointer}
 @media print{#ycTourControls,[data-tour]{display:none!important}}
+
+.yc-presenting .yc-tour-active{outline:1px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:3px;box-shadow:0 0 24px color-mix(in srgb,var(--accent) 12%,transparent)}
+.yc-presenting .yc-bar,.yc-presenting .yc-trace{animation:none!important}
+#ycTourControls span{font-size:.8rem;white-space:nowrap}
+@media(prefers-reduced-motion:reduce){.yc-presenting .yc-tour-active{box-shadow:none}}

@@ -77,7 +77,7 @@
         if(!x||x.v==null)return;
         var by=y+j*20,width=pw*x.v/100,counts=x.c!=null?' ('+x.c+' of '+x.n+')':'';
         var txt=row.label+' · '+years[j]+': '+value(x.v)+(x.c!=null?' · '+x.c+' of '+x.n+' students counted':' · n='+x.n);
-        body+='<rect class="yc-bar" x="'+l+'" y="'+by+'" width="'+width+'" height="12" rx="4" fill="'+color(j)+'"'+tip(txt)+'><title>'+esc(txt)+'</title></rect>'+label(l+width+6,by+11,value(x.v)+counts,'start',' class="yc-value"');
+        body+='<rect class="yc-bar" data-tour-full="'+pw+'" x="'+l+'" y="'+by+'" width="'+width+'" height="12" rx="4" fill="'+color(j)+'"'+tip(txt)+'><title>'+esc(txt)+'</title></rect>'+label(l+width+6,by+11,value(x.v)+counts,'start',' class="yc-value"');
       });
     });
     return panel(title,legend(years)+svg(title+'; '+(metricName||'average result')+' by group, percent (0–100%)',body,w,h)+(foot||''),actions,cls);
