@@ -1,13 +1,26 @@
 /* Short visual replay for the current Year Comparison view. */
 (function(){
 'use strict';
-var animations=[],endTimer=null,stepTimer=null,running=false;
+var animations=[],endTimer=null,stepTimer=null,scrollFrame=null,running=false;
 function clearVisuals(){
   clearTimeout(endTimer);
   clearTimeout(stepTimer);
+  if(scrollFrame)cancelAnimationFrame(scrollFrame);scrollFrame=null;
   animations.forEach(function(a){a.cancel();});animations=[];
   document.body.classList.remove('yc-presenting');
   document.querySelectorAll('.yc-tour-active').forEach(function(el){el.classList.remove('yc-tour-active');});
+}
+function sweepToEnd(view){
+  if(!view)return;
+  var start=scrollY;
+  var end=Math.max(start,scrollY+view.getBoundingClientRect().bottom-innerHeight+36);
+  var began=performance.now(),duration=1150;
+  function move(now){
+    var progress=Math.min(1,(now-began)/duration),ease=1-Math.pow(1-progress,3);
+    scrollTo(0,start+(end-start)*ease);
+    if(progress<1&&running)scrollFrame=requestAnimationFrame(move);else scrollFrame=null;
+  }
+  scrollFrame=requestAnimationFrame(move);
 }
 function cancel(){clearVisuals();running=false;}
 function play(node,frames,duration,delay){
@@ -53,6 +66,7 @@ function present(){
     stepTimer=setTimeout(function(){
       if(!running)return;
       replay();
+      sweepToEnd(view);
       stepTimer=setTimeout(next,1550);
     },260);
   }
