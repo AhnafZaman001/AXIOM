@@ -501,7 +501,6 @@
     if (!host) return;
     state.last = null;
     host.innerHTML = termsBar() + yearsPanel() + body();
-    if(window.AxiomYearPresentation)window.AxiomYearPresentation.mount();
     var pb = $('ycPrintBtn');
     if (pb) pb.style.display = state.last ? '' : 'none';
   }
