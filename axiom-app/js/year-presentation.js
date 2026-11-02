@@ -47,8 +47,14 @@ function present(){
     if(!running||index>=sections.length){running=false;return;}
     var button=document.querySelector('#yearComparePage .yc-view-nav [data-view="'+sections[index++]+'"]');
     if(button)button.click();
-    replay();
-    stepTimer=setTimeout(next,1550);
+    var view=document.getElementById('ycActiveView');
+    var visual=view&&view.querySelector('.yc-chart,.yc-spotlight,.yc-find,.yc-card');
+    if(visual)visual.scrollIntoView({behavior:'smooth',block:'center'});
+    stepTimer=setTimeout(function(){
+      if(!running)return;
+      replay();
+      stepTimer=setTimeout(next,1550);
+    },260);
   }
   next();
 }
