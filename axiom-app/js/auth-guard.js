@@ -123,4 +123,5 @@
   updateLastUpdatedNow();
   renderTable();
   renderPinnedPanel();
+  if(window.AxiomHome)window.AxiomHome.ready(session,profile);
 })();
