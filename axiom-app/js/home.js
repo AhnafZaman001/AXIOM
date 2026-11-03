@@ -8,6 +8,9 @@
   var manage=function(){return ['principal','coordinator'].includes(window.axRole);};
   var escape=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   var host=document.createElement('section');host.id='axiomHome';host.hidden=true;
+  // The working Home hub replaces the extra marketing/launch gate.
+  var welcome=document.getElementById('welcomeHero');if(welcome)welcome.remove();
+  var wrap=document.querySelector('.wrap');if(wrap)wrap.inert=false;
   document.querySelector('.masthead').after(host);
   var nav=document.createElement('nav');nav.className='ax-main-nav';nav.setAttribute('aria-label','AXIOM navigation');
   document.querySelector('.masthead').after(nav);
