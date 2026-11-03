@@ -46,6 +46,7 @@ const server=http.createServer((req,res)=>{
       </script><script src="/js/year-compare-core.js"></script><script src="/js/year-compare-storage.js"></script><script src="/js/year-compare-charts.js"></script><script src="/js/year-compare-reports.js"></script><script src="/js/year-compare-export.js"></script><script src="/js/year-compare.js"></script></body></html>`);
   }
   const files={'/js/year-compare-reports.js':'js/year-compare-reports.js','/js/year-compare-export.js':'js/year-compare-export.js','/js/year-compare-core.js':'js/year-compare-core.js','/js/year-compare-storage.js':'js/year-compare-storage.js','/js/year-compare-charts.js':'js/year-compare-charts.js','/js/year-compare.js':'js/year-compare.js','/css/styles.css':'css/styles.css','/css/year-compare.css':'css/year-compare.css','/js/app.js':'js/app.js','/js/parent-comms.js':'js/parent-comms.js'};
+  ['js/results/zones.js','js/imports/excel-engine.js','js/home-history.js','js/home-content.js','js/home.js','css/home.css','css/system.css','css/refresh.css','css/brand.css','js/brand-launch.js'].forEach(file=>{files['/'+file]=file;});
   if(!files[url.pathname]){res.writeHead(404);return res.end();}
   res.setHeader('Content-Type',url.pathname.endsWith('.css')?'text/css':'text/javascript');
   res.end(fs.readFileSync(path.join(root,files[url.pathname])));

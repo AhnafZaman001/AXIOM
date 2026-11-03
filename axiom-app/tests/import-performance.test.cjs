@@ -1,8 +1,8 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const source=fs.readFileSync(path.join(__dirname,'../js/app.js'),'utf8');
-const fn=source.slice(source.indexOf('function applyImport('),source.indexOf('/* ---- 008_'));
+const source=fs.readFileSync(path.join(__dirname,'../js/imports/excel-engine.js'),'utf8');
+const fn=source.slice(source.indexOf('function applyImport('));
 function harness(students=[]){
   let id=0,saves=0;
   const store={students:structuredClone(students)};

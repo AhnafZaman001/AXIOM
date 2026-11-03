@@ -21,7 +21,9 @@ const server=http.createServer((req,res)=>{
    const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/*',r=>{
     if(!r.request().url().startsWith(origin))return r.abort();
-    if(before&&r.request().url().endsWith('/js/app.js'))return r.fulfill({contentType:'text/javascript',body:baseline});
+    const pathname=new URL(r.request().url()).pathname;
+    if(before&&['/js/results/zones.js','/js/imports/excel-engine.js'].includes(pathname))return r.fulfill({contentType:'text/javascript',body:''});
+    if(before&&pathname==='/js/app.js')return r.fulfill({contentType:'text/javascript',body:baseline});
     return r.continue();
    });
    await page.goto(origin);await page.waitForFunction(()=>typeof renderTable==='function');
