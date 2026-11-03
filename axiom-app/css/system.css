@@ -1,0 +1,26 @@
+/* Shared screen foundations. Existing report print rules keep their own sizing. */
+:root{--ax-space-xs:4px;--ax-space-sm:8px;--ax-space-md:12px;--ax-space-lg:16px;--ax-space-xl:24px;--ax-radius-control:8px;--ax-radius-panel:12px;--ax-duration:140ms}
+@media screen{
+body{background:var(--paper);font-family:var(--font-body)}
+.bg-animated{display:none}
+.masthead{padding:16px 20px;background:var(--paper-raised);border:1px solid var(--line);border-radius:var(--ax-radius-panel);box-shadow:none;gap:16px}
+.masthead::after{display:none}
+.masthead h1{font-family:var(--font-body);font-size:1.2rem;font-weight:600;color:var(--ink)}
+.masthead .sub{font-size:.78rem;color:var(--muted)}
+.masthead-brand{margin-right:auto}
+.masthead .brand-kicker{font-size:.6rem;color:var(--muted)}
+.masthead .brand-mark{width:100px;height:40px;background:#fafafa;border-radius:6px;box-shadow:none;display:flex;align-items:center;padding:5px}
+.brand-mark img{width:100%;height:auto;display:block}
+button{border-radius:var(--ax-radius-control);transition:background var(--ax-duration),border-color var(--ax-duration),color var(--ax-duration)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-2);outline-offset:3px}
+button:disabled{cursor:not-allowed}
+select,input[type=text],input[type=number],input[type=date],input[type=email],textarea{font-family:var(--font-body);border-radius:var(--ax-radius-control);border:1px solid var(--line);color:var(--ink);background:var(--surface-2)}
+.panel,.modal,.yc-modal,.drawer{border-radius:var(--ax-radius-panel)}
+.panel{padding:var(--ax-space-lg);box-shadow:none}
+.panel h3,.modal h3,.yc-modal h3{font-family:var(--font-body);font-weight:600;font-size:1rem}
+.card:hover,.chart-card:hover,.card.clickable:hover{transform:none;box-shadow:none}
+.card,.chart-card,.hero-metric{will-change:auto}
+.status-line{color:var(--ink-soft)}
+.last-updated{color:var(--muted)}
+}
+@media(max-width:700px){.masthead{padding:12px;flex-wrap:wrap}.masthead h1{font-size:1rem}.masthead .brand-mark{width:78px}.masthead-brand{min-width:0}}
