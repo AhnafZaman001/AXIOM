@@ -22,7 +22,7 @@ const server=http.createServer((req,res)=>{
    await page.route('**/*',r=>{
     if(!r.request().url().startsWith(origin))return r.abort();
     const pathname=new URL(r.request().url()).pathname;
-    if(before&&['/js/results/zones.js','/js/imports/excel-engine.js'].includes(pathname))return r.fulfill({contentType:'text/javascript',body:''});
+    if(before&&['/js/config/sections.js','/js/config/teachers.js','/js/storage/workspace-backup.js','/js/results/zones.js','/js/imports/excel-engine.js'].includes(pathname))return r.fulfill({contentType:'text/javascript',body:''});
     if(before&&pathname==='/js/app.js')return r.fulfill({contentType:'text/javascript',body:baseline});
     return r.continue();
    });
