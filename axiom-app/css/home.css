@@ -26,3 +26,5 @@
 .ax-home-options{display:grid;gap:12px;max-width:650px}.ax-home-options button{text-align:left;padding:16px}
 @media(max-width:700px){.ax-home-work{grid-template-columns:1fr;gap:20px}.ax-home-stats{grid-template-columns:1fr 1fr;gap:18px}.ax-home-stats div:nth-child(3){border:0;padding-left:0}.ax-home-bottom{grid-template-columns:1fr}.ax-home-head{align-items:flex-start}.ax-main-nav{margin-bottom:18px}}
 @media print{.ax-main-nav,#axiomHome{display:none!important}}
+body[data-ax-page="data"] #axiomHome{margin-bottom:20px}
+body[data-ax-page="data"] #importPanel{max-width:1200px;margin:0 auto 30px}

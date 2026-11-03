@@ -11,6 +11,8 @@
   document.querySelector('.masthead').after(host);
   var nav=document.createElement('nav');nav.className='ax-main-nav';nav.setAttribute('aria-label','AXIOM navigation');
   document.querySelector('.masthead').after(nav);
+  var importPanel=document.getElementById('importPanel');
+  host.after(importPanel);
   function storageKey(){return identity?'axiom.home.'+identity.userId:null;}
   function history(){try{return JSON.parse(localStorage.getItem(storageKey())||'[]');}catch(e){return [];}}
   function remember(route){if(!storageKey()||route==='home')return;try{localStorage.setItem(storageKey(),JSON.stringify([{route:route,at:Date.now()}].concat(history().filter(function(x){return x.route!==route;})).slice(0,6)));}catch(e){}}
@@ -27,11 +29,12 @@
       '<div class="ax-home-bottom"><section><h3>Continue</h3>'+(latest.length?button(latest[0].route,'Return to '+routes[latest[0].route]+' →'):'<p>Open a workspace to begin.</p>')+'</section><section><h3>Recently opened</h3>'+(latest.length?latest.slice(0,4).map(function(x){return '<div class="ax-home-recent">'+button(x.route)+'<time>'+new Date(x.at).toLocaleDateString()+'</time></div>';}).join(''):'<p>Your recent work will appear here.</p>')+'</section></div>';
   }
   function hub(route){
-    var items=route==='reports'?[['overall','Overall Summary'],['sectionSummary','Section Summary'],['teacherReport','Teacher Report']]:route==='data'?[['import','Import Excel results'],['cloud','Upload a master workbook'],['yearCompare','Year Comparison files']]:route==='messages'?[['parent','Open parent messages']]:[['teachers','Teacher assignments'],['subjects','Section subjects'],['backup','Download workspace']];
+    var items=route==='reports'?[['overall','Overall Summary'],['sectionSummary','Section Summary'],['teacherReport','Teacher Report']]:route==='data'?[['cloud','Upload a master workbook'],['yearCompare','Year Comparison files']]:route==='messages'?[['parent','Open parent messages']]:[['teachers','Teacher assignments'],['subjects','Section subjects'],['backup','Download workspace']];
     host.innerHTML='<header class="ax-home-head"><h2>'+routes[route]+'</h2></header><div class="ax-home-options">'+items.map(function(item){return button(item[0],item[1]+' →');}).join('')+'</div>';
   }
   function navigate(route){
     if(!allowed(route))return;
+    if(route==='import'){navigate('data');return;}
     if(route==='yearCompare'&&window.AxiomYearCompare){AxiomYearCompare.open();return;}
     if(['home','data','reports','messages','admin','overall','section','sectionSummary','teacherReport'].includes(route)){window.setActivePage(route);window.scrollTo(0,0);return;}
     var actions={import:'importBtn',cloud:'uploadCloudBtn',parent:'pcBulkBtn',teachers:'manageTeacherBtn',subjects:'manageSubjectsBtn',backup:'saveDownloadBtn'};
@@ -43,11 +46,17 @@
     var isHub=['home','data','reports','messages','admin'].includes(route);
     host.hidden=!isHub;
     if(isHub){if(route==='home')home();else hub(route);}
+    if(route==='data'&&manage()){
+      importPanel.classList.add('open');
+      if(typeof renderLoadedTests==='function')renderLoadedTests();
+      if(typeof refreshCloudFileList==='function')refreshCloudFileList();
+    }
     remember(route);navigation(route);
     return result;
   };
   document.addEventListener('click',function(e){var b=e.target.closest('[data-home-route]');if(b)navigate(b.dataset.homeRoute);});
   document.getElementById('homeBtn').addEventListener('click',function(e){e.stopImmediatePropagation();navigate('home');},true);
+  document.getElementById('importBtn').addEventListener('click',function(e){e.stopImmediatePropagation();navigate('data');},true);
   window.AxiomHome={ready:function(session,profile){identity={userId:session.user.id,name:profile.campus_name||profile.institution_name||profile.full_name};ready=true;navigation(document.body.dataset.axPage||'home');if(!host.hidden)home();}};
   window.setActivePage('home');
 })();
