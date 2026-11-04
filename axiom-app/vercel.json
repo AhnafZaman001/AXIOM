@@ -1,0 +1,16 @@
+{
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "axiom-hsus.vercel.app" }],
+      "destination": "https://axiom.keystonelabs.site/",
+      "permanent": false
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "axiom-hsus.vercel.app" }],
+      "destination": "https://axiom.keystonelabs.site/:path*",
+      "permanent": false
+    }
+  ]
+}
