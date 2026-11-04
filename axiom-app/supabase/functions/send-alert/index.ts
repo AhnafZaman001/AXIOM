@@ -1,9 +1,8 @@
 // AXIOM security alerts -> email.
-// Deploy:  supabase functions deploy send-alert --project-ref adqvtmnvyzkusswbwqdr
+// Deploy: supabase functions deploy send-alert --project-ref adqvtmnvyzkusswbwqdr --no-verify-jwt
 // Secrets (see SETUP.md "Email alerts"):
-//   GMAIL_USER, GMAIL_APP_PASSWORD, ALERT_WEBHOOK_SECRET, [ALERT_RECIPIENTS]
+//   RESEND_API_KEY, ALERT_WEBHOOK_SECRET, [ALERT_RECIPIENTS], [ALERT_FROM]
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const RECIPIENTS = (Deno.env.get("ALERT_RECIPIENTS") ?? "ahnaf7624@gmail.com,ahnaf7625@gmail.com,zamankips@gmail.com")
   .split(",").map((s) => s.trim()).filter(Boolean);
@@ -93,18 +92,27 @@ function layout(o: { kind: Kind; title: string; lead: string; rows: [string, unk
 }
 
 async function sendMail(subject: string, mail: { html: string; text: string }) {
-  const user = Deno.env.get("GMAIL_USER")!;
-  const client = new SMTPClient({
-    connection: {
-      hostname: "smtp.gmail.com", port: 465, tls: true,
-      auth: { username: user, password: Deno.env.get("GMAIL_APP_PASSWORD")! },
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) throw new Error("RESEND_API_KEY is not configured");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      from: Deno.env.get("ALERT_FROM") || "AXIOM Alerts <alerts@keystonelabs.site>",
+      to: RECIPIENTS,
+      subject,
+      text: mail.text,
+      html: mail.html,
+    }),
+    signal: AbortSignal.timeout(10000),
   });
-  try {
-    await client.send({ from: `AXIOM Security <${user}>`, to: RECIPIENTS, subject, content: mail.text, html: mail.html });
-  } finally {
-    await client.close();
-  }
+  // Never log the API key, email content or provider response body.
+  if (!response.ok) throw new Error(`Resend rejected the alert (HTTP ${response.status})`);
+  const result = await response.json();
+  if (!result.id) throw new Error("Resend did not acknowledge the alert");
 }
 
 // Turn the trigger's details object into readable blocks (no raw JSON).

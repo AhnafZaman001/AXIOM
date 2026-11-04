@@ -89,7 +89,8 @@ happy to wire that in next.
 
 ## Email alerts (login, critical changes, files)
 
-Alerts go to `ahnaf7624@gmail.com` and `zamankips@gmail.com` (change them with the
+Alerts are sent from `AXIOM Alerts <alerts@keystonelabs.site>` through Resend.
+Recipients default to `ahnaf7624@gmail.com`, `ahnaf7625@gmail.com` and `zamankips@gmail.com` (change them with the
 optional `ALERT_RECIPIENTS` secret, comma-separated).
 
 | Event | Email |
@@ -101,15 +102,13 @@ optional `ALERT_RECIPIENTS` secret, comma-separated).
 | Adding a student, entering or editing marks | **no email** |
 
 ### One-time setup
-1. **Gmail app password** (the mailbox that *sends* the alerts, e.g. one of the two above):
-   Google Account → Security → turn on 2-Step Verification → search "App passwords" →
-   create one called `AXIOM` → copy the 16 characters.
+1. **Resend:** add and verify `keystonelabs.site` using the DNS records supplied
+   by Resend. Create a Sending-access API key. A paid email inbox is not required.
 2. **Deploy the function** (needs the [Supabase CLI](https://supabase.com/docs/guides/cli)):
    ```bash
    supabase login
    supabase secrets set --project-ref adqvtmnvyzkusswbwqdr \
-     GMAIL_USER=you@gmail.com \
-     GMAIL_APP_PASSWORD=abcdefghijklmnop \
+     RESEND_API_KEY=YOUR_RESEND_API_KEY \
      ALERT_WEBHOOK_SECRET=$(openssl rand -hex 32)
    supabase functions deploy send-alert --project-ref adqvtmnvyzkusswbwqdr --no-verify-jwt
    ```
@@ -121,7 +120,26 @@ optional `ALERT_RECIPIENTS` secret, comma-separated).
 
 Notes: login and file alerts are sent by the app after a successful action; the critical-change
 alerts come from database triggers, so they fire even if someone changes data outside the app.
-If Gmail/the function is down the app keeps working normally — alerts are best-effort.
+If Resend/the function is down the app keeps working normally — alerts are best-effort.
+
+### Existing Gmail alert installations: switching to the official sender
+
+1. Confirm the domain is **Verified** in Resend with Sending enabled.
+2. In the AXIOM Supabase project → Edge Functions → Secrets, add `RESEND_API_KEY`.
+   The sender defaults to `AXIOM Alerts <alerts@keystonelabs.site>`. Optionally set
+   `ALERT_FROM` to another address on a Resend-verified domain.
+3. Keep the existing `ALERT_RECIPIENTS` and `ALERT_WEBHOOK_SECRET`. Do not rotate
+   the webhook secret or rerun migration 007 for this change.
+4. Redeploy `send-alert` from `supabase/functions/send-alert/index.ts`. Keep
+   Verify JWT **off**: the function still verifies user JWTs and trigger secrets
+   internally. Dashboard editor users can replace the complete function source
+   with this file and deploy it under the existing name `send-alert`.
+5. Sign in once and confirm the alert in Resend's email logs and the admin inbox.
+   API acceptance does not itself confirm inbox delivery.
+
+This sender change requires **no SQL migration** and no frontend update. Pushing
+to GitHub/Vercel does not deploy the Supabase Edge Function. Gmail secrets are no
+longer used by this function; keep them until the new delivery has been checked.
 
 ## Parents & communication (report cards, Message Parent)
 
