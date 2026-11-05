@@ -1960,6 +1960,12 @@ function renderOverallSummary(){
   const avgTrend = trends.length ? axRound1(trends.reduce((a,b)=>a+b,0)/trends.length) : null;
   const rankedSections = sections.slice().filter(s=>s.avg!=null).sort((a,b)=>b.avg-a.avg);
   const latest = axLatestTestLabel(defsShown);
+  window.AxiomAssistant?.setDashboard('overall', {
+    title: groupKey ? AX_GROUP_LABEL[groupKey] || groupKey : 'All sections',
+    sourceIds: sections.map(section => section.def.key),
+    listed: sections.reduce((total, section) => total + section.studentCount, 0),
+    scored: totalStudents, average: overallAvgAll, passRate: passRateAll, attention: attention.length,
+  });
 
   document.getElementById('osSubtitle').textContent =
     `${groupKey ? (AX_GROUP_LABEL[groupKey]||groupKey)+' · ' : 'All '}${sections.length} section${sections.length===1?'':'s'}${latest?` · results through ${latest}`:''}`;
@@ -2307,14 +2313,21 @@ function renderSectionSummary(){
     `<b>${greenStudents.length}</b> in the Green Zone`, `<b>${redStudents.length}</b> in the Red Zone`
   ].filter(Boolean).join(' <span class="ax-sep">·</span> ');
 
-  const subjAvgs = def.subjects.map(subj=>{
+  const subjectResults = def.subjects.map(subj=>{
     const vals = [];
+    let absent = 0;
     (store?store.students:[]).forEach(st=>{
       const t = latestTest(st, subj);
       if(t && !t.absent && t.percent!=null) vals.push(t.percent);
+      if(t?.absent) absent++;
     });
-    return {subject:subj, avg: vals.length?Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10:null};
-  }).filter(x=>x.avg!=null);
+    return {subject:subj, avg: vals.length?Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10:null, scored: vals.length, absent};
+  });
+  const subjAvgs = subjectResults.filter(x=>x.avg!=null);
+  window.AxiomAssistant?.setDashboard('section', {
+    title: def.label, sourceIds: [key], listed: totalInSection, scored: scored.length,
+    average: avg, passRate, subjects: subjectResults,
+  });
 
   const insights = [];
   if(avg!=null && rank!=null) insights.push(`<b>${escapeHtml(def.label)}</b> averages ${avg}%, ranking <b>#${rank} of ${totalRankedSections}</b> sections.`);

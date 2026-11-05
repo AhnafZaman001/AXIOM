@@ -174,6 +174,7 @@
       '<div class="section-title">Year Comparison ' +
       '<span style="flex:1;"></span>' +
       '<button class="ghost small" id="ycBackBtn" title="Return to Section View">← Back to Section View</button>' +
+      '<button class="ghost small" type="button" data-ax-assistant="years">Ask Assistant</button>' +
       '<button class="ghost small" id="ycPrintBtn" title="Print or save the comparison as a PDF">Print Report</button></div>' +
       '<div id="ycBody"></div>';
     var anchor = $('overallSummaryPage');
@@ -831,6 +832,11 @@
       if (window.axRole) { clearInterval(t); init(); } else if (tries > 150) clearInterval(t);
     }, 200);
   }
-  window.AxiomYearCompare = { open: openPage, _state: state };
+  window.AxiomYearCompare = {
+    open: openPage, _state: state,
+    assistantComparison: function () {
+      return !state.loading && state.last && state.last.analyses.length === 2 ? state.last.cmp : null;
+    }
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

@@ -20,7 +20,6 @@ const yearMetrics = {
   median: "Typical result (median %)",
   belowPass: "Students with at least one recorded subject fail",
   unknown: "Students whose subject pass outcome is unconfirmed",
-  excellence: "Students meeting the selected high-score cutoff",
 };
 const subjectMetrics = {
   average: "Average of latest scores (%)",

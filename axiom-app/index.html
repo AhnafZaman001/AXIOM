@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/brand.css?v=1">
 <link rel="stylesheet" href="css/home.css?v=1">
 <link rel="stylesheet" href="css/system.css?v=1">
+<link rel="stylesheet" href="css/reporting-assistant.css?v=1">
 </head>
 <body>
 <div id="welcomeHero" class="welcome-hero" aria-hidden="false">
@@ -75,6 +76,7 @@
       <div class="ax-head-text"><h2 class="ax-title">Overall Summary</h2><p class="ax-sub" id="osSubtitle">Every section, every subject</p></div>
       <div class="ax-head-right">
         <div class="ax-seg" id="osGroupSeg" role="group" aria-label="Filter by stream"></div>
+        <button type="button" class="ghost small" data-ax-assistant="overall" hidden>Ask Assistant</button>
         <button class="ghost small" id="backFromOverallBtn" title="Return to Section View">← Back to Section View</button>
         <button class="ghost small" id="printOverallBtn" title="Download a PDF report of the Overall Summary"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button>
       </div>
@@ -127,6 +129,7 @@
           <button type="button" data-ss-metric="top">Top score</button>
         </div>
         <button class="ghost small" id="backFromSectionSummaryBtn" title="Return to Section View">← Back to Section View</button>
+        <button type="button" class="ghost small" data-ax-assistant="section" hidden>Ask Assistant</button>
         <button class="ghost small" id="printSectionBtn" title="Download a PDF report of this Section Summary"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Report</button>
       </div>
     </header>
@@ -786,14 +789,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <script src="js/results/zones.js?v=1"></script>
 <script src="js/imports/excel-engine.js?v=1"></script>
 <script src="js/storage/workspace-backup.js?v=1"></script>
-<script src="js/app.js?v=20261104b"></script>
+<script src="js/reporting-assistant.js?v=1"></script>
+<script src="js/app.js?v=20261106a"></script>
 <script src="js/parent-comms.js?v=20261030b"></script>
 <script src="js/year-compare-core.js?v=20261030b"></script>
 <script src="js/year-compare-storage.js?v=20261030b"></script>
 <script src="js/year-compare-charts.js?v=20261030b"></script>
 <script src="js/year-compare-reports.js?v=20261030b"></script>
 <script src="js/year-compare-export.js?v=20261030b"></script>
-<script src="js/year-compare.js?v=20261030b"></script>
+<script src="js/year-compare.js?v=20261106a"></script>
 <script src="js/home-history.js?v=1"></script>
 <script src="js/home-content.js?v=1"></script>
 <script src="js/home.js?v=2"></script>
