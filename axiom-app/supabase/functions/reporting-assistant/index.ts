@@ -114,9 +114,11 @@ Deno.serve(async (request: Request) => {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "openai/gpt-oss-20b",
         temperature: 0.1,
-        max_completion_tokens: 260,
+        reasoning_effort: "low",
+        reasoning_format: "hidden",
+        max_completion_tokens: 500,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: 'You explain school report figures in plain English. Return JSON {"observations":[{"text":"one short sentence","sources":["evidence_id"]}]} with one or two useful observations. Every sentence must cite the supplied evidence IDs that support it. Leave digits and percentages out of text because the app shows the exact cited values alongside it. The earlier_ and later_ prefixes identify different cohorts, never individual progress. When review is true, do not conclude that performance improved or declined; explain that a like-for-like comparison needs checking. Treat missing, absent and unknown separately from failure. Avoid causal claims, names and speculation. If coverage is incomplete, qualify the observation.' },
