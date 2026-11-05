@@ -5,15 +5,15 @@ const Charts=require('../js/year-compare-charts.js');
 const Core=require('../js/year-compare-core.js');
 function mock(options={}){
   const files=new Map(),rows=[],events=[];
-  const client={storage:{from(bucket){assert.equal(bucket,'year-result-files');return {
-    async list(prefix,{limit,offset}){assert.equal(prefix,'workbooks');return {data:[...files.keys()].filter(p=>p.startsWith(prefix+'/')).slice(offset,offset+limit).map(p=>({name:p.slice(prefix.length+1)}))};},
+  const client={async rpc(name){assert.equal(name,'current_campus');return {data:'academy'};},storage:{from(bucket){assert.equal(bucket,'year-result-files');return {
+    async list(prefix,{limit,offset}){return {data:[...files.keys()].filter(p=>p.startsWith(prefix+'/')&&!p.slice(prefix.length+1).includes('/')).slice(offset,offset+limit).map(p=>({name:p.slice(prefix.length+1)}))};},
     async upload(path,file,config){events.push('upload');assert.equal(config.upsert,false);if(options.uploadFail)return {error:{message:'Upload denied'}};files.set(path,file);return {data:{path}};},
     async remove(paths){events.push('cleanup');if(options.cleanupFail)return {error:{message:'Delete denied'}};paths.forEach(p=>files.delete(p));return {data:[]};},
     async download(path){return files.has(path)?{data:files.get(path)}:{error:{message:'Missing file'}};}
   };}},from(){let payload,id,mode='list';const q={
     select(){return q;},order(){return q;},eq(key,v){if(key==='id')id=v;return q;},
-    upsert(p,c){payload=p;mode='save';events.push('save');if(p.id)assert.equal(c.onConflict,'id');return q;},
-    update(p){payload=p;mode='save';return q;},delete(){mode='delete';return q;},
+    insert(p){payload=p;mode='save';events.push('save');return q;},
+    update(p){payload=p;mode='save';if(p.campus)events.push('save');return q;},delete(){mode='delete';return q;},
     async single(){if(options.saveFail)return {error:{message:'Save failed',code:options.saveCode===undefined?'23514':options.saveCode}};const row={...payload,id:payload.id||id||'year-1'};const old=rows.findIndex(x=>x.id===row.id);if(old>=0)rows.splice(old,1);rows.push(row);return {data:row};},
     async maybeSingle(){return options.verifyFail?{error:{message:'Offline'}}:{data:options.committed?{source_path:[...files.keys()][0]}:null};},
     then(resolve){if(mode==='delete'){if(options.deleteFail)return Promise.resolve({error:{message:'Delete failed'}}).then(resolve);rows.splice(rows.findIndex(x=>x.id===id),1);}return Promise.resolve({data:rows}).then(resolve);}
@@ -25,6 +25,8 @@ const ds={label:'2026',assessment:'Annual',grade_level:'First year',source_file:
 test('cloud saves original file and result snapshot, lists and downloads without another upload',async()=>{
   const m=mock(),saved=await m.store.save(ds,file);
   assert.equal(m.files.size,1);assert.equal(m.rows.length,1);
+  assert.equal(saved.campus,'academy');
+  assert.match(saved.source_path,/^workbooks\/academy\//);
   assert.equal((await m.store.list())[0].source_path,saved.source_path);
   assert.equal(await m.store.download(saved),file);
   assert.deepEqual(m.events,['upload','save']);

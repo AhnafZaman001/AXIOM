@@ -12,45 +12,58 @@
   function migrationError(error){
     return error && (/bucket not found|schema cache/i.test(error.message||'') || ['42P01','42703','PGRST204','PGRST205'].indexOf(error.code)>=0);
   }
-  function message(error){ return migrationError(error)?'Cloud setup needs migration 014. Run it in Supabase SQL Editor, then refresh.':(error.message||String(error)); }
+  function message(error){ return migrationError(error)?'Cloud setup needs migrations 014 and 016. Run them in Supabase SQL Editor, then refresh.':(error.message||String(error)); }
   function create(client){
     function storage(){if(!client || !client.storage) throw new Error('Sign in to use cloud files.');return client.storage.from(BUCKET);}
+    async function campus(){
+      var result=await client.rpc('current_campus');
+      if(result.error)throw new Error(message(result.error));
+      if(!result.data || !/^[a-zA-Z0-9_-]+$/.test(result.data))throw new Error('Your account needs a campus assignment to use year workbooks.');
+      return result.data;
+    }
     async function list(){
       var res=await client.from('year_datasets').select('*').order('created_at',{ascending:true});
       if(res.error) throw new Error(message(res.error));
       return res.data||[];
     }
-    async function listFiles(){
+    async function listPrefix(prefix){
       var files=[],offset=0;
       while(true){
-        var res=await storage().list('workbooks',{limit:100,offset:offset,sortBy:{column:'name',order:'asc'}});
+        var res=await storage().list(prefix,{limit:100,offset:offset,sortBy:{column:'name',order:'asc'}});
         if(res.error)throw new Error(message(res.error));
         var batch=res.data||[];
         files=files.concat(batch.filter(function(f){return /\.xlsx?$/i.test(f.name||'');}).map(function(f){
-          return Object.assign({},f,{path:'workbooks/'+f.name,displayName:f.name.replace(/^[a-f0-9-]{36}__/, '')});
+          return Object.assign({},f,{path:prefix+'/'+f.name,displayName:f.name.replace(/^[a-f0-9-]{36}__/, '')});
         }));
         if(batch.length<100)break;
         offset+=batch.length;
       }
       return files;
     }
+    async function listFiles(){
+      var prefix='workbooks/'+await campus();
+      var lists=await Promise.all([listPrefix(prefix),listPrefix('workbooks')]);
+      return lists.flat();
+    }
     async function uploadFile(file){
       checkFile(file);
-      var name=crypto.randomUUID()+'__'+file.name.replace(/[^a-zA-Z0-9._ -]/g,'_');
+      var name=await campus()+'/'+crypto.randomUUID()+'__'+file.name.replace(/[^a-zA-Z0-9._ -]/g,'_');
       var res=await storage().upload('workbooks/'+name,file,{upsert:false,cacheControl:'0',contentType:/\.xlsx$/i.test(file.name)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
       if(res.error)throw new Error(message(res.error));
       return name;
     }
     async function save(ds,file,previous,libraryFile){
       checkFile(file);
-      var path=libraryFile||'workbooks/'+crypto.randomUUID()+(/\.xlsx$/i.test(file.name)?'.xlsx':'.xls');
+      var campusKey=await campus();
+      var path=libraryFile||'workbooks/'+campusKey+'/'+crypto.randomUUID()+(/\.xlsx$/i.test(file.name)?'.xlsx':'.xls');
       var upload=libraryFile?{}:await storage().upload(path,file,{upsert:false,cacheControl:'0',contentType:/\.xlsx$/i.test(file.name)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'});
       if(upload.error) throw new Error(message(upload.error));
-      var payload=Object.assign({},ds,{source_path:path,source_size:file.size,source_uploaded_at:new Date().toISOString()});
-      if(previous)payload.id=previous.id;
+      var payload=Object.assign({},ds,{campus:campusKey,source_path:path,source_size:file.size,source_uploaded_at:new Date().toISOString()});
       var result;
       try{
-        result=await client.from('year_datasets').upsert(payload,{onConflict:previous?'id':'label,assessment,grade_level'}).select('*').single();
+        var table=client.from('year_datasets');
+        var write=previous?table.update(payload).eq('id',previous.id):table.insert(payload);
+        result=await write.select('*').single();
         if(result.error) throw result.error;
       }catch(error){
         // Only definite transaction/validation rejections are safe to clean up.
