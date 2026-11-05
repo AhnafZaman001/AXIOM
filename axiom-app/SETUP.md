@@ -1,5 +1,19 @@
 # AXIOM + Supabase — Setup Guide
 
+## Reporting assistant
+
+1. Run `supabase/migration_015_reporting_assistant.sql` in AXIOM's SQL Editor. It adds the assistant's request limit without changing existing report tables.
+2. Deploy `supabase/functions/reporting-assistant/index.ts` as `reporting-assistant` with legacy **Verify JWT** disabled. The handler verifies the signed-in user's JWT and role itself.
+3. Set the Edge Function secrets `GROQ_API_KEY` and `AXIOM_ASSISTANT_SCOPES`. Use a separate Groq key for AXIOM. The scopes secret is a JSON array with one entry per campus.
+
+   ```json
+   [{"users":["staff-auth-user-uuid"],"sections":["section-key"],"years":["saved-year-uuid"]}]
+   ```
+
+   Get the IDs from Authentication → Users, `public.sections.key`, and `public.year_datasets.id`. Verify ownership before assigning a section or dataset to a campus. Leave uncertain or mixed-campus sources out. Approve new sections and saved years here before using them in the assistant. An account must match exactly one scope. If an Overall Summary includes any unapproved section, choose an approved stream or open a single section.
+
+The model receives only the chosen report's numeric aggregates and generic metric labels. It does not receive account identifiers, student records, workbook contents, or chat history. The assistant uses the figures calculated by the open report. These assistant scopes do not change the existing AXIOM database policies.
+
 ## 1. Create / confirm your Supabase project
 1. Go to https://supabase.com/dashboard and sign in.
 2. You already have a project reference in this build: `adqvtmnvyzkusswbwqdr`.

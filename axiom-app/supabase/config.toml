@@ -9,3 +9,6 @@ verify_jwt = false
 # caller itself (Supabase JWT + principal/coordinator role check).
 [functions.send-parent-message]
 verify_jwt = false
+
+[functions.reporting-assistant]
+verify_jwt = false
