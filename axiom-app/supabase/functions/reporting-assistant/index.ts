@@ -47,8 +47,6 @@ function evidenceFor(facts: unknown, labels: Record<string, string>, prefix = ""
   return evidence;
 }
 
-type Scope = { users: string[]; sections: string[]; years: string[] };
-
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (request.method !== "POST") return reply({ error: "Method not allowed." }, 405);
@@ -63,12 +61,9 @@ Deno.serve(async (request: Request) => {
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser(authorization.slice(7));
     if (authError || !user) return reply({ error: "Sign in again." }, 401);
-    const { data: profile } = await userClient.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const { data: profile } = await userClient.from("profiles").select("role,campus").eq("id", user.id).maybeSingle();
     if (!roles.includes(profile?.role)) return reply({ error: "The assistant is available to reporting staff." }, 403);
-
-    const scopes: Scope[] = JSON.parse(Deno.env.get("AXIOM_ASSISTANT_SCOPES") || "[]");
-    const assigned = scopes.filter(scope => scope.users.includes(user.id));
-    if (assigned.length !== 1) return reply({ error: "Ask your administrator to configure assistant access for this campus." }, 403);
+    if (!profile.campus) return reply({ error: "Ask your administrator to assign your account to a campus." }, 403);
 
     const raw = await request.text();
     if (raw.length > 6000) return reply({ error: "This report is too large for the assistant." }, 413);
@@ -77,12 +72,22 @@ Deno.serve(async (request: Request) => {
     const { kind, sourceIds, facts, review } = input || {};
     if (!["dashboard", "years", "subject"].includes(kind) || !Array.isArray(sourceIds) ||
         !sourceIds.length || sourceIds.length > 200 || new Set(sourceIds).size !== sourceIds.length ||
+        sourceIds.some(id => typeof id !== "string" || !id || id.length > 128) ||
         (kind === "years" && sourceIds.length !== 2) || (kind === "subject" && sourceIds.length !== 1)) {
       return reply({ error: "Choose a supported report and its sources." }, 400);
     }
-    const allowed = kind === "years" ? assigned[0].years : assigned[0].sections;
-    if (sourceIds.some(id => typeof id !== "string" || !allowed.includes(id))) {
-      return reply({ error: "One or more sources are outside your configured campus. Select an approved report." }, 403);
+    if (kind === "years" && sourceIds.some(id => !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id))) {
+      return reply({ error: "Choose two saved years." }, 400);
+    }
+    const [table, column] = kind === "years" ? ["year_datasets", "id"] : ["sections", "key"];
+    const { data: sources, error: sourceError } = await userClient.from(table)
+      .select(column).eq("campus", profile.campus).in(column, sourceIds);
+    if (sourceError) {
+      console.error("Reporting assistant campus check unavailable", sourceError.code);
+      return reply({ error: "The assistant could not check campus access." }, 503);
+    }
+    if (sources?.length !== sourceIds.length) {
+      return reply({ error: "One or more report sources are unavailable for your campus." }, 403);
     }
 
     const earlier = kind === "years" ? evidenceFor(facts?.earlier, yearMetrics, "earlier_") : null;
