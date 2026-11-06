@@ -2568,6 +2568,32 @@ function renderTeacherReport(){
       </div>`;
     }
 
+    const scaleMax = Math.max(100, ...scored.map(row=>row.avg));
+    const zones = [...OVERALL_ZONE_ORDER, {key:'grey', label:'Absent'}].map(zone=>({
+      ...zone,
+      color: axZoneColor(zone.key),
+      count: rows.reduce((sum,row)=>sum + row[zone.key + 'Count'], 0)
+    }));
+    const recorded = zones.reduce((sum,zone)=>sum + zone.count, 0);
+    html += `<div class="ax-grid2">
+      <section class="chart-card">
+        <h3 class="ax-h3">Average by section</h3>
+        <p class="ax-card-sub">Percentage scale from 0 to ${scaleMax}%</p>
+        ${rows.map(row=>`<div class="ax-subj-row">
+          <div class="ax-subj-name"><b>${escapeHtml(row.def.label)}</b></div>
+          <div class="ax-bar thick" aria-hidden="true"><i style="width:${Math.max(0, row.avg ?? 0)/scaleMax*100}%;background:var(--ax-lilac)"></i></div>
+          <b class="ax-pct small">${row.avg == null ? '—' : row.avg + '%'}</b>
+        </div>`).join('')}
+      </section>
+      <section class="chart-card">
+        <h3 class="ax-h3">Performance and attendance</h3>
+        <p class="ax-card-sub">Latest recorded result per student in this subject</p>
+        ${recorded ? axDonutSvg(zones, recorded) : '<div class="ax-empty">No scores or absences recorded yet.</div>'}
+        ${zones.map(zone=>`<div class="ax-legend-row"><i class="ax-dot" style="background:${zone.color}"></i>
+          <span>${zone.label}${AX_ZONE_TEXT[zone.key] ? ' · ' + AX_ZONE_TEXT[zone.key] : ''}</span><b>${zone.count}</b></div>`).join('')}
+      </section>
+    </div>`;
+
     html += `<div class="table-wrap" style="max-height:320px;margin-bottom:6px;">
       <table class="main-table">
         <thead><tr>
