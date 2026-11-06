@@ -1891,7 +1891,7 @@ function collectOverallRoster(groupKey){
 }
 
 function subjectWiseToppers(groupKey){
-  // subject name -> best {name, score, percent, sectionLabel}
+  // Each subject keeps its highest percentage and everyone tied at that score.
   const bySubject = {};
   SECTION_DEFS.forEach(def=>{
     if(groupKey && def.group!==groupKey) return;
@@ -1900,9 +1900,12 @@ function subjectWiseToppers(groupKey){
     def.subjects.forEach(subj=>{
       store.students.forEach(st=>{
         const t = latestTest(st, subj);
-        if(!t || t.absent || t.percent==null) return;
+        if(!t || t.absent || !Number.isFinite(t.percent) || t.percent < 0 || t.percent > 100) return;
         if(!bySubject[subj] || t.percent > bySubject[subj].percent){
-          bySubject[subj] = {name:st.name, rollNo:st.rollNo, percent:t.percent, obtained:t.obtained, max:t.max, sectionLabel:def.label};
+          bySubject[subj] = {percent:t.percent, students:[]};
+        }
+        if(t.percent === bySubject[subj].percent){
+          bySubject[subj].students.push({name:st.name, rollNo:st.rollNo, obtained:t.obtained, max:t.max, sectionLabel:def.label});
         }
       });
     });
@@ -2019,9 +2022,9 @@ function renderOverallSummary(){
   const toppers = subjectWiseToppers(groupKey);
   const subjNames = Object.keys(toppers).sort();
   document.getElementById('osSubjectToppersWrap').innerHTML = subjNames.length ? subjNames.map((subj,si)=>{
-    const t = toppers[subj];
-    return `<div class="ax-topper" style="--i:${si}"><div class="ax-topper-subj">${escapeHtml(subj)}</div><div class="ax-topper-pct">${axRound1(t.percent)}%</div>
-      <div class="ax-topper-name">${escapeHtml(t.name)}</div><div class="ax-topper-meta">${t.rollNo!=null&&t.rollNo!==''?`Roll ${escapeHtml(t.rollNo)} · `:''}${escapeHtml(axShortSection(t.sectionLabel))}${t.obtained!=null&&t.max!=null?` · ${t.obtained}/${t.max}`:''}</div></div>`;
+    const {percent, students} = toppers[subj];
+    return `<div class="ax-topper" style="--i:${si}"><div class="ax-topper-subj">${escapeHtml(subj)}</div><div class="ax-topper-pct">${axRound1(percent)}%</div>
+      ${students.map(t=>`<div class="ax-topper-name">${escapeHtml(t.name)}</div><div class="ax-topper-meta">${t.rollNo!=null&&t.rollNo!==''?`Roll ${escapeHtml(t.rollNo)} · `:''}${escapeHtml(axShortSection(t.sectionLabel))}${t.obtained!=null&&t.max!=null?` · ${t.obtained}/${t.max}`:''}</div>`).join('')}</div>`;
   }).join('') : `<div class="ax-empty">No subject data yet.</div>`;
 
   // Section ranking
@@ -2296,6 +2299,10 @@ document.getElementById('ssAttentionCol').addEventListener('click', (e)=>{
 function renderSectionSummary(){
   const def = currentSectionDef();
   const key = currentSectionKey();
+  const rosterSelect = document.getElementById('sectionSelect');
+  const summarySelect = document.getElementById('ssSectionSelect');
+  summarySelect.innerHTML = rosterSelect.innerHTML;
+  summarySelect.value = key;
 
   const {students: allStudents, sections} = collectOverallRoster();
   const sectionStudents = allStudents.filter(s=>s.sectionKey===key);
@@ -2459,8 +2466,11 @@ function getAllTeacherNames(){
 function populateTeacherSelect(){
   const sel = document.getElementById('teacherSelect');
   const prev = sel.value;
+  const query = document.getElementById('teacherSearch').value.trim().toLowerCase();
   sel.innerHTML = `<option value="">— Choose a teacher —</option>` +
-    getAllTeacherNames().map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    getAllTeacherNames()
+      .filter(name=>name === prev || name.toLowerCase().includes(query))
+      .map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   if(prev) sel.value = prev;
 }
 
@@ -2884,6 +2894,11 @@ document.getElementById('backFromOverallBtn').addEventListener('click', ()=>togg
 document.getElementById('backFromSectionSummaryBtn').addEventListener('click', ()=>toggleSectionSummary(false));
 document.getElementById('backFromTeacherReportBtn').addEventListener('click', ()=>toggleTeacherReport(false));
 document.getElementById('teacherSelect').addEventListener('change', renderTeacherReport);
+document.getElementById('teacherSearch').addEventListener('input', populateTeacherSelect);
+document.getElementById('ssSectionSelect').addEventListener('change', event=>{
+  document.getElementById('sectionSelect').value = event.currentTarget.value;
+  refreshAllUI();
+});
 document.getElementById('homeBtn').addEventListener('click', ()=>setActivePage('section'));
 
 document.getElementById('sectionSelect').addEventListener('change', refreshAllUI);
