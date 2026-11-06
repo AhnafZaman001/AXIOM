@@ -468,7 +468,7 @@ function currentSectionDef(){ return SECTION_BY_KEY[currentSectionKey()]; }
 
 function populateSubjectFilter(){
   const def = currentSectionDef();
-  const subjects = visibleSubjectsFor(def);
+  const subjects = def ? visibleSubjectsFor(def) : [];
   const sel = document.getElementById('subjectFilter');
   sel.innerHTML = `<option value="">All Subjects</option>` + subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
   const chartSel = document.getElementById('chartSubjectSelect');
@@ -836,6 +836,13 @@ function renderTable(options = {}){
   clearTimeout(rosterSearchTimer);
   const tableOnly = options.tableOnly === true;
   const def = currentSectionDef();
+  if(!def){
+    document.getElementById('tableSection').style.display = 'none';
+    const empty = document.getElementById('emptyState');
+    empty.textContent = 'No sections in this campus yet.';
+    empty.style.display = 'block';
+    return;
+  }
   const store = ensureSection(def.key);
   const head = document.getElementById('tableHeadRow');
   const body = document.getElementById('tableBody');
@@ -2298,6 +2305,7 @@ document.getElementById('ssAttentionCol').addEventListener('click', (e)=>{
 
 function renderSectionSummary(){
   const def = currentSectionDef();
+  if(!def) return;
   const key = currentSectionKey();
   const rosterSelect = document.getElementById('sectionSelect');
   const summarySelect = document.getElementById('ssSectionSelect');
@@ -4162,6 +4170,7 @@ function generateOverallSummaryPDF(){
 
 function generateSectionSummaryPDF(){
   const def = currentSectionDef();
+  if(!def) return;
   const key = currentSectionKey();
   const {students: allStudents, sections} = collectOverallRoster();
   const sectionStudents = allStudents.filter(s=>s.sectionKey===key);

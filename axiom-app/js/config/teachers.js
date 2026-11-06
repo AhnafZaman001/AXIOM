@@ -188,20 +188,30 @@ function clearTeacherOverride(sectionKey, subject){
 // teacher on record", not "fall back to whoever taught it in year 1".
 // Otherwise falls back to the 1st-year default roster (matched by raw
 // section label, e.g. F16 PM/PE/ICS/ICOM all share the same default F16 row).
+const ACADEMY_TEACHER_NAMES = new Set([
+  'abdulkhaliq', 'ayesha', 'drjaved', 'huzaifawarraich', 'mukarramhusnainacadmy',
+  'mukarramhusnainacademy', 'nayyarsulatan', 'nayyarsultan', 'tanveerjazib', 'waqasgull', 'waseemcomp'
+]);
+function collegeDefaultTeacher(name){
+  if(!name) return null;
+  const key = name.trim().replace(/^(professor|prof|p)\.?\s+/i, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ACADEMY_TEACHER_NAMES.has(key) ? null : name;
+}
 function lookupTeacher(subject, def){
   if(!def || !subject) return null;
   const override = getTeacherOverride(def.key, subject);
   if(override !== undefined) return override || null;
+  if(window.axWorkspaceCampusKind !== 'college') return null;
   const year2Raw = secondYearRawLabel(def);
   if(year2Raw){
     const entries2 = SECOND_YEAR_TEACHER_DATA[subject];
     const hit2 = entries2 && entries2.find(e=>e.sections.includes(year2Raw));
-    return hit2 ? hit2.teacher : null;
+    return collegeDefaultTeacher(hit2?.teacher);
   }
   const raw = rawSectionLabel(def);
   if(!raw) return null;
   const entries = TEACHER_DATA[subject];
   if(!entries) return null;
   const hit = entries.find(e=>e.sections.includes(raw));
-  return hit ? hit.teacher : null;
+  return collegeDefaultTeacher(hit?.teacher);
 }

@@ -99,9 +99,19 @@
 
   // ---- 3. Load real data from Supabase and re-render ----
   try {
-    workspace = await axLoadWorkspaceFromSupabase();
+    const { data: campusKind, error } = await supabaseClient.rpc('workspace_campus_kind');
+    if (error) throw error;
+    if (!campusKind || !profile.campus) throw new Error('Your account needs a workspace campus assignment.');
+    workspace = await axLoadWorkspaceFromSupabase(profile.campus);
+    window.axWorkspaceCampusKind = campusKind;
+    if (campusKind !== 'college') {
+      for (const def of [...SECTION_DEFS]) {
+        if (!Object.hasOwn(workspace.sections, def.key)) removeSectionDef(def.key);
+      }
+    }
   } catch (err) {
     console.error('Failed to load data from Supabase:', err);
+    showToast('Could not load your campus workspace. Check the campus setup and reload.', 'error');
     return;
   }
 

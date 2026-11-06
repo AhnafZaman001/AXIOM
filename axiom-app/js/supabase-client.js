@@ -149,16 +149,20 @@ async function axRequireAuth() {
 // ---------- Data layer: Supabase tables <-> the app's in-memory `workspace` shape ----------
 // workspace = { sections: { [sectionKey]: { students: [ {id,name,rollNo,matric,tests:{ [subject]: [ {test,date,obtained,max,percent,absent,position} ] } } ] } }, teacherOverrides: {} }
 
-async function axLoadWorkspaceFromSupabase() {
-  const [{ data: sections }, { data: students }, { data: tests }, { data: assignments }, { data: subjectOverrides }] = await Promise.all([
-    supabaseClient.from('sections').select('*'),
+async function axLoadWorkspaceFromSupabase(campus) {
+  if (!campus) throw new Error('Your account needs a campus assignment.');
+  const results = await Promise.all([
+    supabaseClient.from('sections').select('*').eq('campus', campus),
     supabaseClient.from('students').select('*'),
     supabaseClient.from('tests').select('*'),
     supabaseClient.from('teacher_assignments').select('*'),
     supabaseClient.from('section_subject_overrides').select('*'),
   ]);
 
-  const workspace = { sections: {}, sectionRenames: {}, teacherOverrides: {} };
+  const failed = results.find(result => result.error);
+  if (failed) throw failed.error;
+  const [sections, students, tests, assignments, subjectOverrides] = results.map(result => result.data);
+  const workspace = { campus, sections: {}, sectionRenames: {}, teacherOverrides: {} };
 
   (sections || []).forEach(sec => { workspace.sections[sec.key] = { students: [] }; });
   // Raw section metadata (not just the student/test container above) — used
@@ -184,7 +188,7 @@ async function axLoadWorkspaceFromSupabase() {
   });
 
   (students || []).forEach(s => {
-    if (!workspace.sections[s.section_key]) workspace.sections[s.section_key] = { students: [] };
+    if (!Object.hasOwn(workspace.sections, s.section_key)) return;
     workspace.sections[s.section_key].students.push({
       id: s.id, name: s.name, rollNo: s.roll_no, matric: s.matric,
       tests: testsByStudent[s.id] || {}, _dbId: s.id,
@@ -192,6 +196,7 @@ async function axLoadWorkspaceFromSupabase() {
   });
 
   (assignments || []).forEach(a => {
+    if (!Object.hasOwn(workspace.sections, a.section_key)) return;
     workspace.teacherOverrides[a.section_key] = workspace.teacherOverrides[a.section_key] || {};
     workspace.teacherOverrides[a.section_key][a.subject] = a.teacher_name;
   });

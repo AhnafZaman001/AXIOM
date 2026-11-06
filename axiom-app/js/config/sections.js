@@ -188,7 +188,7 @@ function addSectionDef(sheetName, group){
   if(!SUBJECT_SETS[group]) throw new Error('Choose a valid subject group.');
   const normalized = normalizeSheetName(sheetName);
   if(SHEETNAME_TO_KEY[normalized]) throw new Error(`A section named "${sheetName}" already exists.`);
-  const key = uniqueSectionKey(slugifySectionKey(sheetName));
+  const key = uniqueSectionKey(slugifySectionKey(sheetName) + '-' + crypto.randomUUID());
   const def = {
     key, sheetName, group,
     label: `${sheetName} — ${GROUP_LABELS[group]}`,
