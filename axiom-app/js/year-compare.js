@@ -279,7 +279,7 @@
   function checksBanner(cmp) {
     var review = cmp.checks.filter(function (c) { return c.status === 'review'; });
     if (!review.length) return '';
-    var h = '<div class="yc-banner review" role="status"><div><b>'+review.length+' comparison '+(review.length===1?'note':'notes')+'</b><span>'+esc(cmp.A.label)+' vs '+esc(cmp.B.label)+'</span></div><button class="ghost small" data-act="checks">View checks</button>';
+    var h = '<div class="yc-banner review" role="status"><div><b>'+review.length+' comparison '+(review.length===1?'note':'notes')+'</b><span>'+esc(cmp.A.label)+' vs '+esc(cmp.B.label)+'</span></div>';
     return h + '</div>';
   }
 
@@ -310,7 +310,7 @@
     return '<div class="yc-terms" aria-label="Current score settings"><span><b>Needs attention: below '+s.support+'%</b>'+infoButton('when students need attention','Students whose overall result is below '+s.support+'% are counted as needing attention. This is separate from the subject pass mark.')+'</span><span><b>Subject pass: '+s.pass+'%</b>'+infoButton('subject pass','A subject score below '+s.pass+'% counts as a failed subject. Missing or absent scores are not counted as zero.')+'</span><span><b>Top results: '+s.excellence+'% and above</b>'+infoButton('minimum score for top results','Students whose overall result is '+s.excellence+'% or more. This is not necessarily the school A+ boundary.')+'</span><button class="ghost small" data-act="settings">Settings</button></div>';
   }
   function viewNavigation(){
-    var views=selectedDatasets().length===1?[['overview','Overview'],['reports','Meeting reports']]:[['overview','Overview'],['subjects','Subjects'],['support','Needs attention'],['quality','Data quality'],['reports','Meeting reports']];
+    var views=selectedDatasets().length===1?[['overview','Overview'],['reports','Meeting reports']]:[['overview','Overview'],['subjects','Subjects'],['support','Needs attention'],['reports','Meeting reports']];
     return '<nav class="yc-view-nav" aria-label="Comparison views">'+views.map(function(v){return '<button class="ghost'+(state.view===v[0]?' active':'')+'" data-view="'+v[0]+'" aria-current="'+(state.view===v[0]?'page':'false')+'">'+v[1]+'</button>';}).join('')+'</nav>';
   }
   function signalRow(cmp,ref){
@@ -353,7 +353,7 @@
         metric=f.id==='insufficient'?'More results needed':'Check comparison inputs';
         caption=A.pooled.n+' / '+B.pooled.n+' eligible results';
         facts='<div class="yc-card-fact"><span>Complete results</span><b>'+A.pooled.complete+'/'+A.pooled.listed+' · '+B.pooled.complete+'/'+B.pooled.listed+'</b></div>';
-        action='<button class="ghost small" data-view="quality">Review data quality</button>';
+        action='<button class="ghost small" data-view="overview">Review comparison</button>';
       }
       return '<article class="yc-find" data-finding="'+esc(f.id)+'"><h4>'+esc(f.title)+'</h4><div class="yc-insight-value">'+esc(metric)+'</div><p class="yc-insight-caption">'+esc(caption)+'</p>'+visual+facts+'<div class="yc-card-action">'+action+'</div></article>';
     }).join('')+'</div>';
@@ -391,12 +391,7 @@
     return '<section class="yc-card">'+head+'<div class="yc-wrap"><table class="yc-map"><thead><tr><th>Subject</th>'+analyses.map(function(a){return '<th>'+esc(a.label)+'</th>';}).join('')+'<th>Latest change</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="yc-map-key"><span>0%</span>'+[10,25,40,55,70].map(function(v){return '<i style="--yc-level:'+v+'%"></i>';}).join('')+'<span>100%</span></div></section>'+subjectSpotlights(cmp)+'<div class="yc-charts">'+Charts.movers(cmp)+'</div>';
   }
   function supportView(analyses,cmp){
-    return '<div class="yc-scope-tags"><span>Needs attention: counted students '+infoButton('students included in this percentage','Percentages needing attention use '+(state.settings.basis==='complete'?'students with complete results':'available-subject results')+'. The pass-outcome bars below use all listed students.')+'</span><span>Pass outcomes: all listed students</span></div><div class="yc-charts">'+Charts.outcomes(analyses)+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.streams(cmp,'support')+Charts.supportLimits(analyses)+'</div>';
-  }
-  function qualityView(analyses,cmp){
-    var checks='<section class="yc-card"><div class="yc-head"><h3>Comparison checks</h3><span class="yc-sp"></span><span class="yc-mode-pill">'+esc(cmp.A.label)+' vs '+esc(cmp.B.label)+'</span></div><div class="yc-check-grid">'+cmp.checks.map(function(c){return '<button class="yc-check-tile '+c.status+'" data-yc-tip="'+esc(c.detail)+'" aria-label="'+esc(c.label+': '+c.status+'. '+c.detail)+'"><i></i><b>'+esc(c.label)+'</b><span>'+(c.status==='review'?'Review':'Match')+'</span></button>';}).join('')+'</div></section>';
-    var audit=table(['Year','Empty rows skipped','Duplicates removed','Invalid marks','Totals to review','Warnings'],analyses.map(function(a){var r=a.report||{};return [a.label,(r.padding||0)+(r.summaryRows||0),r.duplicates||0,r.invalidCells||0,r.totalMismatches||0,{html:'<button class="ghost small" data-yc-tip="'+esc((r.warnings||[]).join(' · ')||'No import warnings')+'">'+(r.warnings||[]).length+'</button>'}];}),1);
-    return '<div class="yc-charts">'+Charts.completeness(analyses)+'</div>'+checks+'<section class="yc-card"><div class="yc-head"><h3>Import audit</h3></div>'+audit+'</section>';
+    return '<div class="yc-scope-tags"><span>Needs attention: counted students '+infoButton('students included in this percentage','Percentages needing attention use '+(state.settings.basis==='complete'?'students with complete results':'available-subject results')+'. The pass-outcome bars below use all listed students.')+'</span><span>Pass outcomes: all listed students</span></div><div class="yc-charts">'+Charts.outcomes(analyses)+Charts.streams(cmp,'support')+Charts.supportLimits(analyses)+'</div>';
   }
   function settingsContent(){
     var s=state.settings;
@@ -496,7 +491,8 @@
     if(analyses.length===1)return viewNavigation()+'<div id="ycActiveView" tabindex="-1">'+(state.view==='reports'?meetingReportsView():headlineTable(analyses,null)+'<div class="yc-charts">'+Charts.status(analyses[0])+Charts.distribution(analyses,Core.BAND_LABELS)+'</div>')+'</div>';
     var cmp=Core.compareDatasets(analyses[analyses.length-2],analyses[analyses.length-1],state.settings);
     state.last={analyses:analyses,cmp:cmp};
-    var view=state.view==='reports'?meetingReportsView():state.view==='subjects'?subjectView(analyses,cmp):state.view==='support'?supportView(analyses,cmp):state.view==='quality'?qualityView(analyses,cmp):
+    if(state.view==='quality')state.view='overview';
+    var view=state.view==='reports'?meetingReportsView():state.view==='subjects'?subjectView(analyses,cmp):state.view==='support'?supportView(analyses,cmp):
       headlineTable(analyses,cmp)+findingsView(cmp)+subjectSpotlights(cmp,true)+'<div class="yc-charts">'+Charts.trend(analyses,state.chartMetric,state.settings)+Charts.status(analyses[analyses.length-1])+Charts.distribution(analyses,Core.BAND_LABELS)+Charts.streams(cmp)+Charts.subjects(cmp,state.chartStream)+Charts.streams(cmp,'excellence')+'</div>';
     return checksBanner(cmp)+viewNavigation()+'<div id="ycActiveView" tabindex="-1" aria-label="'+esc(state.view)+' view">'+view+'</div>';
   }
@@ -518,7 +514,7 @@
     var info=e.target.closest?e.target.closest('.yc-info'):null;if(info){showChartTip({target:info});return;}
     var viewButton=e.target.closest?e.target.closest('[data-view]'):null;
     if(viewButton){
-      var nextView=viewButton.getAttribute('data-view');if(['overview','subjects','support','quality','reports'].indexOf(nextView)<0)return;
+      var nextView=viewButton.getAttribute('data-view');if(['overview','subjects','support','reports'].indexOf(nextView)<0)return;
       state.view=nextView;if(nextView==='support')state.chartMetric='support';
       render();var active=$('ycActiveView');if(active)active.focus({preventScroll:true});return;
     }
@@ -542,7 +538,6 @@
     else if (act === 'download-tables') downloadTables();
     else if (act === 'print-meeting' || act === 'print-top') printMeetingReport(act==='print-top');
     else if (act === 'refresh' && !state.busy) loadDatasets();
-    else if (act === 'checks') {state.view='quality';render();}
     else if (act === 'settings') openSettings();
     else if (act === 'close-settings') {hideChartTip();$('ycSettings').close();}
     else if (act === 'distribution' || act === 'excellence') {state.view='overview';render();var chart=document.querySelector(act==='distribution'?'.yc-distribution':'.yc-streams-excellence');if(chart)chart.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});}

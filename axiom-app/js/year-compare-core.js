@@ -860,7 +860,7 @@
       action = {
         text: 'Start with ' + lowerCoverage.label + '. ' + (lowerCoverage.pooled.listed - lowerCoverage.pooled.complete) +
           ' listed results are incomplete. Check the workbook for absences, blanks and invalid marks.',
-        view: 'quality', label: 'Open data quality'
+        view: 'overview', label: 'Review comparison'
       };
     } else {
       action = {
