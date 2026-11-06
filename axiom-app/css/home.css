@@ -28,3 +28,5 @@
 @media print{.ax-main-nav,#axiomHome{display:none!important}}
 body[data-ax-page="data"] #axiomHome{margin-bottom:20px}
 body[data-ax-page="data"] #importPanel{max-width:1200px;margin:0 auto 30px}
+
+.ax-home-activity{margin:28px 0;max-width:36rem}
