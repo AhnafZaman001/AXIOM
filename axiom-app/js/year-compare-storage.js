@@ -9,6 +9,12 @@
     if(!file || !/\.xlsx?$/i.test(file.name||'')) throw new Error('Choose an Excel .xls or .xlsx workbook.');
     if(!file.size || file.size>MAX_BYTES) throw new Error('Workbooks must be between 1 byte and 6 MB.');
   }
+  async function readSheets(blob){
+    var workbook=XLSX.read(await blob.arrayBuffer(),{type:'array',cellDates:false});
+    return workbook.SheetNames.map(function(name){
+      return {name:name,rows:XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:null,raw:true,blankrows:true})};
+    });
+  }
   function migrationError(error){
     return error && (/bucket not found|schema cache/i.test(error.message||'') || ['42P01','42703','PGRST204','PGRST205'].indexOf(error.code)>=0);
   }
@@ -109,5 +115,5 @@
     }
     return {list:list,listFiles:listFiles,uploadFile:uploadFile,save:save,saveSnapshot:saveSnapshot,download:download,remove:remove};
   }
-  return {create:create,checkFile:checkFile,bucket:BUCKET,maxBytes:MAX_BYTES};
+  return {create:create,checkFile:checkFile,readSheets:readSheets,bucket:BUCKET,maxBytes:MAX_BYTES};
 });

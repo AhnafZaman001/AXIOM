@@ -141,23 +141,24 @@
     };
   }
 
-  function studentSummary(row, subject, test, snapshot) {
+  function studentSummary(row, subject, test, snapshot, history) {
     const subjects = subject ? [subject] : row.subjects;
     const details = [];
     for (const name of subjects) {
       const scores = row.tests[name] || [];
-      const selected = test ? scores.filter(score => score.test === test) : subject ? scores : scores.slice(-1);
-      if (!selected.length) details.push([name, test || 'Latest', 'No result']);
+      const selected = test ? scores.filter(score => score.test === test) : subject || history ? scores : scores.slice(-1);
+      if (!selected.length) details.push([name, test || 'Latest', 'No result', '—']);
       for (const score of selected) {
         const value = score.absent ? 'Absent' : score.percent == null ? 'No usable mark' :
           `${score.obtained}/${score.max} · ${percent(score.percent)}`;
-        details.push([name, score.test, value]);
+        details.push([name, score.date ? score.test + ' · ' + score.date : score.test, value, score.position ?? '—']);
       }
     }
     const overall = row.overall == null ? 'No overall result is available.' : `Overall average ${percent(row.overall)}.`;
     return {
-      title: row.name, detail: `${row.sectionLabel} · Roll ${row.rollNo || 'unlisted'}. ${overall}`,
-      columns: ['Subject', 'Test', 'Result'], rows: details, source: snapshot.label,
+      title: row.name || 'Roll ' + row.rollNo, detail: `${row.sectionLabel} · Roll ${row.rollNo || 'unlisted'}. ${overall}`,
+      columns: ['Subject', 'Test', 'Result', 'Position'], rows: details, source: snapshot.label,
+      note: [row.matric ? 'Matric marks: ' + row.matric + '.' : '', row.sheet ? 'Workbook sheet: ' + row.sheet + '.' : ''].filter(Boolean).join(' '),
       student: row.id ? { id: row.id, section: row.section } : null,
       chart: subject ? (row.tests[subject] || []).filter(score => !score.absent && score.percent != null)
         .slice(-8).map(score => [score.test, score.percent]) : null,
@@ -165,7 +166,7 @@
     };
   }
 
-  function answer(question, snapshot, context = {}) {
+  function answer(question, snapshot, context = {}, originalQuestion = question) {
     const reply = (title, detail) => ({ title, detail, source: snapshot.label });
     const text = normalize(question);
     const follow = /^(?:and|what about|how about|same|show their|their|list them|show them)\b/i.test(question);
@@ -182,7 +183,7 @@
     const test = findMention(question, testNames, name => [name])[0] || null;
     const roll = question.match(/\broll(?:\s*(?:no\.?|number|#))?\s*[:#]?\s*([\p{L}\p{N}-]+)/iu);
     let people = roll ? scope.filter(row => normalize(row.rollNo) === normalize(roll[1])) :
-      findMention(question, scope, row => [row.name]);
+      findMention(originalQuestion, scope, row => [row.name]);
     if (!people.length && !roll) {
       const named = text.match(/\b(?:named|student name|student called) (.+)$/)?.[1] ||
         text.match(/^how did (.+?) (?:do|perform)(?: in .+)?$/)?.[1];
@@ -192,18 +193,19 @@
     if (people.length > 1) return reply('More than one student matches', 'Add the section and roll number so I can identify the right student.');
     if (people.length === 1) {
       const student = people[0];
-      return { ...studentSummary(student, subject, test, snapshot), context: { section: student.section, subject, studentId: student.id } };
+      return { ...studentSummary(student, subject, test, snapshot, /\b(history|all tests|every test)\b/.test(text)),
+        context: { section: student.section, subject, studentId: student.id } };
     }
     if (roll || /\b(?:named|student name|student called)\b/.test(text)) {
       return reply('Student not found', snapshot.anonymous ?
-        'Saved year results contain anonymous records. Switch to Current workspace for named students.' :
+        snapshot.identityIssue || 'Names aren’t available for this query. Ask by roll number or include “student named” and their full name.' :
         'Check the spelling or add the student’s section and roll number.');
     }
-    if (/\b(?:test|quiz|paper)\b/i.test(question) && !subject && !snapshot.anonymous) {
+    if (/\b(?:test|quiz|paper)\b/i.test(question) && !subject && !snapshot.isSavedYear) {
       return reply('Which subject is the test for?', 'Include the subject and test name, such as “Physics Test 2”.');
     }
     const requestedTest = question.match(/\b(?:test|quiz)\s*#?\s*\d+\b/i)?.[0];
-    if (requestedTest && !test && !snapshot.anonymous) return reply('Test not found', 'Use the test name shown in the roster, or ask for the latest result.');
+    if (requestedTest && !test && !snapshot.isSavedYear) return reply('Test not found', 'Use the test name shown in the roster, or ask for the latest result.');
     const scoreQuestion = test ? question.replace(new RegExp(test.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), '') : question;
     const filter = scoreFilter(scoreQuestion) || (/^(?:list|show) them\b/i.test(question) ? context.filter : null);
     if (filter?.invalid) return reply('Check the score range', 'Use a valid range or a mark within its total, such as 75/100.');
@@ -216,7 +218,7 @@
     const outcome = !filter && text.match(/\b(pass(?:ed|ing)?|fail(?:ed|ing)?)\b/)?.[1];
     const groups = /\b(by section|across sections|by stream|across streams)\b/.test(text);
     const subjectOverview = !subject && /\bsubjects?\b/.test(text) && /\b(compare|weakest|strongest|average|performance|rank|struggl\w*)\b/.test(text);
-    if (!scope.length) return reply('No student records in this scope', 'Choose a workspace or saved year that contains results.');
+    if (!scope.length) return reply('No student records in this source', 'Name a saved year or a roster section that contains results.');
     if (!filter && !distribution && !average && !rank && !absences && !count && !groups && !subjectOverview && !outcome && !missing) return null;
 
     const rawMarks = filter?.marks || (rank && /\bby (?:total )?marks\b/.test(text));
@@ -240,8 +242,8 @@
     const show = (items, heading) => ({
       ...reply(heading, coverage), context: nextContext,
       columns: ['Student', 'Section', unit === '%' ? 'Result' : 'Marks'],
-      rows: snapshot.anonymous ? [] : items.map(item => [item.row.name, item.row.sectionLabel, item.absent ? 'Absent' : display(item)]),
-      note: snapshot.anonymous ? 'Saved year results are anonymous.' :
+      rows: snapshot.anonymous ? [] : items.map(item => [item.row.name || (item.row.rollNo ? 'Roll ' + item.row.rollNo : 'Name unavailable'), item.row.sectionLabel, item.absent ? 'Absent' : display(item)]),
+      note: snapshot.anonymous ? (snapshot.identityIssue || 'Ask “who” or “list students” to include names from the attached workbook.') :
         rawMarks && !subject ? snapshot.totalNote : (subject && !test ? 'Latest recorded result per student. Name a test to use the same assessment.' : ''),
     });
     if (filter) {
@@ -265,7 +267,7 @@
     }
     if (outcome) {
       const passing = outcome.startsWith('pass');
-      if (snapshot.anonymous && !subject) {
+      if (snapshot.isSavedYear && !subject) {
         const failed = scope.filter(row => row.belowPass > 0).length;
         const passed = scope.filter(row => row.complete && row.belowPass === 0).length;
         return reply(`${passing ? passed + ' passed every subject' : failed + ' failed at least one subject'} · ${label}`,
@@ -302,7 +304,8 @@
       const top = sorted.slice(0, limit);
       if (snapshot.anonymous) {
         return { ...reply(`Ranked results · ${label}`, coverage), columns: ['Rank', 'Stream', 'Result'],
-          rows: top.map((item, i) => [i + 1, item.row.sectionLabel, display(item)]), note: 'Saved year results are anonymous.', context: nextContext };
+          rows: top.map((item, i) => [i + 1, item.row.sectionLabel, display(item)]),
+          note: snapshot.identityIssue || 'Student names are unavailable for this result.', context: nextContext };
       }
       return show(top, `${/bottom|lowest/.test(rank[1]) ? 'Lowest' : 'Highest'} ${top.length} results · ${label}`);
     }

@@ -35,14 +35,14 @@
     async function workspaceData() {
       const [sectionRows, studentRows, scoreRows] = await Promise.all([
         pages(() => client.from('sections').select('key,label,sheet_name,subject_group').eq('campus', campus).order('key')),
-        pages(() => client.from('students').select('id,section_key,name,roll_no').order('id')),
-        pages(() => client.from('tests').select('id,student_id,subject,test_name,test_date,obtained,max_marks,absent,created_at')
+        pages(() => client.from('students').select('id,section_key,name,roll_no,matric').order('id')),
+        pages(() => client.from('tests').select('id,student_id,subject,test_name,test_date,obtained,max_marks,absent,position,created_at')
           .order('test_date', { ascending: true, nullsFirst: true }).order('created_at').order('id')),
       ]);
       const sections = sectionRows.map(row => ({ key: row.key, label: row.label, alias: row.sheet_name }));
       const sectionByKey = new Map(sectionRows.map(row => [row.key, row]));
       const students = studentRows.filter(row => sectionByKey.has(row.section_key)).map(row => ({
-        id: row.id, name: row.name, rollNo: row.roll_no, section: row.section_key,
+        id: row.id, name: row.name, rollNo: row.roll_no, matric: row.matric, section: row.section_key,
         sectionLabel: sectionByKey.get(row.section_key).label, tests: Object.create(null),
       }));
       const studentById = new Map(students.map(row => [row.id, row]));
@@ -53,7 +53,7 @@
         const obtained = row.obtained == null ? null : Number(row.obtained);
         const valid = !row.absent && obtained != null && max != null && max > 0 && obtained >= 0 && obtained <= max;
         (student.tests[row.subject] ||= []).push({
-          test: row.test_name, date: row.test_date, absent: Boolean(row.absent),
+          test: row.test_name, date: row.test_date, absent: Boolean(row.absent), position: row.position,
           obtained: valid ? obtained : null, max, percent: valid ? Number((obtained / max * 100).toFixed(2)) : null,
         });
       }
@@ -74,12 +74,25 @@
 
     const loadYear = id => cache('year:' + id, async () => {
       const { data, error } = await client.from('year_datasets')
-        .select('id,label,assessment,grade_level,streams,records,import_report').eq('campus', campus).eq('id', id).maybeSingle();
+        .select('id,label,assessment,grade_level,streams,records,import_report,source_file,source_path,updated_at').eq('campus', campus).eq('id', id).maybeSingle();
       if (error || !data) throw new Error('This saved year is unavailable for your campus.');
       return data;
     });
 
-    function yearSnapshot(dataset) {
+    async function withIdentities(dataset) {
+      if (!dataset.source_path) return { dataset, issue: 'This saved year has no attached workbook with names or roll numbers.' };
+      return cache('year-names:' + dataset.id + ':' + dataset.updated_at, async () => {
+        const storage = window.AxiomYearStorage;
+        const blob = await storage.create(client).download(dataset);
+        const sheets = await storage.readSheets(blob);
+        const parsed = window.AxiomYearCore.parseWorkbook(sheets, { fileName: dataset.source_file });
+        return { dataset: window.AxiomYearReports.hydrateIdentities(dataset, parsed), namesVerified: true };
+      }).catch(() => ({
+        dataset, issue: 'The original workbook could not be verified against the saved marks. Reload or reattach it to use student names.',
+      }));
+    }
+
+    function yearSnapshot(dataset, namesVerified = false, identityIssue = '') {
       const core = window.AxiomYearCore;
       const settings = window.AxiomYearCompare?._state.settings || core.DEFAULTS;
       const byStream = new Map(dataset.streams.map(stream => [stream.key, stream]));
@@ -102,6 +115,8 @@
         }
         const counted = settings.basis === 'complete' ? result.complete : result.hasMarks;
         return [{
+          id: namesVerified ? record.i : null, name: namesVerified ? record.name : null,
+          rollNo: namesVerified ? record.roll : null, sheet: namesVerified ? record.sheet : null,
           section: stream.key, sectionLabel: stream.label, subjects, tests,
           overall: counted ? result.avail : null, total: counted ? { obtained, max } : null,
           complete: result.complete, belowPass: result.below,
@@ -110,14 +125,20 @@
       return {
         label: `${dataset.label} · ${dataset.assessment || 'Saved year'}`, students,
         sections: dataset.streams.map(stream => ({ key: stream.key, label: stream.label })),
-        anonymous: true, passMark: settings.pass, totalNote: 'Overall marks come from the subjects counted in the selected year.',
+        anonymous: !namesVerified, isSavedYear: true, identityIssue,
+        passMark: settings.pass, totalNote: 'Overall marks come from the subjects counted in the selected year.',
       };
     }
 
     return {
       years,
-      async snapshot(id) {
-        return id === 'workspace' ? cache(id, workspaceData) : yearSnapshot(await loadYear(id));
+      async snapshot(id, question = '', previous = {}) {
+        if (id === 'workspace') return cache(id, workspaceData);
+        const dataset = await loadYear(id);
+        const needsIdentities = previous.studentId || /\b(?:who|roll|names?|named|top|lowest|highest|list|student called|how did|marks for|results for|show student|show .* marks)\b|[’']s\b/i.test(question);
+        if (!needsIdentities) return yearSnapshot(dataset);
+        const named = await withIdentities(dataset);
+        return yearSnapshot(named.dataset, named.namesVerified, named.issue);
       },
       async compare(first, second) {
         const [a, b] = await Promise.all([loadYear(first), loadYear(second)]);

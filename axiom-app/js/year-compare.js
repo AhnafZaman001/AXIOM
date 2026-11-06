@@ -452,8 +452,7 @@
     var ctx=reportContext();if(!ctx)return;var d=ctx.current,old=namedEntry(d);if(old&&old.loading)return;
     var entry={signature:reportSignature(d),loading:true};state.namedYears[d.id]=entry;render();
     try{
-      var blob=await Cloud.create(supabaseClient).download(d),wb=XLSX.read(await blob.arrayBuffer(),{type:'array',cellDates:false});
-      var sheets=wb.SheetNames.map(function(n){return {name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:null,raw:true,blankrows:true})};});
+      var sheets=await Cloud.readSheets(await Cloud.create(supabaseClient).download(d));
       entry.data=Reports.hydrateIdentities(d,Core.parseWorkbook(sheets,{fileName:d.source_file}));
     }catch(error){entry.error='Names could not be loaded: '+error.message;}
     finally{entry.loading=false;render();}

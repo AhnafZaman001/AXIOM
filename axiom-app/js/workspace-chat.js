@@ -7,6 +7,7 @@
   const examples = {
     'Student Roster': [
       'In the roster, show roll 12 in F1A and their latest subject results.',
+      'Show all test history for roll 12 in F1A in the Student Roster.',
       'How many students in F1A got at least 80/100 in Physics Test 2?',
       'List students in F1A who were absent in Physics Test 2.',
     ],
@@ -17,6 +18,7 @@
     'Year Comparison': [
       'Compare 2025–26 and 2026–27 in Year Comparison.',
       'In the latest saved year, how many students scored 90% or more?',
+      'In Year Comparison, show roll 12 in 2026–27.',
       'In the latest saved year, compare subject averages in ICS.',
     ],
   };
@@ -174,11 +176,11 @@
       if (previousRoute?.kind !== route.kind || previousRoute?.id !== route.id) {
         context = {};
       }
-      const snapshot = await data.snapshot(sourceId, repaired);
+      const snapshot = await data.snapshot(sourceId, repaired, context);
       if (generation !== request) return;
       const subjects = new Set(snapshot.students.flatMap(row => row.subjects));
       const normalized = core.repairQuestion(repaired, [...intentWords, ...subjects]);
-      const result = core.answer(normalized, snapshot, context) || await interpret(normalized, snapshot);
+      const result = core.answer(normalized, snapshot, context, question) || await interpret(normalized, snapshot);
       if (generation !== request) return;
       if (result) {
         previousRoute = route;
