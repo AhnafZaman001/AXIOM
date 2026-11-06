@@ -504,7 +504,6 @@
     host.innerHTML = termsBar() + yearsPanel() + body();
     var pb = $('ycPrintBtn');
     if (pb) pb.style.display = state.last ? '' : 'none';
-    window.AxiomWorkspaceChat?.syncSource();
   }
 
   /* --------------------------------- page events --------------------------------- */
@@ -835,9 +834,6 @@
   }
   window.AxiomYearCompare = {
     open: openPage, _state: state,
-    selectedYears: function () {
-      return selectedDatasets().map(function (d) { return { id: d.id, label: d.label, assessment: d.assessment }; });
-    },
     assistantComparison: function () {
       return !state.loading && state.last && state.last.analyses.length === 2 ? state.last.cmp : null;
     }

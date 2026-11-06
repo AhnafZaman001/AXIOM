@@ -1,10 +1,25 @@
 (function () {
   'use strict';
 
-  let panel, launcher, feed, source, input, sendButton;
-  let userId, campus, token, store, savedYears = [], context = {}, contextSource, generation = 0, sending = false;
+  let panel, launcher, feed, input, sendButton;
+  let userId, campus, token, store, context = {}, previousRoute, generation = 0, sending = false;
   const core = window.AxiomWorkspaceChatCore;
-  const examples = ['How many students scored 90% or more?', 'Which subjects have the lowest averages?', 'Show the score distribution'];
+  const examples = {
+    'Student Roster': [
+      'In the roster, show roll 12 in F1A and their latest subject results.',
+      'How many students in F1A got at least 80/100 in Physics Test 2?',
+      'List students in F1A who were absent in Physics Test 2.',
+    ],
+    'Dashboard': [
+      'Which subjects have the lowest averages across the current workspace?',
+      'Show the score distribution for the current workspace.',
+    ],
+    'Year Comparison': [
+      'Compare 2025–26 and 2026–27 in Year Comparison.',
+      'In the latest saved year, how many students scored 90% or more?',
+      'In the latest saved year, compare subject averages in ICS.',
+    ],
+  };
   const intentWords = new Set('a about absent absences across all an and any are at average best bottom break breakdown by can chart class classes compare count difference did distribution do doing each every exactly fail failed failing fewer find for from give got graph group groups had has have high higher highest how i in is last latest least list low lower lowest many mark marks mean missing more most need number of on one overall pass passed passing percent percentage performance poor rank recorded result results same score scored scores section sections show some spread student students subject subjects summarize test than that the their them there these this those to top total trend under us was we weak weakest were what which who whose with without worst year years'.split(' '));
   const intents = {
     count: 'How many students', average: 'Average result', top: 'Top results',
@@ -92,14 +107,21 @@
   function clear() {
     generation++;
     context = {};
+    previousRoute = null;
     feed.replaceChildren();
-    message('Ask about marks, a student, a subject, or a saved year. I’ll show the figures and who was counted.');
-    const shortcuts = node('div', null, 'ax-chat-shortcuts');
-    for (const example of examples) {
-      const button = node('button', example, 'ghost small');
-      button.type = 'button';
-      button.addEventListener('click', () => { input.value = example; input.focus(); });
-      shortcuts.append(button);
+    message('Ask about the Student Roster, dashboard results, or Year Comparison from here. Name a section, test, or year when it matters.');
+    const shortcuts = node('details', null, 'ax-chat-shortcuts');
+    shortcuts.append(node('summary', 'Example questions'));
+    for (const [section, prompts] of Object.entries(examples)) {
+      const group = node('section');
+      group.append(node('strong', section));
+      for (const example of prompts) {
+        const button = node('button', example, 'ghost small');
+        button.type = 'button';
+        button.addEventListener('click', () => { input.value = example; input.focus(); });
+        group.append(button);
+      }
+      shortcuts.append(group);
     }
     feed.append(shortcuts);
   }
@@ -107,10 +129,7 @@
   function setOpen(open) {
     panel.hidden = !open;
     launcher.setAttribute('aria-expanded', String(open));
-    if (open) {
-      syncSource();
-      input.focus();
-    }
+    if (open) input.focus();
     else launcher.focus();
   }
 
@@ -124,77 +143,45 @@
     return store;
   }
 
-  function openReportYears() {
-    if (document.body.dataset.axPage !== 'yearCompare') return null;
-    return window.AxiomYearCompare?.selectedYears?.() || [];
-  }
-
-  function syncSource() {
-    if (!source || panel.hidden) return;
-    const years = openReportYears();
-    const option = source.options[0];
-    option.textContent = years === null ? 'Open report · Current workspace' :
-      years.length === 1 ? 'Open report · ' + years[0].label :
-        years.length > 1 ? 'Open report · ' + years.length + ' selected years' : 'Open report · Select a year';
-  }
-
-  function updateYears(years) {
-    savedYears = years;
-    const selected = source.value;
-    const options = [new Option('Follow open report', 'auto'), new Option('Current workspace', 'workspace')];
-    for (const year of years) options.push(new Option([year.label, year.assessment].filter(Boolean).join(' · '), year.id));
-    source.replaceChildren(...options);
-    if (options.some(option => option.value === selected)) source.value = selected;
-    syncSource();
-  }
-
   async function submit(question) {
     if (!question || sending) return;
     input.value = '';
     message(question, 'user');
     const progress = message('Checking the records…');
     const request = generation;
-    const pageYears = openReportYears();
-    const selectedSource = source.value;
     sending = sendButton.disabled = true;
     try {
       const data = await dataStore();
-      const years = await data.years().catch(() => savedYears);
+      const repaired = core.repairQuestion(question, intentWords);
+      let route = core.routeQuestion(repaired, [], previousRoute);
+      if (route.error) route = core.routeQuestion(repaired, await data.years(), previousRoute);
       if (generation !== request) return;
-      updateYears(years);
-      const text = core.normalize(question);
-      const yearChoices = [...new Map([...years, ...(pageYears || [])].map(year => [year.id, year])).values()];
-      const yearsMentioned = yearChoices.filter(year => {
-        const label = core.normalize(year.label);
-        const start = label.match(/^(\d{4})(?:\s|$)/)?.[1];
-        return (label && (' ' + text + ' ').includes(' ' + label + ' ')) ||
-          (start && text.split(' ').includes(start));
-      });
-      const selectedYears = yearsMentioned.length ? yearsMentioned : selectedSource === 'auto' ? pageYears : null;
-      if (/\b(?:compare|comparison|difference|changed)\b/.test(text) && selectedYears?.length > 1) {
-        if (selectedYears.length !== 2) throw new Error('Choose exactly two years to compare.');
-        const brief = await data.compare(selectedYears[0].id, selectedYears[1].id);
+      if (route.error) throw new Error(route.error);
+      if (route.kind === 'compare') {
+        const [earlier, later] = route.years;
+        const brief = await data.compare(earlier.id, later.id);
         if (generation !== request) return;
+        previousRoute = route;
+        context = {};
         render({
           title: brief.title, detail: brief.summary, note: [brief.limit, brief.action.text].filter(Boolean).join(' '),
-          source: selectedYears.map(year => year.label).join(' → '), columns: ['Measure', 'Earlier → later'],
+          source: earlier.label + ' → ' + later.label, columns: ['Measure', 'Earlier → later'],
           rows: brief.metrics.map(metric => [metric.label, metric.values]),
         });
         return;
       }
-      if (selectedYears?.length > 1) throw new Error('Name one of the selected years for this question, or ask to compare the two years.');
-      if (selectedYears?.length === 0) throw new Error('Select a year in Year Comparison, or choose Current workspace in the chat.');
-      const sourceId = selectedYears?.[0]?.id || (selectedSource === 'auto' ? 'workspace' : selectedSource);
-      if (contextSource !== sourceId) {
+      const sourceId = route.id || 'workspace';
+      if (previousRoute?.kind !== route.kind || previousRoute?.id !== route.id) {
         context = {};
-        contextSource = sourceId;
       }
-      const snapshot = await data.snapshot(sourceId);
+      const snapshot = await data.snapshot(sourceId, repaired);
       if (generation !== request) return;
-      const result = core.answer(question, snapshot, context) ||
-        await interpret(question, snapshot);
+      const subjects = new Set(snapshot.students.flatMap(row => row.subjects));
+      const normalized = core.repairQuestion(repaired, [...intentWords, ...subjects]);
+      const result = core.answer(normalized, snapshot, context) || await interpret(normalized, snapshot);
       if (generation !== request) return;
       if (result) {
+        previousRoute = route;
         if (result.context) context = result.context;
         render(result);
       } else {
@@ -220,24 +207,17 @@
     panel.setAttribute('aria-label', 'AXIOM workspace chat');
     panel.hidden = true;
     panel.innerHTML = '<header><strong>Ask AXIOM</strong><button type="button" class="ghost small" data-close aria-label="Close chat">Close</button></header>' +
-      '<label class="ax-chat-source">Data source <select><option value="auto">Follow open report</option><option value="workspace">Current workspace</option></select></label>' +
       '<div role="log" aria-label="Chat messages" class="ax-chat-feed"></div>' +
       '<form><input type="text" autocomplete="off" maxlength="400" aria-label="Question" placeholder="Ask about your results…"><button type="submit" class="primary small">Send</button></form>';
     document.body.append(launcher, panel);
-    source = panel.querySelector('select');
     feed = panel.querySelector('[role="log"]');
     input = panel.querySelector('input');
     sendButton = panel.querySelector('[type="submit"]');
     launcher.setAttribute('aria-expanded', 'false');
-    launcher.addEventListener('click', () => {
-      setOpen(panel.hidden);
-      if (!panel.hidden) dataStore().then(data => data.years()).then(updateYears).catch(() => {});
-    });
+    launcher.addEventListener('click', () => setOpen(panel.hidden));
     panel.querySelector('[data-close]').addEventListener('click', () => setOpen(false));
     panel.addEventListener('keydown', event => { if (event.key === 'Escape') setOpen(false); });
     panel.querySelector('form').addEventListener('submit', event => { event.preventDefault(); submit(input.value.trim()); });
-    source.addEventListener('change', () => { generation++; context = {}; });
-    new MutationObserver(syncSource).observe(document.body, { attributes: true, attributeFilter: ['data-ax-page'] });
     supabaseClient.auth.onAuthStateChange((_event, nextSession) => {
       if (nextSession?.user.id === userId) return;
       clear();
@@ -248,5 +228,5 @@
     clear();
   }
 
-  window.AxiomWorkspaceChat = { enable, syncSource };
+  window.AxiomWorkspaceChat = { enable };
 })();

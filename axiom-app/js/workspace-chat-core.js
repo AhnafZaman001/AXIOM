@@ -8,6 +8,98 @@
   const rounded = value => Number(value.toFixed(2));
   const percent = value => `${rounded(value)}%`;
   const help = 'Try “How many students got exactly 90% in Physics?”, “Show roll 12 in F1A”, or “Show the score distribution”.';
+  const routingWords = 'academic academy assessment average board change changed compare comparison current dashboard distribution exactly first last latest marks previous quarter results roll roster saved scored section show student students subject subjects test workspace year years'.split(' ');
+
+  function editDistance(a, b) {
+    const grid = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 0; j <= b.length; j++) grid[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        grid[i][j] = Math.min(grid[i - 1][j] + 1, grid[i][j - 1] + 1,
+          grid[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          grid[i][j] = Math.min(grid[i][j], grid[i - 2][j - 2] + 1);
+        }
+      }
+    }
+    return grid[a.length][b.length];
+  }
+
+  function nearest(word, candidates) {
+    let best = word.length >= 8 ? 2 : 1, matches = [];
+    for (const candidate of candidates) {
+      if (Math.abs(word.length - candidate.length) > best) continue;
+      const distance = editDistance(word, candidate);
+      if (distance > best) continue;
+      if (distance < best) { best = distance; matches = []; }
+      matches.push(candidate);
+    }
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function repairQuestion(question, extraWords = []) {
+    const words = new Set([...routingWords, ...extraWords].flatMap(value => normalize(value).split(' ')));
+    return question.replace(/\b[a-z]{4,24}\b/gi, value => {
+      const word = value.toLowerCase();
+      return words.has(word) ? value : nearest(word, words) || value;
+    });
+  }
+
+  function routeQuestion(question, years, previous = null) {
+    const text = normalize(question), padded = ' ' + text + ' ';
+    const yearRequest = /\b(year comparison|saved (?:year|years|results)|academic year|board results?|latest year|previous year|last year)\b/.test(text);
+    const roster = /\b(roster|current workspace)\b/.test(text);
+    const compares = /\b(compare|comparison between|difference|changed|versus|vs)\b/.test(text);
+    const follow = /^(and|what about|how about|same|show their|their|list them|show them)\b/.test(text);
+    const ranges = [...text.matchAll(/\b((?:19|20)\d{2})\s+((?:19|20)\d{2}|\d{2})\b/g)]
+      .filter(match => Number(match[2].slice(-2)) === (Number(match[1]) + 1) % 100)
+      .map(match => match[1] + ' ' + match[2].slice(-2));
+    const yearTokens = [...text.matchAll(/\b(?:19|20)\d{2}\b/g)].map(match => match[0])
+      .filter(token => !ranges.some(range => range.startsWith(token)));
+    const singles = yearRequest || compares || !roster ? [...new Set(yearTokens)].filter(token => {
+      if (yearRequest || compares) return true;
+      return !new RegExp('(?:exactly|at least|above|below|scored|got)\\s+' + token + '\\b|\\b' + token + '\\s*(?:marks?|/)', 'i').test(question);
+    }) : [];
+    const catalog = years.map(year => {
+      const label = normalize(year.label).replace(/\b((?:19|20)\d{2}) ((?:19|20)\d{2})\b/g, (_, first, second) => first + ' ' + second.slice(-2));
+      return { ...year, key: label, start: label.match(/\b(?:19|20)\d{2}\b/)?.[0] };
+    });
+    const requested = [...new Set([...ranges, ...singles])];
+    const named = catalog.filter(year => year.key && padded.includes(' ' + year.key + ' '));
+    if (roster && !yearRequest && !ranges.length) return { kind: 'workspace' };
+    if (requested.length || named.length) {
+      const picks = new Map(named.map(year => [year.id, year]));
+      for (const value of requested) {
+        const matches = catalog.filter(year => year.key === value || year.start === value);
+        if (!matches.length) return { error: 'I couldn’t find ' + value.replace(' ', '–') + ' in your campus’s saved years.' };
+        for (const year of matches) picks.set(year.id, year);
+      }
+      let selected = [...picks.values()];
+      const sameYear = selected.some((year, index) => selected.findIndex(item => item.start && item.start === year.start) !== index && year.start);
+      if (sameYear) {
+        const namedAssessments = selected.filter(year => year.assessment && padded.includes(' ' + normalize(year.assessment) + ' '));
+        if (namedAssessments.length) selected = namedAssessments;
+        else return { error: 'More than one assessment uses that year. Include the assessment name from Year Comparison.' };
+      }
+      if (selected.length === 1) return { kind: 'year', id: selected[0].id };
+      if (selected.length === 2 && compares) return { kind: 'compare', years: selected.sort((a, b) => a.key.localeCompare(b.key)) };
+      return { error: 'Name one year for that question, or ask to compare two saved years.' };
+    }
+    if (yearRequest) {
+      if (!catalog.length) return { error: 'Your campus has no saved years in Year Comparison.' };
+      const latest = catalog.slice().sort((a, b) => b.key.localeCompare(a.key));
+      if (compares) {
+        if (latest.length < 2) return { error: 'Save a second year before asking for a comparison.' };
+        if (latest.length === 2 && latest[0].key !== latest[1].key) return { kind: 'compare', years: latest.reverse() };
+        return { error: 'Which two years should I compare? Include the year labels, and the assessment if a label repeats.' };
+      }
+      if (latest.length === 1 || (/\blatest (?:saved )?year\b/.test(text) && latest[0].key !== latest[1].key)) {
+        return { kind: 'year', id: latest[0].id };
+      }
+      return { error: 'Which saved year should I use? Name a year, or ask for the latest year.' };
+    }
+    return follow && previous?.kind === 'year' ? previous : { kind: 'workspace' };
+  }
 
   function findMention(text, choices, names) {
     const haystack = ' ' + normalize(text) + ' ';
@@ -221,5 +313,5 @@
     return { ...reply(`${scope.length} students listed · ${label}`, coverage), context: nextContext };
   }
 
-  return { answer, normalize, help };
+  return { answer, normalize, repairQuestion, routeQuestion, help };
 });
