@@ -262,6 +262,28 @@
     <input type="file" id="cloudUploadFileInput" accept=".xls,.xlsx" style="display:none;">
   </div>
 
+  <!-- Add/Edit marks panel — intentionally sits immediately beneath the action
+       toolbar so opening Add → Add / Edit Test Score keeps the form beside the
+       control that opened it. -->
+  <div class="panel" id="addTestPanel">
+    <h3>Add / Edit a Test Score</h3>
+    <div class="panel-row">
+      <div class="field"><label>Section</label><select id="atSection"></select></div>
+      <div class="field"><label>Student</label><select id="atStudent"></select></div>
+      <div class="field"><label>Subject</label><select id="atSubject"></select><div class="hint" id="atSubjectTeacherHint" style="margin-top:4px;"></div></div>
+    </div>
+    <div class="panel-row">
+      <div class="field"><label>Test Name</label><input type="text" id="atTestName" placeholder="e.g. Mid Term" required style="width:180px;"></div>
+      <div class="field"><label>Obtained</label><input type="number" id="atObtained" min="0" step="0.5" style="width:90px;"></div>
+      <div class="field"><label>Max Marks</label><input type="number" id="atMax" min="1" step="0.5" style="width:90px;"></div>
+      <div class="field"><label>Absent?</label><select id="atAbsent"><option value="no">No</option><option value="yes">Yes</option></select></div>
+    </div>
+    <div class="panel-row">
+      <button class="primary" id="atSaveBtn">Save Score</button>
+      <button class="ghost" id="atCancelBtn">Cancel</button>
+    </div>
+  </div>
+
   <!-- Import panel — kept directly under the Import Excel Results button so the
        test name / date / file / cloud controls open right where the button is,
        instead of appearing below the section filters. -->
@@ -366,26 +388,6 @@
   <div class="pinned-panel" id="pinnedPanel" role="group" aria-label="Pinned favourite students" style="display:none;">
     <div class="pinned-panel-head">⭐ Pinned Students</div>
     <div class="pinned-panel-list" id="pinnedPanelList"></div>
-  </div>
-
-  <!-- Add/Edit test panel -->
-  <div class="panel" id="addTestPanel">
-    <h3>Add / Edit a Test Score</h3>
-    <div class="panel-row">
-      <div class="field"><label>Section</label><select id="atSection"></select></div>
-      <div class="field"><label>Student</label><select id="atStudent"></select></div>
-      <div class="field"><label>Subject</label><select id="atSubject"></select><div class="hint" id="atSubjectTeacherHint" style="margin-top:4px;"></div></div>
-    </div>
-    <div class="panel-row">
-      <div class="field"><label>Test Name</label><input type="text" id="atTestName" placeholder="e.g. Mid Term" required style="width:180px;"></div>
-      <div class="field"><label>Obtained</label><input type="number" id="atObtained" min="0" step="0.5" style="width:90px;"></div>
-      <div class="field"><label>Max Marks</label><input type="number" id="atMax" min="1" step="0.5" style="width:90px;"></div>
-      <div class="field"><label>Absent?</label><select id="atAbsent"><option value="no">No</option><option value="yes">Yes</option></select></div>
-    </div>
-    <div class="panel-row">
-      <button class="primary" id="atSaveBtn">Save Score</button>
-      <button class="ghost" id="atCancelBtn">Cancel</button>
-    </div>
   </div>
 
   <!-- Add student panel -->
