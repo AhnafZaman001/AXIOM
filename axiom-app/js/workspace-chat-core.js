@@ -69,6 +69,7 @@
       student: row.id ? { id: row.id, section: row.section } : null,
       chart: subject ? (row.tests[subject] || []).filter(score => !score.absent && score.percent != null)
         .slice(-8).map(score => [score.test, score.percent]) : null,
+      chartUnit: subject ? '%' : null,
     };
   }
 

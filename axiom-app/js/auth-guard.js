@@ -124,5 +124,6 @@
   renderTable();
   renderPinnedPanel();
   if (window.AxiomAssistant) window.AxiomAssistant.enable(role, session.user.id);
+  if (window.AxiomWorkspaceChat) window.AxiomWorkspaceChat.enable(session, profile);
   if(window.AxiomHome)window.AxiomHome.ready(session,profile);
 })();
