@@ -165,6 +165,7 @@
   }
 
   /* ------------------------------ page + buttons ------------------------------ */
+  var returnPage = 'section';
   function injectPage() {
     if ($('yearComparePage')) return;
     var host = document.createElement('div');
@@ -179,7 +180,7 @@
       '<div id="ycBody"></div>';
     var anchor = $('overallSummaryPage');
     if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(host, anchor); else document.body.appendChild(host);
-    $('ycBackBtn').addEventListener('click', function () { if (typeof setActivePage === 'function') setActivePage('section'); });
+    $('ycBackBtn').addEventListener('click', function () { if (typeof setActivePage === 'function') setActivePage(returnPage); });
     $('ycPrintBtn').addEventListener('click', printReportNow);
     var body = $('ycBody');
     body.addEventListener('click', onClick);
@@ -239,6 +240,13 @@
   }
 
   function openPage() {
+    returnPage = document.body.dataset.axPage === 'data' ? 'data' : 'section';
+    var backButton = $('ycBackBtn');
+    if (backButton) {
+      var destination = returnPage === 'data' ? 'Data Center' : 'Section View';
+      backButton.textContent = '← Back to ' + destination;
+      backButton.title = 'Return to ' + destination;
+    }
     if (typeof setActivePage === 'function') setActivePage('yearCompare');
     window.scrollTo(0, 0);
     loadDatasets();
