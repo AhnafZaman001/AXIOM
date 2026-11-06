@@ -800,11 +800,88 @@
     };
   }
 
+  function meetingBrief(comparison) {
+    var A = comparison.A, B = comparison.B, a = A.pooled, b = B.pooled;
+    var first = comparison.findings[0];
+    var coverageA = share(a.complete, a.listed), coverageB = share(b.complete, b.listed);
+    var coverage = {
+      label: 'Complete results',
+      values: f1(coverageA) + ' → ' + f1(coverageB),
+      detail: a.complete + ' of ' + a.listed + ' → ' + b.complete + ' of ' + b.listed + ' listed students'
+    };
+    if (first.id !== 'typical') return {
+      title: first.title,
+      summary: first.observation,
+      metrics: [coverage],
+      limit: first.evidence.slice(0, 2).join(' '),
+      action: { text: first.next, view: 'quality', label: 'Review comparison checks' }
+    };
+
+    var change = comparison.deltas.mean;
+    var basis = comparison.settings.basis === 'complete' ? 'students with complete results' : 'students with available marks';
+    var title = Math.abs(change) < 0.05 ? 'The reported average held steady' :
+      'The reported average ' + (change > 0 ? 'rose ' : 'fell ') + Math.abs(change).toFixed(1) + ' points';
+    var limit = 'These are different groups of students.';
+    if (a.complete < a.listed || b.complete < b.listed) {
+      limit += ' Check missing and absent marks before treating the change as a whole-cohort result.';
+    }
+    if (comparison.mix && (comparison.mix.material || comparison.mix.reversal)) {
+      limit += ' With stream sizes held constant, the change is ' + pts(comparison.mix.within) + '.';
+    }
+    var signals = comparison.signals || {};
+    function subjectFor(signal) {
+      return signal && comparison.subjects.find(function (row) {
+        return row.streamKey === signal.streamKey && row.key === signal.subjectKey;
+      });
+    }
+    var priority = subjectFor(signals.priority);
+    var hasFailures = priority && priority.b.below > 0;
+    var subject = hasFailures ? priority : subjectFor(signals.gain);
+    var action;
+    if (subject) {
+      var name = subject.stream + ' ' + subject.subject;
+      if (hasFailures) {
+        action = {
+          text: 'Review ' + name + ' first. Its average was ' + f1(subject.a.mean) + ' → ' + f1(subject.b.mean) +
+            ', and ' + subject.b.below + ' of ' + subject.b.n + ' scored below ' + comparison.settings.pass +
+            '% in ' + B.label + '. Check which topics those students struggled with.',
+          view: 'subjects', label: 'Open subject results'
+        };
+      } else {
+        action = {
+          text: 'Review ' + name + ' with the subject lead. Its average was ' + f1(subject.a.mean) + ' → ' + f1(subject.b.mean) +
+            ', and the lower-quarter score moved from ' + f1(subject.a.p25) + ' to ' + f1(subject.b.p25) +
+            '. Check whether the papers and marking were comparable.',
+          view: 'subjects', label: 'Open subject results'
+        };
+      }
+    } else if (a.complete < a.listed || b.complete < b.listed) {
+      var lowerCoverage = coverageA <= coverageB ? A : B;
+      action = {
+        text: 'Start with ' + lowerCoverage.label + '. ' + (lowerCoverage.pooled.listed - lowerCoverage.pooled.complete) +
+          ' listed results are incomplete. Check the workbook for absences, blanks and invalid marks.',
+        view: 'quality', label: 'Open data quality'
+      };
+    } else {
+      action = {
+        text: 'Check which subjects and streams moved in the same direction before acting on the overall average.',
+        view: 'subjects', label: 'Open subject results'
+      };
+    }
+    return {
+      title: title,
+      summary: 'Among ' + basis + ', ' + A.label + ' averaged ' + f1(a.mean) + ' and ' + B.label + ' averaged ' + f1(b.mean) + '.',
+      metrics: [{ label: 'Students counted', values: a.n + ' → ' + b.n, detail: basis }, coverage],
+      limit: limit,
+      action: action
+    };
+  }
+
   return {
     DEFAULTS: DEFAULTS, BAND_LABELS: BAND_LABELS, settingsFrom: settingsFrom,
     classifyCell: classifyCell, subjectKey: subjectKey, streamKey: streamKey, detectStream: detectStream,
     parseSheet: parseSheet, parseWorkbook: parseWorkbook, buildDataset: buildDataset,
-    analyseDataset: analyseDataset, compareDatasets: compareDatasets, quantile: quantile, deriveRecord: deriveRecord, passRate: passRate,
+    analyseDataset: analyseDataset, compareDatasets: compareDatasets, meetingBrief: meetingBrief, quantile: quantile, deriveRecord: deriveRecord, passRate: passRate,
     fmt: { pct: f1, pts: pts }
   };
 });

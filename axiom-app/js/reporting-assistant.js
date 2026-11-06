@@ -23,9 +23,9 @@
   dialog.setAttribute('aria-labelledby', 'axAssistantTitle');
   dialog.innerHTML = '<form><header><h2 id="axAssistantTitle">Reporting Assistant</h2>' +
     '<button type="button" class="ghost small" data-close>Close</button></header>' +
-    '<p data-scope></p><label for="axAssistantQuestion">Question</label>' +
+    '<p data-scope></p><div data-question-controls><label for="axAssistantQuestion">Question</label>' +
     '<div class="ax-assistant-controls"><select id="axAssistantQuestion"></select>' +
-    '<button type="submit" class="primary small">Ask</button></div>' +
+    '<button type="submit" class="primary small">Ask</button></div></div>' +
     '<p role="status" data-status></p><div data-answer></div></form>';
   document.body.append(dialog);
   const form = dialog.querySelector('form');
@@ -54,43 +54,57 @@
     return options;
   }
 
-  function yearFacts({ pooled }) {
-    return {
-      listed: pooled.listed, counted: pooled.n, complete: pooled.complete,
-      median: pooled.median == null ? null : Number(pooled.median.toFixed(1)),
-      belowPass: pooled.belowPass.recorded, unknown: pooled.belowPass.unknown,
-    };
-  }
-
-  function yearChoices(comparison) {
-    if (!comparison) return [];
-    const { A, B, checks, status: comparisonStatus } = comparison;
-    const notes = checks.filter(check => check.status === 'review').map(check => check.label);
-    const coverage = [A, B].filter(year => year.pooled.complete < year.pooled.listed)
-      .map(year => `${year.label}: ${year.pooled.complete} of ${year.pooled.listed} students have complete results.`).join(' ');
-    return [{
-      label: 'Compare the two selected years', kind: 'years', sourceIds: [A.id, B.id],
-      facts: { earlier: yearFacts(A), later: yearFacts(B) }, review: comparisonStatus === 'review',
-      earlierTitle: A.label, laterTitle: B.label,
-      note: [coverage, notes.length ? 'Check before drawing conclusions: ' + notes.join(', ') + '.' : ''].filter(Boolean).join(' '),
-    }];
-  }
-
   function open(page) {
-    const comparison = page === 'years' ? window.AxiomYearCompare?.assistantComparison() : null;
+    const isYearBrief = page === 'years';
+    const comparison = isYearBrief ? window.AxiomYearCompare?.assistantComparison() : null;
     const dashboard = dashboards[page];
-    choices = page === 'years' ? yearChoices(comparison) : dashboardChoices(dashboard);
+    dialog.querySelector('h2').textContent = isYearBrief ? 'Year Comparison Brief' : 'Reporting Assistant';
+    dialog.querySelector('[data-question-controls]').hidden = isYearBrief;
     dialog.querySelector('[data-scope]').textContent = comparison ? `${comparison.A.label} → ${comparison.B.label}` : dashboard?.title || 'Year Comparison';
+    answer.replaceChildren();
+    choices = isYearBrief ? [] : dashboardChoices(dashboard);
+    if (isYearBrief) {
+      status.textContent = comparison ? '' : 'Select exactly two years, then reopen the brief.';
+      if (comparison) renderYearBrief(window.AxiomYearCore.meetingBrief(comparison));
+      dialog.showModal();
+      return;
+    }
     question.replaceChildren(...choices.map((choice, index) => {
       const option = element('option', choice.label);
       option.value = index;
       return option;
     }));
     question.disabled = ask.disabled = !choices.length;
-    answer.replaceChildren();
-    status.textContent = choices.length ? 'Uses the figures in this report.' :
-      (page === 'years' ? 'Select exactly two years, then open the assistant again.' : 'Load scored results for this dashboard first.');
+    status.textContent = choices.length ? 'Uses the figures in this report.' : 'Load scored results for this dashboard first.';
     dialog.showModal();
+  }
+
+  function renderYearBrief(brief) {
+    const body = element('div');
+    body.className = 'ax-assistant-brief';
+    body.append(element('h3', brief.title), element('p', brief.summary));
+    const metrics = element('dl');
+    for (const metric of brief.metrics) {
+      const card = element('div');
+      const value = element('dd', metric.values);
+      value.append(element('small', metric.detail));
+      card.append(element('dt', metric.label), value);
+      metrics.append(card);
+    }
+    const action = element('button', brief.action.label);
+    action.type = 'button';
+    action.className = 'ghost small';
+    action.addEventListener('click', () => {
+      dialog.close();
+      document.querySelector('#yearComparePage [data-view="' + brief.action.view + '"]')?.click();
+    });
+    body.append(metrics, element('h4', 'What to check next'), element('p', brief.action.text), action);
+    if (brief.limit) {
+      const note = element('p', brief.limit);
+      note.className = 'ax-assistant-brief-note';
+      body.append(note);
+    }
+    answer.append(body);
   }
 
   function render(result, choice) {
@@ -101,9 +115,8 @@
       const list = element('ul');
       for (const id of new Set(observation.sources)) {
         const { label, value } = facts.get(id);
-        const title = id.startsWith('earlier_') ? choice.earlierTitle : id.startsWith('later_') ? choice.laterTitle : '';
-        const display = label.includes('(%)') || label.includes('median %)') ? `${value}%` : String(value);
-        list.append(element('li', [title, label].filter(Boolean).join(' · ') + ' — ' + display));
+        const display = label.includes('(%)') ? `${value}%` : String(value);
+        list.append(element('li', label + ' — ' + display));
       }
       block.append(list);
       answer.append(block);
@@ -124,11 +137,11 @@
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) throw new Error('Sign in again to use the assistant.');
       if (session.user.id !== reportUserId) throw new Error('Reload AXIOM to update the report for your current account.');
-      const { kind, sourceIds, facts, review } = choice;
+      const { kind, sourceIds, facts } = choice;
       const response = await fetch(SUPABASE_URL + '/functions/v1/reporting-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + session.access_token },
-        body: JSON.stringify({ kind, sourceIds, facts, review }),
+        body: JSON.stringify({ kind, sourceIds, facts }),
         signal: controller.signal,
       });
       const result = await response.json();

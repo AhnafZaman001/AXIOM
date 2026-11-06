@@ -174,7 +174,7 @@
       '<div class="section-title">Year Comparison ' +
       '<span style="flex:1;"></span>' +
       '<button class="ghost small" id="ycBackBtn" title="Return to Section View">← Back to Section View</button>' +
-      '<button class="ghost small" type="button" data-ax-assistant="years">Ask Assistant</button>' +
+      '<button class="ghost small" type="button" data-ax-assistant="years">Meeting Brief</button>' +
       '<button class="ghost small" id="ycPrintBtn" title="Print or save the comparison as a PDF">Print Report</button></div>' +
       '<div id="ycBody"></div>';
     var anchor = $('overallSummaryPage');

@@ -18,4 +18,14 @@
 .ax-assistant [data-scope], .ax-assistant [data-status], .ax-assistant [data-answer] > p { color: var(--muted); font-size: .85rem; }
 .ax-assistant [data-answer] section { border-top: 1px solid var(--line); }
 .ax-assistant ul { padding-inline-start: 20px; font-size: .85rem; }
+.ax-assistant [data-status]:empty { display: none; }
+.ax-assistant-brief h3 { margin: 0; font-size: 1.35rem; }
+.ax-assistant-brief h4 { margin: 16px 0 0; font-size: .92rem; }
+.ax-assistant-brief p { margin: 8px 0; line-height: 1.45; }
+.ax-assistant-brief dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 10px; }
+.ax-assistant-brief dl > div { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.ax-assistant-brief dt, .ax-assistant-brief small, .ax-assistant-brief-note { color: var(--muted); font-size: .8rem; }
+.ax-assistant-brief dd { margin: 3px 0 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.ax-assistant-brief small { display: block; margin-top: 4px; font-weight: 400; }
+.ax-assistant-brief .ax-assistant-brief-note { margin-top: 14px; }
 @media print { [data-ax-assistant], .ax-assistant { display: none !important; } }

@@ -37,6 +37,29 @@ function dataset(label,students,opts={}){
 // n students scoring `score` in every subject (names are made up)
 function cohort(n,score,prefix='S'){return Array.from({length:n},(_,i)=>({name:`${prefix}${i}`,marks:SUBJ.map(()=>score)}));}
 
+test('meeting brief leads with measured performance and compares coverage as a rate',()=>{
+  const earlier=dataset('2025-26',cohort(86,76.4).concat(cohort(47,null,'Missing')),{grade:'First year'});
+  const later=dataset('2026-27',cohort(68,83.2).concat(cohort(22,null,'Missing')),{grade:'First year'});
+  const brief=Core.meetingBrief(Core.compareDatasets(earlier,later,{basis:'complete'}));
+  assert.equal(brief.title,'The reported average rose 6.8 points');
+  assert.match(brief.summary,/76\.4%.*83\.2%/);
+  assert.deepEqual(brief.metrics[1],{
+    label:'Complete results', values:'64.7% → 75.6%', detail:'86 of 133 → 68 of 90 listed students'
+  });
+  assert.equal(brief.action.view,'subjects');
+  assert.match(brief.action.text,/lower-quarter score.*papers and marking/);
+  assert.match(brief.limit,/missing and absent marks/);
+});
+
+test('meeting brief withholds a performance headline when assessments differ',()=>{
+  const earlier=dataset('2025-26',cohort(20,65),{grade:'First year'});
+  const later=dataset('2026-27',cohort(20,85),{assessment:'Mock exam',grade:'First year'});
+  const brief=Core.meetingBrief(Core.compareDatasets(earlier,later));
+  assert.equal(brief.title,'Comparability not established');
+  assert.equal(brief.action.view,'quality');
+  assert.match(brief.limit,/Assessment names differ/);
+});
+
 /* ---------- reader ---------- */
 test('reads a stream sheet: subjects, maxima, stream, year and assessment; names are never stored',()=>{
   const rows=sheetRows({title:'FY BOARD RESULT (PM)\n(2025-26)',subjects:SUBJ,students:[{name:'ALI KHAN',marks:[50,60,70,80]},{name:'SARA AHMED',marks:[90,80,70,60]}]});

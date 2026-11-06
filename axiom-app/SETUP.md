@@ -6,7 +6,7 @@
 2. Deploy `supabase/functions/reporting-assistant/index.ts` as `reporting-assistant` with legacy **Verify JWT** disabled. The handler verifies the signed-in user's JWT and role itself.
 3. Set the Edge Function secret `GROQ_API_KEY`. Use a separate Groq key for AXIOM. Reporting staff access follows the signed-in account's campus and the report source's campus. A new year uploaded through the app is automatically assigned to the uploader's campus.
 
-The model receives only the chosen report's numeric aggregates and generic metric labels. It does not receive account identifiers, student records, workbook contents, or chat history. The assistant uses the figures calculated by the open report.
+The model receives only the chosen report's numeric aggregates and generic metric labels. It does not receive account identifiers, student records, workbook contents, or chat history. The Year Comparison **Meeting Brief** uses the report's calculations directly and does not call Groq.
 
 ## 1. Create / confirm your Supabase project
 1. Go to https://supabase.com/dashboard and sign in.
