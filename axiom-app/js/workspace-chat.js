@@ -17,6 +17,7 @@
     ],
     'Year Comparison': [
       'Compare 2025–26 and 2026–27 in Year Comparison.',
+      'Compare Physics averages in PM for 2025–26 and 2026–27.',
       'In the latest saved year, how many students scored 90% or more?',
       'In Year Comparison, show roll 12 in 2026–27.',
       'In the latest saved year, compare subject averages in ICS.',
@@ -161,15 +162,12 @@
       if (route.error) throw new Error(route.error);
       if (route.kind === 'compare') {
         const [earlier, later] = route.years;
-        const brief = await data.compare(earlier.id, later.id);
+        const [brief, ...snapshots] = await Promise.all([data.compare(earlier.id, later.id),
+          data.snapshot(earlier.id), data.snapshot(later.id)]);
         if (generation !== request) return;
         previousRoute = route;
         context = {};
-        render({
-          title: brief.title, detail: brief.summary, note: [brief.limit, brief.action.text].filter(Boolean).join(' '),
-          source: earlier.label + ' → ' + later.label, columns: ['Measure', 'Earlier → later'],
-          rows: brief.metrics.map(metric => [metric.label, metric.values]),
-        });
+        render(core.compareYears(repaired, snapshots, route.years, brief, intentWords));
         return;
       }
       const sourceId = route.id || 'workspace';

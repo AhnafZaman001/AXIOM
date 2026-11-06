@@ -8,7 +8,7 @@
   const rounded = value => Number(value.toFixed(2));
   const percent = value => `${rounded(value)}%`;
   const help = 'Try “How many students got exactly 90% in Physics?”, “Show roll 12 in F1A”, or “Show the score distribution”.';
-  const routingWords = 'academic academy assessment average board change changed compare comparison current dashboard distribution exactly first last latest marks previous quarter results roll roster saved scored section show student students subject subjects test workspace year years'.split(' ');
+  const routingWords = 'academic academy assessment average board change changed compare comparison current dashboard distribution exactly first last latest marks previous quarter results roll roster saved scored section show student students subject subjects test workspace year years above absent absence below between fewer greater least less lower more over than under'.split(' ');
 
   function editDistance(a, b) {
     const grid = Array.from({ length: a.length + 1 }, (_, i) => [i]);
@@ -270,12 +270,15 @@
       if (snapshot.isSavedYear && !subject) {
         const failed = scope.filter(row => row.belowPass > 0).length;
         const passed = scope.filter(row => row.complete && row.belowPass === 0).length;
-        return reply(`${passing ? passed + ' passed every subject' : failed + ' failed at least one subject'} · ${label}`,
+        const known = passed + failed;
+        const rate = known ? ' (' + percent((passing ? passed : failed) / known * 100) + ' of confirmed outcomes)' : '';
+        return reply(`${passing ? passed + ' passed every subject' : failed + ' failed at least one subject'}${rate} · ${label}`,
           `${scope.length - passed - failed} of ${scope.length} students have unconfirmed outcomes.`);
       }
       const cutoff = snapshot.passMark || 50;
       const matches = scored.filter(row => passing ? row.value >= cutoff : row.value < cutoff);
-      return show(matches, `${matches.length} ${passing ? 'at or above' : 'below'} ${cutoff}% · ${label}`);
+      const rate = scored.length ? ' (' + percent(matches.length / scored.length * 100) + ' of scored)' : '';
+      return show(matches, `${matches.length} ${passing ? 'at or above' : 'below'} ${cutoff}%${rate} · ${label}`);
     }
     if (subjectOverview) {
       const metrics = subjectNames.map(name => {
@@ -316,5 +319,36 @@
     return { ...reply(`${scope.length} students listed · ${label}`, coverage), context: nextContext };
   }
 
-  return { answer, normalize, repairQuestion, routeQuestion, help };
+  function compareYears(question, snapshots, years, brief, vocabulary = []) {
+    const subjectNames = [...new Set(snapshots.flatMap(snapshot => snapshot.students.flatMap(row => row.subjects)))];
+    const sections = [...new Map(snapshots.flatMap(snapshot => snapshot.sections).map(section => [section.key, section])).values()];
+    const query = repairQuestion(question, [...vocabulary, ...subjectNames])
+      .replace(/\b(?:19|20)\d{2}\s*[-–—/]\s*(?:(?:19|20)\d{2}|\d{2})\b/g, '')
+      .replace(/\b(?:19|20)\d{2}\b(?!\s*(?:%|marks?\b|\/))/gi, '');
+    const subject = findMention(query, subjectNames, name => /^math$/i.test(name) ? [name, 'maths', 'mathematics'] : [name])[0];
+    const section = findMention(query, sections, item => [item.key, item.label])[0];
+    const source = years.map(year => year.label).join(' → ');
+    if (/\b(?:roll|student named|student called)\b/i.test(query)) return {
+      title: 'Choose one year for a student lookup', detail: 'A roll number or name can belong to different students across cohorts.', source,
+    };
+    const specific = subject || section || scoreFilter(query) || /\b(average|mean|pass(?:ed|ing)?|fail(?:ed|ing)?|absent|absence|missing|how many)\b/i.test(query);
+    if (!specific) return {
+      title: brief.title, detail: brief.summary, note: [brief.limit, brief.action.text].filter(Boolean).join(' '),
+      source, columns: ['Measure', 'Earlier → later'], rows: brief.metrics.map(metric => [metric.label, metric.values]),
+    };
+
+    const questionForEach = scoreFilter(query) || /\b(pass(?:ed|ing)?|fail(?:ed|ing)?|absent|absence|missing|how many)\b/i.test(query) ? query : query + ' average';
+    return {
+      title: ['Year Comparison', section?.label, subject].filter(Boolean).join(' · '),
+      source, columns: ['Year', 'Result', 'Coverage'], note: brief.limit,
+      rows: snapshots.map((snapshot, index) => {
+        const available = (!section || snapshot.sections.some(item => item.key === section.key)) &&
+          (!subject || snapshot.students.some(row => (!section || row.section === section.key) && row.subjects.includes(subject)));
+        const result = available ? answer(questionForEach, snapshot) : null;
+        return [years[index].label, result?.title || 'Unavailable', result?.detail || 'No matching results in this saved year.'];
+      }),
+    };
+  }
+
+  return { answer, compareYears, normalize, repairQuestion, routeQuestion, help };
 });
