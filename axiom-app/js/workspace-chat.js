@@ -2,7 +2,7 @@
   'use strict';
 
   let panel, launcher, feed, source, input, sendButton;
-  let userId, campus, token, store, savedYears = [], context = {}, generation = 0, sending = false;
+  let userId, campus, token, store, savedYears = [], context = {}, contextSource, generation = 0, sending = false;
   const core = window.AxiomWorkspaceChatCore;
   const examples = ['How many students scored 90% or more?', 'Which subjects have the lowest averages?', 'Show the score distribution'];
   const intentWords = new Set('a about absent absences across all an and any are at average best bottom break breakdown by can chart class classes compare count difference did distribution do doing each every exactly fail failed failing fewer find for from give got graph group groups had has have high higher highest how i in is last latest least list low lower lowest many mark marks mean missing more most need number of on one overall pass passed passing percent percentage performance poor rank recorded result results same score scored scores section sections show some spread student students subject subjects summarize test than that the their them there these this those to top total trend under us was we weak weakest were what which who whose with without worst year years'.split(' '));
@@ -107,7 +107,10 @@
   function setOpen(open) {
     panel.hidden = !open;
     launcher.setAttribute('aria-expanded', String(open));
-    if (open) input.focus();
+    if (open) {
+      syncSource();
+      input.focus();
+    }
     else launcher.focus();
   }
 
@@ -121,13 +124,28 @@
     return store;
   }
 
+  function openReportYears() {
+    if (document.body.dataset.axPage !== 'yearCompare') return null;
+    return window.AxiomYearCompare?.selectedYears?.() || [];
+  }
+
+  function syncSource() {
+    if (!source || panel.hidden) return;
+    const years = openReportYears();
+    const option = source.options[0];
+    option.textContent = years === null ? 'Open report · Current workspace' :
+      years.length === 1 ? 'Open report · ' + years[0].label :
+        years.length > 1 ? 'Open report · ' + years.length + ' selected years' : 'Open report · Select a year';
+  }
+
   function updateYears(years) {
     savedYears = years;
     const selected = source.value;
-    const options = [new Option('Current workspace', 'workspace')];
+    const options = [new Option('Follow open report', 'auto'), new Option('Current workspace', 'workspace')];
     for (const year of years) options.push(new Option([year.label, year.assessment].filter(Boolean).join(' · '), year.id));
     source.replaceChildren(...options);
     if (options.some(option => option.value === selected)) source.value = selected;
+    syncSource();
   }
 
   async function submit(question) {
@@ -136,6 +154,8 @@
     message(question, 'user');
     const progress = message('Checking the records…');
     const request = generation;
+    const pageYears = openReportYears();
+    const selectedSource = source.value;
     sending = sendButton.disabled = true;
     try {
       const data = await dataStore();
@@ -143,29 +163,33 @@
       if (generation !== request) return;
       updateYears(years);
       const text = core.normalize(question);
-      const yearsMentioned = years.filter(year => {
+      const yearChoices = [...new Map([...years, ...(pageYears || [])].map(year => [year.id, year])).values()];
+      const yearsMentioned = yearChoices.filter(year => {
         const label = core.normalize(year.label);
         const start = label.match(/^(\d{4})(?:\s|$)/)?.[1];
         return (label && (' ' + text + ' ').includes(' ' + label + ' ')) ||
           (start && text.split(' ').includes(start));
       });
-      if (/\b(?:compare|comparison|difference|changed)\b/.test(text) && yearsMentioned.length > 1) {
-        if (yearsMentioned.length !== 2) throw new Error('Name exactly two saved years and their assessments if the year labels repeat.');
-        const brief = await data.compare(yearsMentioned[0].id, yearsMentioned[1].id);
+      const selectedYears = yearsMentioned.length ? yearsMentioned : selectedSource === 'auto' ? pageYears : null;
+      if (/\b(?:compare|comparison|difference|changed)\b/.test(text) && selectedYears?.length > 1) {
+        if (selectedYears.length !== 2) throw new Error('Choose exactly two years to compare.');
+        const brief = await data.compare(selectedYears[0].id, selectedYears[1].id);
         if (generation !== request) return;
         render({
           title: brief.title, detail: brief.summary, note: [brief.limit, brief.action.text].filter(Boolean).join(' '),
-          source: yearsMentioned.map(year => year.label).join(' → '), columns: ['Measure', 'Earlier → later'],
+          source: selectedYears.map(year => year.label).join(' → '), columns: ['Measure', 'Earlier → later'],
           rows: brief.metrics.map(metric => [metric.label, metric.values]),
         });
         return;
       }
-      if (yearsMentioned.length > 1) throw new Error('Choose one saved year, or ask to compare two years.');
-      if (yearsMentioned.length === 1 && source.value !== yearsMentioned[0].id) {
-        source.value = yearsMentioned[0].id;
+      if (selectedYears?.length > 1) throw new Error('Name one of the selected years for this question, or ask to compare the two years.');
+      if (selectedYears?.length === 0) throw new Error('Select a year in Year Comparison, or choose Current workspace in the chat.');
+      const sourceId = selectedYears?.[0]?.id || (selectedSource === 'auto' ? 'workspace' : selectedSource);
+      if (contextSource !== sourceId) {
         context = {};
+        contextSource = sourceId;
       }
-      const snapshot = await data.snapshot(source.value);
+      const snapshot = await data.snapshot(sourceId);
       if (generation !== request) return;
       const result = core.answer(question, snapshot, context) ||
         await interpret(question, snapshot);
@@ -196,7 +220,7 @@
     panel.setAttribute('aria-label', 'AXIOM workspace chat');
     panel.hidden = true;
     panel.innerHTML = '<header><strong>Ask AXIOM</strong><button type="button" class="ghost small" data-close aria-label="Close chat">Close</button></header>' +
-      '<label class="ax-chat-source">Data source <select><option value="workspace">Current workspace</option></select></label>' +
+      '<label class="ax-chat-source">Data source <select><option value="auto">Follow open report</option><option value="workspace">Current workspace</option></select></label>' +
       '<div role="log" aria-label="Chat messages" class="ax-chat-feed"></div>' +
       '<form><input type="text" autocomplete="off" maxlength="400" aria-label="Question" placeholder="Ask about your results…"><button type="submit" class="primary small">Send</button></form>';
     document.body.append(launcher, panel);
@@ -213,6 +237,7 @@
     panel.addEventListener('keydown', event => { if (event.key === 'Escape') setOpen(false); });
     panel.querySelector('form').addEventListener('submit', event => { event.preventDefault(); submit(input.value.trim()); });
     source.addEventListener('change', () => { generation++; context = {}; });
+    new MutationObserver(syncSource).observe(document.body, { attributes: true, attributeFilter: ['data-ax-page'] });
     supabaseClient.auth.onAuthStateChange((_event, nextSession) => {
       if (nextSession?.user.id === userId) return;
       clear();
@@ -223,5 +248,5 @@
     clear();
   }
 
-  window.AxiomWorkspaceChat = { enable };
+  window.AxiomWorkspaceChat = { enable, syncSource };
 })();
