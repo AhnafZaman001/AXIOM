@@ -20,7 +20,7 @@
     if(/scored|students|share|rank|count/.test(h))return 'blue';
     return '';
   }
-  function table(headers,rows){return '<div class="yc-wrap"><table class="yc-report-table"><thead><tr>'+headers.map(function(h){return '<th scope="col">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c,i){var tone=i?reportCellTone(headers[i],c):'';return '<'+(i?'td':'th scope="row"')+(tone?' class="yc-number yc-number-'+tone+'"':'')+'>'+esc(c)+'</'+(i?'td':'th')+'>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';}
+  function table(headers,rows){return '<div class="yc-wrap"><table class="yc-report-table'+(headers[1]==='Student'?' yc-student-rankings':'')+'"><thead><tr>'+headers.map(function(h){return '<th scope="col">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c,i){var tone=i?reportCellTone(headers[i],c):'';return '<'+(i?'td':'th scope="row"')+(tone?' class="yc-number yc-number-'+tone+'"':'')+'>'+esc(c)+'</'+(i?'td':'th')+'>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';}
   function panel(title,content){return '<section class="yc-card yc-report-section"><h3>'+esc(title)+'</h3>'+content+'</section>';}
   function subjectStats(ds,settings){
     var pass=Core.settingsFrom(settings).pass;
