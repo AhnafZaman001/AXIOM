@@ -131,7 +131,8 @@
     var w=compact?400:760,l=compact?80:115,r=15,pw=w-l-r,rowH=compact?100:70,h=rows.length*rowH+28,body='';
     rows.forEach(function(a,i){var x=l,y=i*rowH+10,m=a.pooled;body+=label(0,y+17,short(a.label));
       parts.forEach(function(p){var n=p.get(m);if(!n)return;var width=pw*n/m.listed,txt=a.label+' · '+p.name+': '+n+' of '+m.listed+' ('+value(n/m.listed*100)+')';
-        body+='<rect class="yc-bar" x="'+x+'" y="'+y+'" width="'+width+'" height="26" fill="'+p.color+'"'+tip(txt)+'><title>'+esc(txt)+'</title></rect>';
+        var action=p.key?' role="button" tabindex="0" data-yc-outcome="'+p.key+'" data-yc-year="'+esc(a.id)+'" aria-label="'+esc(txt)+'. Open student list."':'';
+        body+='<rect class="yc-bar'+(p.key?' yc-outcome-segment':'')+'" x="'+x+'" y="'+y+'" width="'+width+'" height="26" fill="'+p.color+'"'+action+tip(txt)+'><title>'+esc(txt)+'</title></rect>';
         if(width>28)body+=label(x+width/2,y+18,n,'middle',' class="yc-band-value"');x+=width;
       });
       // every count, in words, under the bar: a segment too narrow for its number is still readable
@@ -143,9 +144,9 @@
     return panel(title,svg(title+'; counts in bars and written under each bar, widths as percent of all listed students',body,w,h)+key,'',cls);
   }
   function outcomes(analyses){return cohortStack('Subject pass outcomes',analyses,[
-    {name:'Passed every subject',short:'passed every subject',get:function(m){return m.belowPass.confirmedPass;},color:'var(--yc-cyan)'},
-    {name:'Failed at least one subject',short:'failed at least one subject',get:function(m){return m.belowPass.recorded;},color:'var(--yc-rose)'},
-    {name:'Cannot confirm yet',short:'cannot confirm yet',get:function(m){return m.belowPass.unknown;},color:'var(--accent)'}],'yc-distribution');}
+    {key:'pass',name:'Passed every subject',short:'passed every subject',get:function(m){return m.belowPass.confirmedPass;},color:'var(--yc-cyan)'},
+    {key:'fail',name:'Failed at least one subject',short:'failed at least one subject',get:function(m){return m.belowPass.recorded;},color:'var(--yc-rose)'},
+    {key:'unknown',name:'Cannot confirm yet',short:'cannot confirm yet',get:function(m){return m.belowPass.unknown;},color:'var(--accent)'}],'yc-distribution');}
   function completeness(analyses){return cohortStack('Result completeness',analyses,[
     {name:'Complete',short:'complete',get:function(m){return m.complete;},color:'var(--yc-cyan)'},
     {name:'Partial',short:'partial',get:function(m){return m.partial;},color:'var(--accent)'},

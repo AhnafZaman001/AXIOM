@@ -133,6 +133,9 @@
       '.yc-svg text{fill:var(--muted);font-size:11px;font-family:inherit;}',
       '.yc-svg .yc-val{font-size:9px;fill:var(--ink-soft);}',
       '.yc-svg line{stroke:var(--line);}',
+      '.yc-outcome-segment{cursor:pointer;transition:filter .15s,opacity .15s;}',
+      '.yc-outcome-segment:hover,.yc-outcome-segment:focus{filter:brightness(1.16);opacity:.94;outline:none;}',
+      '.stat-list-row.static{cursor:default;}',
       'details.yc-det{border:1px solid var(--line);border-radius:14px;background:var(--paper-raised,var(--surface-2));margin-bottom:10px;}',
       'details.yc-det>summary{cursor:pointer;padding:13px 18px;font-weight:700;font-size:.9rem;color:var(--ink);list-style:none;display:flex;align-items:center;gap:8px;}',
       'details.yc-det>summary::-webkit-details-marker{display:none;}',
@@ -193,6 +196,7 @@
     body.addEventListener('pointerleave', hideChartTip);
     body.addEventListener('focusin', showChartTip);
     body.addEventListener('focusout', hideChartTip);
+    body.addEventListener('keydown',function(e){var segment=e.target.closest&&e.target.closest('[data-yc-outcome]');if(segment&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openOutcomeStudents(segment);}});
     document.addEventListener('keydown',function(e){if(e.key==='Escape')hideChartTip();});
   }
 
@@ -461,6 +465,47 @@
     finally{entry.loading=false;render();}
     return entry.data;
   }
+
+  async function namedDataset(d){
+    var entry=namedEntry(d);
+    if(entry&&entry.data)return entry.data;
+    if(!d.source_path)return d;
+    if(entry&&entry.loading){toast('Student names are still loading.','info');return null;}
+    entry={signature:reportSignature(d),loading:true};state.namedYears[d.id]=entry;
+    try{
+      var sheets=await Cloud.readSheets(await Cloud.create(supabaseClient).download(d));
+      entry.data=Reports.hydrateIdentities(d,Core.parseWorkbook(sheets,{fileName:d.source_file}));
+    }catch(error){entry.error='Names could not be loaded: '+error.message;toast(entry.error,'warning');}
+    finally{entry.loading=false;}
+    return entry.data||d;
+  }
+
+  function outcomeRows(d,kind){
+    var st=Core.settingsFrom(state.settings),rows=[];
+    (d.streams||[]).forEach(function(stream){
+      (d.records||[]).filter(function(rec){return rec.st===stream.key;}).forEach(function(rec,index){
+        var derived=Core.deriveRecord(rec,stream,st);
+        var result=derived.below>0?'fail':derived.complete?'pass':'unknown';
+        if(result!==kind)return;
+        rows.push({
+          id:'',static:true,name:rec.name||('Student '+(rec.i!=null?(Number(rec.i)+1):(index+1))),rollNo:rec.roll||'',
+          sectionLabel:[stream.label,rec.sheet].filter(Boolean).join(' · '),overall:derived.avail==null?null:Math.round(derived.avail*10)/10,
+          obtained:null,max:null
+        });
+      });
+    });
+    return rows;
+  }
+
+  async function openOutcomeStudents(segment){
+    var id=segment.getAttribute('data-yc-year'),kind=segment.getAttribute('data-yc-outcome');
+    var d=state.datasets.filter(function(item){return String(item.id)===String(id);})[0];
+    if(!d||['pass','fail','unknown'].indexOf(kind)<0)return;
+    hideChartTip();
+    var source=await namedDataset(d);if(!source)return;
+    var rows=outcomeRows(source,kind),titles={pass:'Passed every subject',fail:'Failed at least one subject',unknown:'Cannot confirm yet'};
+    if(typeof openStatListDrawer==='function')openStatListDrawer(titles[kind],rows.length+' students · '+d.label,rows);
+  }
   async function printMeetingReport(topOnly){
     var ctx=reportContext();if(!ctx||typeof printReport!=='function')return;
     var d=ctx.current,entry=namedEntry(d),named=entry&&entry.data;
@@ -512,6 +557,7 @@
   /* --------------------------------- page events --------------------------------- */
   function onClick(e) {
     var info=e.target.closest?e.target.closest('.yc-info'):null;if(info){showChartTip({target:info});return;}
+    var outcome=e.target.closest?e.target.closest('[data-yc-outcome]'):null;if(outcome){openOutcomeStudents(outcome);return;}
     var viewButton=e.target.closest?e.target.closest('[data-view]'):null;
     if(viewButton){
       var nextView=viewButton.getAttribute('data-view');if(['overview','subjects','support','reports'].indexOf(nextView)<0)return;

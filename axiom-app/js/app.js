@@ -1621,7 +1621,8 @@ function openStatListDrawer(title, subtitle, students){
       const z = s.overall!=null ? zoneOf(s.overall, false) : null;
       const marksPart = (s.obtained!=null && s.max!=null) ? `${s.obtained}/${s.max} ` : '';
       const pill = s.overall!=null ? `<span class="zone-pill ${z}">${marksPart}(${s.overall}%)</span>` : '';
-      return `<div class="stat-list-row" data-sid="${s.id}" data-skey="${s.sectionKey}">
+      const linkAttrs = s.static ? '' : ` data-sid="${s.id}" data-skey="${s.sectionKey}"`;
+      return `<div class="stat-list-row${s.static?' static':''}"${linkAttrs}>
         <div><div class="slr-name">${escapeHtml(s.name)}</div><div class="slr-meta">${s.rollNo!=null&&s.rollNo!==''?`Roll ${escapeHtml(s.rollNo)} · `:''}${escapeHtml(s.sectionLabel||'')}</div></div>
         ${pill}
       </div>`;
