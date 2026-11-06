@@ -593,6 +593,12 @@ function axPillHtml(t, z){
   const tip = escapeHtml(t.test || 'Result');
   return `<span class="zone-pill ${z||'none'}" title="${tip}">${percent}${marks ? ` · ${marks}` : ''}</span>`;
 }
+function studentTotalPillHtml(student, def){
+  const {obtained, max} = studentTotalMarks(student, def);
+  if(!(max > 0)) return axPillHtml(null);
+  const percent = Math.round(obtained / max * 1000) / 10;
+  return axPillHtml({obtained, max, percent, test:'Overall marks across all scored tests'}, zoneOf(percent, false));
+}
 function rosterTestCellsHtml(st, subj, testNames){
   const arr = (st.tests||{})[subj] || [];
   return testNames.map(tn=>{
@@ -761,7 +767,7 @@ function axChangeCellHtml(st, def, subjFilter, perTest){
   return axDeltaHtml(studentOverallTrend(st, def));
 }
 function axAverageRowHtml(store, def, subjFilter, perTest, subjectsShown, testNames){
-  const extra = showExtra ? '<td class="extra-detail"></td><td class="extra-detail"></td><td class="extra-detail"></td>' : '';
+  const extra = showExtra ? '<td class="extra-detail"></td><td class="extra-detail"></td><td class="extra-detail"></td><td class="extra-detail"></td>' : '';
   let cells = '', change = '<td class="ax-change flat">&mdash;</td>';
   if(perTest){
     const avgs = testNames.map(tn=>rosterTestAverage(store, subjFilter, tn));
@@ -842,6 +848,7 @@ function renderTable(options = {}){
 
   let headHtml = sortableThHtml('Student', '__name', mainTableSort);
   headHtml += rosterExtraHeadHtml(mainTableSort);
+  if(showExtra) headHtml += '<th scope="col" class="roster-overall">Overall</th>';
   const testNames = subjFilter ? rosterTestNames(store, subjFilter) : [];
   const perTest = !!subjFilter && testNames.length > 0;
   if(perTest){
@@ -885,6 +892,7 @@ function renderTable(options = {}){
   body.innerHTML = pageStudents.map(st=>{
     let row = `<td class="name-cell"><span class="pin-star${st.pinned?' pinned':''}" data-pin-sid="${st.id}" title="${st.pinned?'Unpin student':'Pin student'}" role="button" aria-label="${st.pinned?'Unpin student':'Pin student'}">${st.pinned?'★':'☆'}</span>${supportIndicatorHtml(st)}${avatarHtml(st.name)}<span class="ax-who"><b>${escapeHtml(st.name)}</b>${st.rollNo!=null&&st.rollNo!==''?`<small>Roll ${escapeHtml(st.rollNo)}</small>`:''}</span></td>`;
     row += rosterExtraCellsHtml(st, def, subjFilter);
+    if(showExtra) row += `<td class="extra-detail zone-cell">${studentTotalPillHtml(st, def)}</td>`;
     if(perTest) row += rosterTestCellsHtml(st, subjFilter, testNames);
     (perTest ? [] : subjectsShown).forEach(subj=>{
       const arr = (st.tests||{})[subj] || [];
@@ -1539,7 +1547,10 @@ function openStudentDrawerById(id, sectionKeyHint){
   if(drawerPos) metaBits.push(`Position ${drawerPos.rank} of ${drawerPos.total}`);
   document.getElementById('drawerStudentMeta').textContent = metaBits.join(' · ');
 
-  let bodyHtml = '';
+  let bodyHtml = `<div class="drawer-subject-row">
+    <div class="dsr-head"><span class="drawer-subject-name">Total Evaluation</span></div>
+    <div class="dsr-pills">${studentTotalPillHtml(student, def)}</div>
+  </div>`;
   def.subjects.forEach(subj=>{
     const arr = (student.tests||{})[subj] || [];
     const t = arr.length ? arr[arr.length-1] : null;
@@ -1578,7 +1589,7 @@ function openStudentDrawerById(id, sectionKeyHint){
       <div class="dsr-pills">${pillsHtml}</div>
     </div>`;
   });
-  document.getElementById('drawerBody').innerHTML = renderSupportSectionHtml(student, def) + (bodyHtml || `<div class="hint">No subjects configured for this section.</div>`);
+  document.getElementById('drawerBody').innerHTML = renderSupportSectionHtml(student, def) + bodyHtml + (def.subjects.length ? '' : `<div class="hint">No subjects configured for this section.</div>`);
 
   document.getElementById('studentDrawerOverlay').classList.add('open');
 }
@@ -2928,7 +2939,8 @@ document.getElementById('moreMenuDropdown').addEventListener('click', ()=>docume
 
 document.getElementById('extraDetailsBtn').addEventListener('click', (e)=>{
   const on = document.body.classList.toggle('ax-details');
-  e.target.textContent = on ? 'Hide Details' : 'Show Details';
+  e.currentTarget.textContent = on ? 'Hide Details' : 'Show Details';
+  e.currentTarget.setAttribute('aria-pressed', String(on));
 });
 
 function togglePanel(id){
