@@ -1479,7 +1479,6 @@ function togglePinStudent(id, sectionKeyHint){
   found.student.pinned = !found.student.pinned;
   markDirty();
   renderTable();
-  if(typeof renderTRRoster === 'function') renderTRRoster();
   renderPinnedPanel();
   const overlay = document.getElementById('studentDrawerOverlay');
   if(overlay.classList.contains('open') && document.getElementById('drawerStudentName').dataset.sid === id){
@@ -2616,7 +2615,6 @@ function renderTeacherReport(){
   });
 
   body.innerHTML = html;
-  renderTRRoster();
   triggerEntranceAnimations();
 }
 
@@ -2808,6 +2806,7 @@ const ROSTER_EMPTY_NO_STUDENTS = `<h3>No students in this section yet</h3><div>I
 const ROSTER_EMPTY_NO_MATCHES = `<h3>No students match the current filters</h3><div>Try clearing the zone filter or quick filter chips above.</div>`;
 
 /* ---- Teacher Report's independent roster (scoped to the selected teacher's own sections/subjects) ---- */
+if(document.getElementById('trRRosterWrap')){
 let trRosterState = { teacherName:null, sectionKey:null, subjFilter:'', zoneFilter:'', quickFilter:null, searchQuery:'', sort:{key:null,dir:'desc'} };
 
 function trRosterSectionsForTeacher(teacherName){
@@ -2915,6 +2914,7 @@ document.querySelectorAll('#trRChipRow .chip').forEach(chip=>{
     openStudentDrawerById(tr.getAttribute('data-sid'), tr.getAttribute('data-skey'));
   });
 });
+}
 
 function toggleOverallSummary(open){ setActivePage(open ? 'overall' : 'section'); }
 function toggleSectionSummary(open){ setActivePage(open ? 'sectionSummary' : 'section'); }
@@ -3964,7 +3964,6 @@ populateSubjectFilter();
 updateStatusLine();
 updateLastUpdatedNow();
 renderTable();
-renderTRRoster();
 renderPinnedPanel();
 
 /* ---- 025_print-report-generation-native-browser-print-no-ex.js ---- */

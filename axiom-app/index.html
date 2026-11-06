@@ -198,45 +198,6 @@
     </div>
     <div id="teacherReportBody"></div>
 
-    <div id="trRRosterWrap" style="display:none;">
-      <div class="section-title">Student Roster <span class="filters" style="font-style:italic;color:var(--muted);font-weight:400;">— independent of the Section View table; limited to this teacher's own sections</span><span style="flex:1;"></span><button class="ghost small" id="trRPrintBtn" title="Print only the students currently shown below, with the active filters applied"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8"/><path d="M6 17H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/></svg> Print Filtered List</button></div>
-      <div class="toolbar" id="trRFiltersToolbar">
-        <select id="trRSection"></select>
-      </div>
-      <div class="field">
-        <label>Subject Filter</label>
-        <select id="trRSubject"></select>
-      </div>
-      <div class="field">
-        <label>Zone Filter</label>
-        <select id="trRZone">
-          <option value="">All Zones</option>
-          <option value="green">Green (90%+)</option>
-          <option value="blue">Blue (80-89%)</option>
-          <option value="yellow">Yellow (70-79%)</option>
-          <option value="pink">Pink (60-69%)</option>
-          <option value="red">Red (below 60%)</option>
-          <option value="grey">Absent</option>
-        </select>
-      </div>
-      <div class="field" style="flex:1;min-width:200px;">
-        <label>Search Student</label>
-        <input type="text" id="trRSearch" placeholder="Type a name…" style="width:100%;">
-      </div>
-      <div class="chip-row" id="trRChipRow" role="group" aria-label="Quick filters">
-        <span class="chip" data-quick="atrisk" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>At Risk</span>
-        <span class="chip" data-quick="improving" role="button" tabindex="0" aria-pressed="false"><span class="dot green"></span>Improving</span>
-        <span class="chip" data-quick="declining" role="button" tabindex="0" aria-pressed="false"><span class="dot red"></span>Declining</span>
-        <span class="chip" data-quick="absent" role="button" tabindex="0" aria-pressed="false"><span class="dot grey"></span>Absent</span>
-      </div>
-      <div id="trRTableWrap" class="table-wrap">
-        <table class="main-table">
-          <thead><tr id="trRTableHead"></tr></thead>
-          <tbody id="trRTableBody"></tbody>
-        </table>
-      </div>
-      <div class="empty-state" id="trREmptyState" style="display:none;"></div>
-    </div>
   </div>
 
   <div class="toolbar" id="actionsToolbar">
@@ -794,7 +755,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <script src="js/imports/excel-engine.js?v=1"></script>
 <script src="js/storage/workspace-backup.js?v=1"></script>
 <script src="js/reporting-assistant.js?v=2"></script>
-<script src="js/app.js?v=20261107e"></script>
+<script src="js/app.js?v=20261107f"></script>
 <script src="js/parent-comms.js?v=20261030b"></script>
 <script src="js/year-compare-core.js?v=20261106b"></script>
 <script src="js/year-compare-storage.js?v=20261106b"></script>
