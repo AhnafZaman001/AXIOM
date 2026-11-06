@@ -104,12 +104,13 @@
         return [{
           section: stream.key, sectionLabel: stream.label, subjects, tests,
           overall: counted ? result.avail : null, total: counted ? { obtained, max } : null,
+          complete: result.complete, belowPass: result.below,
         }];
       });
       return {
         label: `${dataset.label} · ${dataset.assessment || 'Saved year'}`, students,
         sections: dataset.streams.map(stream => ({ key: stream.key, label: stream.label })),
-        anonymous: true, totalNote: 'Overall marks come from the subjects counted in the selected year.',
+        anonymous: true, passMark: settings.pass, totalNote: 'Overall marks come from the subjects counted in the selected year.',
       };
     }
 

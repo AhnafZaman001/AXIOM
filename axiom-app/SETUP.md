@@ -2,7 +2,7 @@
 
 ## Reporting assistant
 
-**Ask AXIOM** opens from the bottom right for principals, coordinators, and HODs with a campus assignment. It loads the current workspace on demand using the signed-in account's database permissions. The data-source menu also includes campus-approved saved years. Saved-year snapshots are anonymous, so use the current workspace for named student or roll-number questions.
+**Ask AXIOM** opens from the bottom right for principals, coordinators, and HODs with a campus assignment. It loads the current workspace on demand using the signed-in account's database permissions. The data-source menu also includes campus-approved saved years. Saved-year snapshots are anonymous, so use the current workspace for named student or roll-number questions. When local matching needs help, the assistant sends only allowlisted analysis words to Groq to classify the request. It calculates results in the browser.
 
 1. Run `supabase/migration_015_reporting_assistant.sql` and `supabase/migration_016_year_comparison_campus.sql` in AXIOM's SQL Editor. Migration 016 needs the existing `public.current_campus()` function. For previously uploaded years, supply the verified year ID to campus mapping inside the migration as described in its comments. Existing rows without an assignment are hidden until an administrator maps them.
 2. Deploy `supabase/functions/reporting-assistant/index.ts` as `reporting-assistant` with legacy **Verify JWT** disabled. The handler verifies the signed-in user's JWT and role itself.

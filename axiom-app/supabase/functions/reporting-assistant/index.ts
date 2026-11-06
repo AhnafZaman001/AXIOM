@@ -6,6 +6,8 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const roles = ["principal", "coordinator", "hod"];
+const chatTerms = new Set("a about absent absences across all an and any are at average best bottom break breakdown by can chart class classes compare count difference did distribution do doing each every exactly fail failed failing fewer find for from give got graph group groups had has have high higher highest how i in is last latest least list low lower lowest many mark marks mean missing more most need number of on one overall pass passed passing percent percentage performance poor rank recorded result results same score scored scores section sections show some spread student students subject subjects summarize test than that the their them there these this those to top total trend under us was we weak weakest were what which who whose with without worst year years".split(" "));
+const chatOperations = ["count", "average", "top", "bottom", "distribution", "subjects", "absences", "groups", "clarify"];
 const dashboardMetrics = {
   average: "Overall average (%)",
   passRate: "Overall pass rate (%) at 50% or higher",
@@ -70,24 +72,31 @@ Deno.serve(async (request: Request) => {
     let input;
     try { input = JSON.parse(raw); } catch { return reply({ error: "Invalid report request." }, 400); }
     const { kind, sourceIds, facts, review } = input || {};
-    if (!["dashboard", "years", "subject"].includes(kind) || !Array.isArray(sourceIds) ||
+    const isChat = kind === "chat-intent";
+    if (isChat && (typeof input.phrase !== "string" || input.phrase.length > 350 ||
+        !input.phrase.split(" ").every((word: string) => chatTerms.has(word)))) {
+      return reply({ error: "Invalid chat request." }, 400);
+    }
+    if (!isChat && (!["dashboard", "years", "subject"].includes(kind) || !Array.isArray(sourceIds) ||
         !sourceIds.length || sourceIds.length > 200 || new Set(sourceIds).size !== sourceIds.length ||
         sourceIds.some(id => typeof id !== "string" || !id || id.length > 128) ||
-        (kind === "years" && sourceIds.length !== 2) || (kind === "subject" && sourceIds.length !== 1)) {
+        (kind === "years" && sourceIds.length !== 2) || (kind === "subject" && sourceIds.length !== 1))) {
       return reply({ error: "Choose a supported report and its sources." }, 400);
     }
     if (kind === "years" && sourceIds.some(id => !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id))) {
       return reply({ error: "Choose two saved years." }, 400);
     }
-    const [table, column] = kind === "years" ? ["year_datasets", "id"] : ["sections", "key"];
-    const { data: sources, error: sourceError } = await userClient.from(table)
-      .select(column).eq("campus", profile.campus).in(column, sourceIds);
-    if (sourceError) {
-      console.error("Reporting assistant campus check unavailable", sourceError.code);
-      return reply({ error: "The assistant could not check campus access." }, 503);
-    }
-    if (sources?.length !== sourceIds.length) {
-      return reply({ error: "One or more report sources are unavailable for your campus." }, 403);
+    if (!isChat) {
+      const [table, column] = kind === "years" ? ["year_datasets", "id"] : ["sections", "key"];
+      const { data: sources, error: sourceError } = await userClient.from(table)
+        .select(column).eq("campus", profile.campus).in(column, sourceIds);
+      if (sourceError) {
+        console.error("Reporting assistant campus check unavailable", sourceError.code);
+        return reply({ error: "The assistant could not check campus access." }, 503);
+      }
+      if (sources?.length !== sourceIds.length) {
+        return reply({ error: "One or more report sources are unavailable for your campus." }, 403);
+      }
     }
 
     const earlier = kind === "years" ? evidenceFor(facts?.earlier, yearMetrics, "earlier_") : null;
@@ -95,7 +104,7 @@ Deno.serve(async (request: Request) => {
     const evidence = kind === "years" ? (earlier && later ? [...earlier, ...later] : null)
       : evidenceFor(facts, kind === "subject" ? subjectMetrics : dashboardMetrics);
     const available = evidence?.filter(item => item.value !== null);
-    if (!available?.length) return reply({ error: "There are no usable figures for this report." }, 422);
+    if (!isChat && !available?.length) return reply({ error: "There are no usable figures for this report." }, 422);
 
     const key = Deno.env.get("GROQ_API_KEY");
     if (!key) return reply({ error: "The assistant is awaiting setup." }, 503);
@@ -118,9 +127,12 @@ Deno.serve(async (request: Request) => {
         temperature: 0.1,
         reasoning_effort: "low",
         reasoning_format: "hidden",
-        max_completion_tokens: 500,
+        max_completion_tokens: isChat ? 220 : 500,
         response_format: { type: "json_object" },
-        messages: [
+        messages: isChat ? [
+          { role: "system", content: 'Classify the academic query into one operation. Return JSON {"operation":"..."} using only ' + chatOperations.join(", ") + '. The input contains only public analytical vocabulary. Subjects means compare subject averages, groups means counts by section or stream. Use clarify for unsupported or ambiguous requests. Never answer the question or invent an entity.' },
+          { role: "user", content: input.phrase },
+        ] : [
           { role: "system", content: 'You explain school report figures in plain English. Return JSON {"observations":[{"text":"one short sentence","sources":["evidence_id"]}]} with one or two useful observations. Every sentence must cite the supplied evidence IDs that support it. Leave digits and percentages out of text because the app shows the exact cited values alongside it. The earlier_ and later_ prefixes identify different cohorts, never individual progress. When review is true, do not conclude that performance improved or declined; explain that a like-for-like comparison needs checking. Treat missing, absent and unknown separately from failure. Avoid causal claims, names and speculation. If coverage is incomplete, qualify the observation.' },
           { role: "user", content: JSON.stringify({ job: kind, review: kind === "years" && review === true, evidence }) },
         ],
@@ -131,8 +143,10 @@ Deno.serve(async (request: Request) => {
       return reply({ error: "The assistant could not write a summary. The report figures are still available." }, 502);
     }
     const completion = await result.json();
-    const { observations } = JSON.parse(completion.choices[0].message.content);
-    const validIds = new Set(available.map(item => item.id));
+    const output = JSON.parse(completion.choices[0].message.content);
+    if (isChat) return reply({ operation: chatOperations.includes(output.operation) ? output.operation : "clarify" });
+    const { observations } = output;
+    const validIds = new Set(available?.map(item => item.id));
     if (!Array.isArray(observations) || observations.length < 1 || observations.length > 2 ||
         observations.some(item => typeof item?.text !== "string" || !item.text.trim() || item.text.length > 300 ||
           /\d/.test(item.text) || !Array.isArray(item.sources) || !item.sources.length ||

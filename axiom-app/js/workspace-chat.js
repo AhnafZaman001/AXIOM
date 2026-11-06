@@ -5,6 +5,30 @@
   let userId, campus, token, store, savedYears = [], context = {}, generation = 0, sending = false;
   const core = window.AxiomWorkspaceChatCore;
   const examples = ['How many students scored 90% or more?', 'Which subjects have the lowest averages?', 'Show the score distribution'];
+  const intentWords = new Set('a about absent absences across all an and any are at average best bottom break breakdown by can chart class classes compare count difference did distribution do doing each every exactly fail failed failing fewer find for from give got graph group groups had has have high higher highest how i in is last latest least list low lower lowest many mark marks mean missing more most need number of on one overall pass passed passing percent percentage performance poor rank recorded result results same score scored scores section sections show some spread student students subject subjects summarize test than that the their them there these this those to top total trend under us was we weak weakest were what which who whose with without worst year years'.split(' '));
+  const intents = {
+    count: 'How many students', average: 'Average result', top: 'Top results',
+    bottom: 'Lowest results', distribution: 'Score distribution', subjects: 'Compare subjects',
+    absences: 'How many were absent', groups: 'Students by section',
+  };
+
+  async function interpret(question, snapshot) {
+    const phrase = core.normalize(question).split(' ').filter(word => intentWords.has(word)).slice(0, 35).join(' ');
+    if (phrase.length < 8) return null;
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/reporting-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ kind: 'chat-intent', phrase }),
+        signal: AbortSignal.timeout(8500),
+      });
+      if (!response.ok) return null;
+      const { operation } = await response.json();
+      return Object.hasOwn(intents, operation) ? core.answer(intents[operation] + ' ' + question, snapshot, context) : null;
+    } catch {
+      return null;
+    }
+  }
 
   function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -144,7 +168,7 @@
       const snapshot = await data.snapshot(source.value);
       if (generation !== request) return;
       const result = core.answer(question, snapshot, context) ||
-        await window.AxiomChatInterpret?.resolve(question, snapshot, context, token);
+        await interpret(question, snapshot);
       if (generation !== request) return;
       if (result) {
         if (result.context) context = result.context;

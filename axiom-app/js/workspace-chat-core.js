@@ -28,7 +28,7 @@
     const number = '(\\d+(?:\\.\\d+)?)';
     const range = question.match(new RegExp('(?:between|from)\\s+' + number + '\\s*%?\\s*(?:and|to|–|-)\\s*' + number, 'i'));
     const explicit = question.match(new RegExp(number + '\\s*(%|marks?\\b|points?\\b|\\+|/\\s*' + number + ')', 'i'));
-    const phrase = question.match(new RegExp('(?:exactly|at least|at most|more than|less than|above|below|under|over|got|scored|greater than|equal to)\\s+' + number, 'i'));
+    const phrase = question.match(new RegExp('(?:exactly|at least|at most|more than|less than|above|below|under|over|got|scored|greater than|equal to|marks? of|score of)\\s+' + number, 'i'));
     if (!range && !explicit && !phrase) return null;
     const value = Number((range || explicit || phrase)[1]);
     const upper = range ? Number(range[2]) : null;
@@ -38,8 +38,8 @@
     if (range && upper < value) return { invalid: true };
     if (range) return { marks, denominator, label: `${value}–${upper}`, match: n => n >= value && n <= upper };
     const rule = [
-      [/at least|or more|or above|\d\s*\+|>=|≥/i, 'at least', n => n >= value],
-      [/at most|or less|or below|<=|≤/i, 'at most', n => n <= value],
+      [/at least|or more|or above|or higher|\d\s*\+|>=|≥/i, 'at least', n => n >= value],
+      [/at most|or less|or below|or lower|<=|≤/i, 'at most', n => n <= value],
       [/more than|greater than|\babove\b|\bover\b|>/i, 'above', n => n > value],
       [/less than|\bbelow\b|\bunder\b|</i, 'below', n => n < value],
     ].find(([pattern]) => pattern.test(question));
@@ -83,7 +83,8 @@
     const scope = section ? snapshot.students.filter(row => row.section === section) : snapshot.students;
     const subjectNames = [...new Set(scope.flatMap(row => row.subjects))];
     const alias = subject => /^math$/i.test(subject) ? ['mathematics', 'maths'] : /^computer$/i.test(subject) ? ['computer science'] : [];
-    const explicitSubject = findMention(question, subjectNames, name => [name, ...alias(name)])[0];
+    const allSubjects = section ? [...new Set(snapshot.students.flatMap(row => row.subjects))] : subjectNames;
+    const explicitSubject = findMention(question, allSubjects, name => [name, ...alias(name)])[0];
     const subject = explicitSubject || (follow ? context.subject : null);
     const testNames = subject ? [...new Set(scope.flatMap(row => (row.tests[subject] || []).map(score => score.test)))] : [];
     const test = findMention(question, testNames, name => [name])[0] || null;
@@ -91,7 +92,8 @@
     let people = roll ? scope.filter(row => normalize(row.rollNo) === normalize(roll[1])) :
       findMention(question, scope, row => [row.name]);
     if (!people.length && !roll) {
-      const named = text.match(/\b(?:named|student name|student called) (.+)$/)?.[1];
+      const named = text.match(/\b(?:named|student name|student called) (.+)$/)?.[1] ||
+        text.match(/^how did (.+?) (?:do|perform)(?: in .+)?$/)?.[1];
       if (named) people = scope.filter(row => row.name && normalize(row.name).includes(named));
     }
     if (!people.length && follow && context.studentId && !roll) people = scope.filter(row => row.id === context.studentId);
@@ -118,10 +120,12 @@
     const rank = text.match(/\b(top|bottom|highest|lowest)(?:\s+(\d+))?\b/);
     const absences = /\b(absent|absence|absences)\b/.test(text) && !filter;
     const count = /\b(how many|count|number of|show students|list students)\b/.test(text);
+    const missing = !filter && /\b(no marks|without marks|missing (?:marks|scores|results)|no results)\b/.test(text);
+    const outcome = !filter && text.match(/\b(pass(?:ed|ing)?|fail(?:ed|ing)?)\b/)?.[1];
     const groups = /\b(by section|across sections|by stream|across streams)\b/.test(text);
     const subjectOverview = !subject && /\bsubjects?\b/.test(text) && /\b(compare|weakest|strongest|average|performance|rank|struggl\w*)\b/.test(text);
     if (!scope.length) return reply('No student records in this scope', 'Choose a workspace or saved year that contains results.');
-    if (!filter && !distribution && !average && !rank && !absences && !count && !groups && !subjectOverview) return null;
+    if (!filter && !distribution && !average && !rank && !absences && !count && !groups && !subjectOverview && !outcome && !missing) return null;
 
     const rawMarks = filter?.marks || (rank && /\bby (?:total )?marks\b/.test(text));
     const unit = rawMarks ? 'marks' : '%';
@@ -156,6 +160,28 @@
       if (!subject) return reply('Which subject’s absences?', 'Name a subject and optionally a test.');
       const absent = rows.filter(row => row.absent);
       return show(absent, `${absent.length} marked absent · ${label}`);
+    }
+    if (missing) {
+      const missingScores = rows.filter(item => item.value == null && !item.absent);
+      return {
+        ...reply(`${missingScores.length} without a usable result · ${label}`, coverage),
+        columns: ['Student', 'Section'],
+        rows: snapshot.anonymous ? [] : missingScores.map(item => [item.row.name, item.row.sectionLabel]),
+        note: subject ? 'Recorded absences are counted separately.' : '',
+        context: nextContext,
+      };
+    }
+    if (outcome) {
+      const passing = outcome.startsWith('pass');
+      if (snapshot.anonymous && !subject) {
+        const failed = scope.filter(row => row.belowPass > 0).length;
+        const passed = scope.filter(row => row.complete && row.belowPass === 0).length;
+        return reply(`${passing ? passed + ' passed every subject' : failed + ' failed at least one subject'} · ${label}`,
+          `${scope.length - passed - failed} of ${scope.length} students have unconfirmed outcomes.`);
+      }
+      const cutoff = snapshot.passMark || 50;
+      const matches = scored.filter(row => passing ? row.value >= cutoff : row.value < cutoff);
+      return show(matches, `${matches.length} ${passing ? 'at or above' : 'below'} ${cutoff}% · ${label}`);
     }
     if (subjectOverview) {
       const metrics = subjectNames.map(name => {
