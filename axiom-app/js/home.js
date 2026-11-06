@@ -16,7 +16,13 @@
   var recent=AxiomHomeHistory.create(function(){return identity&&identity.userId;});
   var history=recent.history,remember=recent.remember;
   function allowed(route){return !(['data','admin'].includes(route)&&!manage()) && !(route==='messages'&&window.axRole==='student');}
-  function navigation(route){nav.innerHTML=Object.keys(routes).filter(allowed).map(function(key){return '<button type="button" data-home-route="'+key+'"'+(key===route?' aria-current="page"':'')+'>'+routes[key]+'</button>';}).join('');}
+  function navigation(route){
+    var activeRoute=['overall','yearCompare'].includes(route)?'section':route;
+    var primaryRoutes=['home','section','data','reports','messages','admin'];
+    nav.innerHTML=primaryRoutes.filter(allowed).map(function(key){
+      return '<button type="button" data-home-route="'+key+'"'+(key===activeRoute?' aria-current="page"':'')+'>'+routes[key]+'</button>';
+    }).join('');
+  }
   var content=AxiomHomeContent.create(host,function(){return {identity:identity,ready:ready};},history,allowed);
   var home=content.home,hub=content.hub;
   function navigate(route){
