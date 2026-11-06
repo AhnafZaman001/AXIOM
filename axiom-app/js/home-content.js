@@ -1,7 +1,7 @@
 /* Home content owns markup only; navigation and history are supplied. */
 (function(){
 'use strict';
-  var routes={home:'Home',overall:'Dashboard',section:'Student Workspace',data:'Data Center',reports:'Reports',yearCompare:'Year Comparison',messages:'Messages & Alerts',admin:'Administration'};
+  var routes={home:'Home',overall:'Dashboard',section:'Student Workspace',data:'Data Center',yearCompare:'Year Comparison',messages:'Messages & Alerts',admin:'Administration'};
   var escape=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   function create(host,getState,history,allowed){
   function button(route,label){return '<button type="button" data-home-route="'+route+'">'+escape(label||routes[route])+'</button>';}
@@ -15,7 +15,7 @@
       '<section class="ax-home-activity"><h3>Recently opened</h3>'+(latest.length?latest.slice(0,4).map(function(x){return '<div class="ax-home-recent">'+button(x.route)+'<time>'+new Date(x.at).toLocaleDateString()+'</time></div>';}).join(''):'<p>Your recent work will appear here.</p>')+'</section>';
   }
   function hub(route){
-    var items=route==='reports'?[['overall','Overall Summary'],['sectionSummary','Section Summary'],['teacherReport','Teacher Report']]:route==='data'?[['cloud','Upload a File to Cloud'],['yearCompare','Year Comparison files']]:route==='messages'?[['parent','Open parent messages']]:[['teachers','Teacher assignments'],['subjects','Section subjects'],['backup','Download workspace']];
+    var items=route==='data'?[['cloud','Upload a File to Cloud'],['yearCompare','Year Comparison files']]:route==='messages'?[['parent','Open parent messages']]:[['teachers','Teacher assignments'],['subjects','Section subjects'],['backup','Download workspace']];
     host.innerHTML='<header class="ax-home-head"><h2>'+routes[route]+'</h2></header><div class="ax-home-options">'+items.map(function(item){return button(item[0],item[1]+' →');}).join('')+'</div>';
   }
     return {home:home,hub:hub};

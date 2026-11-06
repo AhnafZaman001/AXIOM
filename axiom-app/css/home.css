@@ -1,5 +1,5 @@
-.ax-main-nav{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 28px;border-bottom:1px solid var(--line);padding-bottom:10px}
-.ax-main-nav button{border:0;background:transparent;color:var(--muted);padding:9px 12px;border-radius:7px;font:inherit;font-size:.83rem;cursor:pointer}
+.ax-main-nav{display:flex;gap:8px clamp(10px, 2vw, 28px);flex-wrap:wrap;margin:0 0 28px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.ax-main-nav button{border:0;background:transparent;color:var(--muted);padding:9px 14px;border-radius:7px;font:inherit;font-size:.83rem;cursor:pointer}
 .ax-main-nav button[aria-current=page],.ax-main-nav button:hover{color:var(--ink);background:var(--surface-2)}
 #axiomHome{max-width:1200px;margin:0 auto 40px;color:var(--ink)}
 #axiomHome[hidden]{display:none}

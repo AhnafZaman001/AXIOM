@@ -15,10 +15,10 @@
   host.after(importPanel);
   var recent=AxiomHomeHistory.create(function(){return identity&&identity.userId;});
   var history=recent.history,remember=recent.remember;
-  function allowed(route){return !(['data','admin'].includes(route)&&!manage()) && !(route==='messages'&&window.axRole==='student');}
+  function allowed(route){return route!=='reports' && !(['data','admin'].includes(route)&&!manage()) && !(route==='messages'&&window.axRole==='student');}
   function navigation(route){
-    var activeRoute=['overall','yearCompare'].includes(route)?'section':route;
-    var primaryRoutes=['home','section','data','reports','messages','admin'];
+    var activeRoute=['overall','yearCompare','sectionSummary','teacherReport'].includes(route)?'section':route;
+    var primaryRoutes=['home','section','data','messages','admin'];
     nav.innerHTML=primaryRoutes.filter(allowed).map(function(key){
       return '<button type="button" data-home-route="'+key+'"'+(key===activeRoute?' aria-current="page"':'')+'>'+routes[key]+'</button>';
     }).join('');
@@ -29,14 +29,14 @@
     if(!allowed(route))return;
     if(route==='import'){navigate('data');return;}
     if(route==='yearCompare'&&window.AxiomYearCompare){AxiomYearCompare.open();return;}
-    if(['home','data','reports','messages','admin','overall','section','sectionSummary','teacherReport'].includes(route)){window.setActivePage(route);window.scrollTo(0,0);return;}
+    if(['home','data','messages','admin','overall','section','sectionSummary','teacherReport'].includes(route)){window.setActivePage(route);window.scrollTo(0,0);return;}
     var actions={import:'importBtn',cloud:'uploadCloudBtn',parent:'pcBulkBtn',teachers:'manageTeacherBtn',subjects:'manageSubjectsBtn',backup:'saveDownloadBtn'};
     if(actions[route]){window.setActivePage('section');var action=document.getElementById(actions[route]);if(action)action.click();}
   }
   var original=window.setActivePage;
   window.setActivePage=function(route){
     var result=original.apply(this,arguments);
-    var isHub=['home','data','reports','messages','admin'].includes(route);
+    var isHub=['home','data','messages','admin'].includes(route);
     host.hidden=!isHub;
     if(isHub){if(route==='home')home();else hub(route);}
     if(route==='data'&&manage()){
