@@ -2466,10 +2466,8 @@ function getAllTeacherNames(){
 function populateTeacherSelect(){
   const sel = document.getElementById('teacherSelect');
   const prev = sel.value;
-  const query = document.getElementById('teacherSearch').value.trim().toLowerCase();
   sel.innerHTML = `<option value="">— Choose a teacher —</option>` +
     getAllTeacherNames()
-      .filter(name=>name === prev || name.toLowerCase().includes(query))
       .map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   if(prev) sel.value = prev;
 }
@@ -2893,8 +2891,69 @@ document.getElementById('teacherReportBtn').addEventListener('click', ()=>toggle
 document.getElementById('backFromOverallBtn').addEventListener('click', ()=>toggleOverallSummary(false));
 document.getElementById('backFromSectionSummaryBtn').addEventListener('click', ()=>toggleSectionSummary(false));
 document.getElementById('backFromTeacherReportBtn').addEventListener('click', ()=>toggleTeacherReport(false));
-document.getElementById('teacherSelect').addEventListener('change', renderTeacherReport);
-document.getElementById('teacherSearch').addEventListener('input', populateTeacherSelect);
+const teacherSearch = document.getElementById('teacherSearch');
+const teacherMatches = document.getElementById('teacherMatches');
+const teacherSelect = document.getElementById('teacherSelect');
+const teacherNamePrefix = /^(?:(?:professor|prof|p|dr|mr|mrs|ms|sir|miss)\.?\s+)+/i;
+
+function closeTeacherMatches(){
+  teacherMatches.hidden = true;
+}
+
+function showTeacherMatches(){
+  const query = teacherSearch.value.trim().replace(teacherNamePrefix, '').toLowerCase();
+  teacherMatches.replaceChildren();
+  teacherMatches.hidden = !query;
+  if(!query) return;
+  for(const name of getAllTeacherNames()){
+    if(!name.trim().replace(teacherNamePrefix, '').toLowerCase().startsWith(query)) continue;
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.textContent = name;
+    option.addEventListener('click', ()=>{
+      teacherSelect.value = name;
+      teacherSearch.value = name;
+      teacherSearch.focus();
+      closeTeacherMatches();
+      renderTeacherReport();
+    });
+    teacherMatches.append(option);
+  }
+  if(!teacherMatches.childElementCount) teacherMatches.textContent = 'No matching teachers';
+}
+teacherSearch.addEventListener('input', showTeacherMatches);
+teacherSearch.addEventListener('click', showTeacherMatches);
+teacherSearch.parentElement.addEventListener('keydown', event=>{
+  if(event.target === teacherSelect) return;
+  if(event.key === 'Escape'){
+    closeTeacherMatches();
+    teacherSearch.focus();
+    return;
+  }
+  if(teacherMatches.hidden && event.target === teacherSearch && event.key === 'ArrowDown') showTeacherMatches();
+  if(teacherMatches.hidden) return;
+  const options = Array.from(teacherMatches.querySelectorAll('button'));
+  if(!options.length) return;
+  const index = options.indexOf(event.target);
+  if(event.key === 'ArrowDown'){
+    event.preventDefault();
+    options[Math.min(index + 1, options.length - 1)].focus();
+  } else if(event.key === 'ArrowUp'){
+    event.preventDefault();
+    (options[index - 1] || teacherSearch).focus();
+  } else if(event.key === 'Enter' && event.target === teacherSearch){
+    event.preventDefault();
+    options[0].click();
+  }
+});
+teacherSearch.parentElement.addEventListener('focusout', event=>{
+  if(!teacherSearch.parentElement.contains(event.relatedTarget)) closeTeacherMatches();
+});
+teacherSelect.addEventListener('change', ()=>{
+  teacherSearch.value = teacherSelect.value;
+  closeTeacherMatches();
+  renderTeacherReport();
+});
 document.getElementById('ssSectionSelect').addEventListener('change', event=>{
   document.getElementById('sectionSelect').value = event.currentTarget.value;
   refreshAllUI();

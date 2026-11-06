@@ -679,3 +679,23 @@
   .ros-list .ros-handle{color:var(--muted);user-select:none;}
   .ros-list .ros-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ros-list button{padding:2px 8px;line-height:1.2;}
+
+#teacherSearch, #teacherMatches {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font: inherit;
+}
+#teacherMatches { max-height: 15rem; overflow: auto; }
+#teacherMatches button {
+  display: block;
+  width: 100%;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 7px 9px;
+  text-align: left;
+}
+#teacherMatches button:is(:hover, :focus-visible) { background: var(--line); }
