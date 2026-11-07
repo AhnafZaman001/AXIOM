@@ -495,9 +495,14 @@ function updateSubjectTeacherHint(){
 function populateAddTestStudents(){
   const store = ensureSection(document.getElementById('atSection').value);
   const select = document.getElementById('atStudent');
+  const query = document.getElementById('atStudentSearch').value.trim().toLowerCase();
   const previous = select.value;
-  select.innerHTML = store.students.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}</option>`).join('') || `<option value="">(no students yet)</option>`;
-  if(previous && store.students.some(s=>s.id===previous)) select.value=previous;
+  const matches = store.students.filter(student=>{
+    if(!query) return true;
+    return String(student.name||'').toLowerCase().includes(query) || String(student.rollNo??'').toLowerCase().includes(query);
+  });
+  select.innerHTML = matches.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}</option>`).join('') || `<option value="">${store.students.length?'(no matching students)':'(no students yet)'}</option>`;
+  if(previous && matches.some(s=>s.id===previous)) select.value=previous;
   renderAddTestEditor();
 }
 
@@ -3228,13 +3233,18 @@ document.getElementById('cloudUploadFileInput').addEventListener('change', async
 document.getElementById('addTestBtn').addEventListener('click', ()=>{
   togglePanel('addTestPanel');
   document.getElementById('atSection').value = currentSectionKey();
+  document.getElementById('atStudentSearch').value = '';
   populateAddTestStudents();
 });
 document.getElementById('addStudentBtn').addEventListener('click', ()=>{
   togglePanel('addStudentPanel');
   document.getElementById('asSection').value = currentSectionKey();
 });
-document.getElementById('atSection').addEventListener('change', populateAddTestStudents);
+document.getElementById('atSection').addEventListener('change', ()=>{
+  document.getElementById('atStudentSearch').value = '';
+  populateAddTestStudents();
+});
+document.getElementById('atStudentSearch').addEventListener('input', populateAddTestStudents);
 document.getElementById('atStudent').addEventListener('change', renderAddTestEditor);
 document.getElementById('atNewAbsent').addEventListener('change', (event)=>{
   ['atNewObtained','atNewMax'].forEach(id=>document.getElementById(id).disabled=event.currentTarget.checked);
