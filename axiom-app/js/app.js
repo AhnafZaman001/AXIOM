@@ -508,30 +508,33 @@ const atStudentMatches = document.getElementById('atStudentMatches');
 const atStudentSelect = document.getElementById('atStudent');
 
 function closeStudentMatches(){ atStudentMatches.hidden=true; }
-function studentOptionText(student){
-  return `${student.name}${student.rollNo!=null&&student.rollNo!==''?` · Roll ${student.rollNo}`:''}`;
+function studentOptionText(student, sectionLabel=''){
+  return `${student.name}${student.rollNo!=null&&student.rollNo!==''?` · Roll ${student.rollNo}`:''}${sectionLabel?` · ${sectionLabel}`:''}`;
 }
 function showStudentMatches(){
   const query=atStudentSearch.value.trim().toLowerCase();
   atStudentMatches.replaceChildren();
   atStudentMatches.hidden=!query;
   if(!query) return;
-  const students=ensureSection(document.getElementById('atSection').value).students;
-  for(const student of students){
-    const name=String(student.name||'').trim().toLowerCase();
-    const roll=String(student.rollNo??'').trim().toLowerCase();
-    if(!name.startsWith(query) && !roll.startsWith(query)) continue;
-    const option=document.createElement('button');
-    option.type='button';
-    option.textContent=studentOptionText(student);
-    option.addEventListener('click',()=>{
-      atStudentSelect.value=student.id;
-      atStudentSearch.value=studentOptionText(student);
-      atStudentSearch.focus();
-      closeStudentMatches();
-      renderAddTestEditor();
-    });
-    atStudentMatches.append(option);
+  for(const section of SECTION_DEFS){
+    for(const student of ensureSection(section.key).students){
+      const name=String(student.name||'').trim().toLowerCase();
+      const roll=String(student.rollNo??'').trim().toLowerCase();
+      if(!name.startsWith(query) && !roll.startsWith(query)) continue;
+      const option=document.createElement('button');
+      option.type='button';
+      option.textContent=studentOptionText(student,section.label);
+      option.addEventListener('click',()=>{
+        document.getElementById('atSection').value=section.key;
+        populateAddTestStudents();
+        atStudentSelect.value=student.id;
+        atStudentSearch.value=studentOptionText(student,section.label);
+        atStudentSearch.focus();
+        closeStudentMatches();
+        renderAddTestEditor();
+      });
+      atStudentMatches.append(option);
+    }
   }
   if(!atStudentMatches.childElementCount) atStudentMatches.textContent='No matching students';
 }
