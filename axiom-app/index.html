@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AXIOM — Student Performance Tracker</title>
-<link rel="stylesheet" href="css/styles.css?v=20261107a">
+<link rel="stylesheet" href="css/styles.css?v=20261107b">
 <link rel="stylesheet" href="css/year-compare.css?v=20261107a">
 <link rel="stylesheet" href="css/refresh.css?v=20261030c">
 <link rel="stylesheet" href="css/brand.css?v=1">
@@ -266,20 +266,25 @@
        toolbar so opening Add → Add / Edit Test Score keeps the form beside the
        control that opened it. -->
   <div class="panel" id="addTestPanel">
-    <h3>Add / Edit a Test Score</h3>
+    <h3>Edit Student Marks</h3>
     <div class="panel-row">
       <div class="field"><label>Section</label><select id="atSection"></select></div>
       <div class="field"><label>Student</label><select id="atStudent"></select></div>
-      <div class="field"><label>Subject</label><select id="atSubject"></select><div class="hint" id="atSubjectTeacherHint" style="margin-top:4px;"></div></div>
+    </div>
+    <p class="hint at-editor-help">Every recorded test for this student is listed below. Edit as many rows as needed, then save once.</p>
+    <div id="atBulkRows" class="at-bulk-rows" aria-live="polite"></div>
+    <div class="at-new-score">
+      <div class="at-new-score-title">Add another test</div>
+      <div class="panel-row">
+        <div class="field"><label>Subject</label><select id="atNewSubject"></select></div>
+        <div class="field"><label>Test Name</label><input type="text" id="atNewTestName" placeholder="e.g. Mid Term" style="width:180px;"></div>
+        <div class="field"><label>Obtained</label><input type="number" id="atNewObtained" min="0" step="0.5" style="width:90px;"></div>
+        <div class="field"><label>Total</label><input type="number" id="atNewMax" min="1" step="0.5" style="width:90px;"></div>
+        <label class="at-absent-check"><input type="checkbox" id="atNewAbsent"> Absent</label>
+      </div>
     </div>
     <div class="panel-row">
-      <div class="field"><label>Test Name</label><input type="text" id="atTestName" placeholder="e.g. Mid Term" required style="width:180px;"></div>
-      <div class="field"><label>Obtained</label><input type="number" id="atObtained" min="0" step="0.5" style="width:90px;"></div>
-      <div class="field"><label>Max Marks</label><input type="number" id="atMax" min="1" step="0.5" style="width:90px;"></div>
-      <div class="field"><label>Absent?</label><select id="atAbsent"><option value="no">No</option><option value="yes">Yes</option></select></div>
-    </div>
-    <div class="panel-row">
-      <button class="primary" id="atSaveBtn">Save Score</button>
+      <button class="primary" id="atSaveBtn">Save All Changes</button>
       <button class="ghost" id="atCancelBtn">Cancel</button>
     </div>
   </div>
@@ -757,7 +762,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <script src="js/imports/excel-engine.js?v=1"></script>
 <script src="js/storage/workspace-backup.js?v=1"></script>
 <script src="js/reporting-assistant.js?v=2"></script>
-<script src="js/app.js?v=20261107g"></script>
+<script src="js/app.js?v=20261107h"></script>
 <script src="js/parent-comms.js?v=20261030b"></script>
 <script src="js/year-compare-core.js?v=20261107c"></script>
 <script src="js/year-compare-storage.js?v=20261106b"></script>

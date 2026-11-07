@@ -492,26 +492,45 @@ function updateSubjectTeacherHint(){
   hintEl.textContent = teacher ? `Teacher: ${teacher}` : `No teacher on record for ${subj} in this section.`;
 }
 
-function populateAddTestSubject(){
-  const def = SECTION_BY_KEY[document.getElementById('atSection').value];
-  document.getElementById('atSubject').innerHTML = def.subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
-  updateAtSubjectTeacherHint();
-}
-
-// Same idea as updateSubjectTeacherHint(), but for the Add/Edit Test panel,
-// which has its own independent Section + Subject selects.
-function updateAtSubjectTeacherHint(){
-  const hintEl = document.getElementById('atSubjectTeacherHint');
-  if(!hintEl) return;
-  const def = SECTION_BY_KEY[document.getElementById('atSection').value];
-  const subj = document.getElementById('atSubject').value;
-  if(!subj || !def){ hintEl.textContent = ''; return; }
-  const teacher = lookupTeacher(subj, def);
-  hintEl.textContent = teacher ? `Teacher: ${teacher}` : `No teacher on record for ${subj} in this section.`;
-}
 function populateAddTestStudents(){
   const store = ensureSection(document.getElementById('atSection').value);
-  document.getElementById('atStudent').innerHTML = store.students.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('') || `<option value="">(no students yet)</option>`;
+  const select = document.getElementById('atStudent');
+  const previous = select.value;
+  select.innerHTML = store.students.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}</option>`).join('') || `<option value="">(no students yet)</option>`;
+  if(previous && store.students.some(s=>s.id===previous)) select.value=previous;
+  renderAddTestEditor();
+}
+
+function renderAddTestEditor(){
+  const secKey = document.getElementById('atSection').value;
+  const def = SECTION_BY_KEY[secKey];
+  const studentId = document.getElementById('atStudent').value;
+  const student = ensureSection(secKey).students.find(s=>s.id===studentId);
+  const rows = document.getElementById('atBulkRows');
+  const newSubject = document.getElementById('atNewSubject');
+  const subjects = def ? [...new Set([...(def.subjects||[]), ...Object.keys((student&&student.tests)||{})])] : [];
+  newSubject.innerHTML = subjects.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if(!student){ rows.innerHTML='<div class="at-empty">Select a student to edit their marks.</div>'; return; }
+
+  let html='<div class="at-score-head"><span>Subject / test</span><span>Obtained</span><span>Total</span><span>Absent</span></div>';
+  let count=0;
+  subjects.forEach(subject=>{
+    const tests=(student.tests||{})[subject]||[];
+    tests.forEach((test,index)=>{
+      count++;
+      html+=`<div class="at-score-row" data-subject="${escapeHtml(subject)}" data-index="${index}">
+        <div class="at-score-label"><div class="at-score-subject">${escapeHtml(subject)}</div><div class="at-score-test">${escapeHtml(test.test||`Test ${index+1}`)}</div></div>
+        <input class="at-obtained" type="number" min="0" step="0.5" aria-label="Obtained marks for ${escapeHtml(subject)} ${escapeHtml(test.test||'test')}" value="${test.obtained==null?'':escapeHtml(test.obtained)}" ${test.absent?'disabled':''}>
+        <input class="at-max" type="number" min="1" step="0.5" aria-label="Total marks for ${escapeHtml(subject)} ${escapeHtml(test.test||'test')}" value="${test.max==null?'':escapeHtml(test.max)}" ${test.absent?'disabled':''}>
+        <label class="at-absent-check"><input class="at-absent" type="checkbox" ${test.absent?'checked':''}> Absent</label>
+      </div>`;
+    });
+  });
+  rows.innerHTML=count?html:'<div class="at-empty">This student has no recorded tests yet. Use “Add another test” below.</div>';
+  rows.querySelectorAll('.at-absent').forEach(box=>box.addEventListener('change',()=>{
+    const row=box.closest('.at-score-row');
+    row.querySelectorAll('input[type="number"]').forEach(input=>input.disabled=box.checked);
+  }));
 }
 
 function escapeHtml(str){ return String(str??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
@@ -3209,14 +3228,17 @@ document.getElementById('cloudUploadFileInput').addEventListener('change', async
 document.getElementById('addTestBtn').addEventListener('click', ()=>{
   togglePanel('addTestPanel');
   document.getElementById('atSection').value = currentSectionKey();
-  populateAddTestSubject(); populateAddTestStudents();
+  populateAddTestStudents();
 });
 document.getElementById('addStudentBtn').addEventListener('click', ()=>{
   togglePanel('addStudentPanel');
   document.getElementById('asSection').value = currentSectionKey();
 });
-document.getElementById('atSection').addEventListener('change', ()=>{ populateAddTestSubject(); populateAddTestStudents(); });
-document.getElementById('atSubject').addEventListener('change', updateAtSubjectTeacherHint);
+document.getElementById('atSection').addEventListener('change', populateAddTestStudents);
+document.getElementById('atStudent').addEventListener('change', renderAddTestEditor);
+document.getElementById('atNewAbsent').addEventListener('change', (event)=>{
+  ['atNewObtained','atNewMax'].forEach(id=>document.getElementById(id).disabled=event.currentTarget.checked);
+});
 
 document.getElementById('cancelImportBtn').addEventListener('click', ()=>{
   document.getElementById('importPanel').classList.remove('open');
@@ -3435,27 +3457,53 @@ document.getElementById('undoImportBtn').addEventListener('click', ()=>{
 document.getElementById('atSaveBtn').addEventListener('click', ()=>{
   const secKey = document.getElementById('atSection').value;
   const studentId = document.getElementById('atStudent').value;
-  const subject = document.getElementById('atSubject').value;
-  const testName = document.getElementById('atTestName').value.trim();
-  const obtained = parseFloat(document.getElementById('atObtained').value);
-  const max = parseFloat(document.getElementById('atMax').value);
-  const absent = document.getElementById('atAbsent').value === 'yes';
   if(!studentId){ showToast('No student selected.', 'warning'); return; }
-  if(!testName){ showToast('Enter a test name.', 'warning'); return; }
-  if(!absent && (Number.isNaN(obtained) || Number.isNaN(max) || max<=0)){ showToast('Enter valid obtained/max marks, or mark as Absent.', 'warning'); return; }
   const store = ensureSection(secKey);
   const student = store.students.find(s=>s.id===studentId);
   if(!student) return;
-  if(!student.tests[subject]) student.tests[subject] = [];
-  const percent = absent ? null : Math.round((obtained/max)*1000)/10;
-  const entry = {test:testName, date:null, obtained: absent?null:obtained, max: absent?null:max, percent, absent, position:null};
-  const idx = student.tests[subject].findIndex(t=>t.test.toLowerCase()===testName.toLowerCase());
-  if(idx>=0) student.tests[subject][idx] = entry; else student.tests[subject].push(entry);
+  if(!student.tests) student.tests={};
+
+  const changes=[];
+  for(const row of document.querySelectorAll('#atBulkRows .at-score-row')){
+    const subject=row.dataset.subject, index=Number(row.dataset.index), absent=row.querySelector('.at-absent').checked;
+    const obtained=parseFloat(row.querySelector('.at-obtained').value), max=parseFloat(row.querySelector('.at-max').value);
+    if(!absent && (Number.isNaN(obtained)||obtained<0||Number.isNaN(max)||max<=0)){
+      showToast(`Enter valid obtained and total marks for ${subject}, or mark it absent.`, 'warning'); return;
+    }
+    changes.push({subject,index,absent,obtained,max});
+  }
+
+  const newSubject=document.getElementById('atNewSubject').value;
+  const newName=document.getElementById('atNewTestName').value.trim();
+  const newAbsent=document.getElementById('atNewAbsent').checked;
+  const newObtained=parseFloat(document.getElementById('atNewObtained').value);
+  const newMax=parseFloat(document.getElementById('atNewMax').value);
+  if(newName && (!newSubject || (!newAbsent && (Number.isNaN(newObtained)||newObtained<0||Number.isNaN(newMax)||newMax<=0)))){
+    showToast('Complete the new test marks, or mark the new test absent.', 'warning'); return;
+  }
+
+  changes.forEach(change=>{
+    const original=student.tests[change.subject][change.index];
+    original.absent=change.absent;
+    original.obtained=change.absent?null:change.obtained;
+    original.max=change.absent?null:change.max;
+    original.percent=change.absent?null:Math.round((change.obtained/change.max)*1000)/10;
+  });
+  if(newName){
+    if(!student.tests[newSubject]) student.tests[newSubject]=[];
+    const entry={test:newName,date:null,obtained:newAbsent?null:newObtained,max:newAbsent?null:newMax,percent:newAbsent?null:Math.round((newObtained/newMax)*1000)/10,absent:newAbsent,position:null};
+    const existing=student.tests[newSubject].findIndex(test=>String(test.test||'').toLowerCase()===newName.toLowerCase());
+    if(existing>=0) student.tests[newSubject][existing]={...student.tests[newSubject][existing],...entry};
+    else student.tests[newSubject].push(entry);
+  }
   markDirty();
   document.getElementById('addTestPanel').classList.remove('open');
-  document.getElementById('atTestName').value=''; document.getElementById('atObtained').value=''; document.getElementById('atMax').value='';
-  if(secKey === currentSectionKey()) renderTable();
-  showToast(`✓ Score saved for ${student.name}.`, 'success');
+  ['atNewTestName','atNewObtained','atNewMax'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('atNewAbsent').checked=false;
+  document.getElementById('atNewObtained').disabled=false;
+  document.getElementById('atNewMax').disabled=false;
+  if(secKey === currentSectionKey()) refreshAllUI();
+  showToast(`✓ All mark changes saved for ${student.name}.`, 'success');
 });
 document.getElementById('atCancelBtn').addEventListener('click', ()=>document.getElementById('addTestPanel').classList.remove('open'));
 
@@ -3806,7 +3854,7 @@ document.getElementById('mtSaveBtn').addEventListener('click', async ()=>{
   updateMtHint();
   populateMtTeacherList();
   updateSubjectTeacherHint();
-  updateAtSubjectTeacherHint();
+  renderAddTestEditor();
   if(typeof teacherReportOpen !== 'undefined' && teacherReportOpen) renderTeacherReport();
 
   // Push the assignment to the cloud too (principal/coordinator only —
@@ -3832,7 +3880,7 @@ document.getElementById('mtClearBtn').addEventListener('click', async ()=>{
   markDirty();
   updateMtHint();
   updateSubjectTeacherHint();
-  updateAtSubjectTeacherHint();
+  renderAddTestEditor();
 
   if(typeof teacherReportOpen !== 'undefined' && teacherReportOpen) renderTeacherReport();
 
@@ -4655,7 +4703,7 @@ const COMMANDS = [
   {label:'Add / Edit Test Score', hint:[], action:()=>{
     setActivePage('section'); togglePanel('addTestPanel');
     document.getElementById('atSection').value = currentSectionKey();
-    populateAddTestSubject(); populateAddTestStudents();
+    populateAddTestStudents();
   }},
   {label:'Add Student', hint:[], action:()=>{
     setActivePage('section'); togglePanel('addStudentPanel');
