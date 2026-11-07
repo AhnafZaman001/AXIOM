@@ -495,15 +495,45 @@ function updateSubjectTeacherHint(){
 function populateAddTestStudents(){
   const store = ensureSection(document.getElementById('atSection').value);
   const select = document.getElementById('atStudent');
-  const query = document.getElementById('atStudentSearch').value.trim().toLowerCase();
   const previous = select.value;
-  const matches = store.students.filter(student=>{
-    if(!query) return true;
-    return String(student.name||'').toLowerCase().includes(query) || String(student.rollNo??'').toLowerCase().includes(query);
-  });
-  select.innerHTML = matches.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}</option>`).join('') || `<option value="">${store.students.length?'(no matching students)':'(no students yet)'}</option>`;
-  if(previous && matches.some(s=>s.id===previous)) select.value=previous;
+  select.innerHTML = store.students.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}${s.rollNo!=null&&s.rollNo!==''?` · Roll ${escapeHtml(s.rollNo)}`:''}</option>`).join('') || `<option value="">(no students yet)</option>`;
+  if(previous && store.students.some(s=>s.id===previous)) select.value=previous;
+  const selected=store.students.find(student=>student.id===select.value);
+  document.getElementById('atStudentSearch').value=selected?studentOptionText(selected):'';
   renderAddTestEditor();
+}
+
+const atStudentSearch = document.getElementById('atStudentSearch');
+const atStudentMatches = document.getElementById('atStudentMatches');
+const atStudentSelect = document.getElementById('atStudent');
+
+function closeStudentMatches(){ atStudentMatches.hidden=true; }
+function studentOptionText(student){
+  return `${student.name}${student.rollNo!=null&&student.rollNo!==''?` · Roll ${student.rollNo}`:''}`;
+}
+function showStudentMatches(){
+  const query=atStudentSearch.value.trim().toLowerCase();
+  atStudentMatches.replaceChildren();
+  atStudentMatches.hidden=!query;
+  if(!query) return;
+  const students=ensureSection(document.getElementById('atSection').value).students;
+  for(const student of students){
+    const name=String(student.name||'').trim().toLowerCase();
+    const roll=String(student.rollNo??'').trim().toLowerCase();
+    if(!name.startsWith(query) && !roll.startsWith(query)) continue;
+    const option=document.createElement('button');
+    option.type='button';
+    option.textContent=studentOptionText(student);
+    option.addEventListener('click',()=>{
+      atStudentSelect.value=student.id;
+      atStudentSearch.value=studentOptionText(student);
+      atStudentSearch.focus();
+      closeStudentMatches();
+      renderAddTestEditor();
+    });
+    atStudentMatches.append(option);
+  }
+  if(!atStudentMatches.childElementCount) atStudentMatches.textContent='No matching students';
 }
 
 function renderAddTestEditor(){
@@ -3242,10 +3272,43 @@ document.getElementById('addStudentBtn').addEventListener('click', ()=>{
 });
 document.getElementById('atSection').addEventListener('change', ()=>{
   document.getElementById('atStudentSearch').value = '';
+  closeStudentMatches();
   populateAddTestStudents();
 });
-document.getElementById('atStudentSearch').addEventListener('input', populateAddTestStudents);
-document.getElementById('atStudent').addEventListener('change', renderAddTestEditor);
+atStudentSearch.addEventListener('input', showStudentMatches);
+atStudentSearch.addEventListener('click', showStudentMatches);
+atStudentSearch.parentElement.addEventListener('keydown', event=>{
+  if(event.target===atStudentSelect) return;
+  if(event.key==='Escape'){
+    closeStudentMatches();
+    atStudentSearch.focus();
+    return;
+  }
+  if(atStudentMatches.hidden && event.target===atStudentSearch && event.key==='ArrowDown') showStudentMatches();
+  if(atStudentMatches.hidden) return;
+  const options=Array.from(atStudentMatches.querySelectorAll('button'));
+  if(!options.length) return;
+  const index=options.indexOf(event.target);
+  if(event.key==='ArrowDown'){
+    event.preventDefault();
+    options[Math.min(index+1,options.length-1)].focus();
+  } else if(event.key==='ArrowUp'){
+    event.preventDefault();
+    (options[index-1]||atStudentSearch).focus();
+  } else if(event.key==='Enter' && event.target===atStudentSearch){
+    event.preventDefault();
+    options[0].click();
+  }
+});
+atStudentSearch.parentElement.addEventListener('focusout', event=>{
+  if(!atStudentSearch.parentElement.contains(event.relatedTarget)) closeStudentMatches();
+});
+atStudentSelect.addEventListener('change', ()=>{
+  const student=ensureSection(document.getElementById('atSection').value).students.find(item=>item.id===atStudentSelect.value);
+  atStudentSearch.value=student?studentOptionText(student):'';
+  closeStudentMatches();
+  renderAddTestEditor();
+});
 document.getElementById('atNewAbsent').addEventListener('change', (event)=>{
   ['atNewObtained','atNewMax'].forEach(id=>document.getElementById(id).disabled=event.currentTarget.checked);
 });
