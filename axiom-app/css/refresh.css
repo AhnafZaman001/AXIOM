@@ -117,6 +117,9 @@ body:not([data-ax-page="yearCompare"]) .ax-topper-subj{font-size:.72rem;letter-s
 body:not([data-ax-page="yearCompare"]) .ax-topper-pct{font-size:1.5rem;font-weight:600;color:var(--ink);margin:4px 0 2px}
 body:not([data-ax-page="yearCompare"]) .ax-topper-name{color:var(--ink-soft);font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body:not([data-ax-page="yearCompare"]) .ax-topper-meta{color:var(--muted);font-size:.78rem;margin-top:2px}
+body:not([data-ax-page="yearCompare"]) .ax-topper-btn{display:block;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;border-radius:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+body:not([data-ax-page="yearCompare"]) .ax-topper-btn:hover .ax-topper-count,body:not([data-ax-page="yearCompare"]) .ax-topper-btn:focus-visible .ax-topper-count{text-decoration:underline}
+body:not([data-ax-page="yearCompare"]) .ax-topper-count{color:var(--ax-lilac);font-size:.86rem;font-weight:600}
 body:not([data-ax-page="yearCompare"]) .ax-plain{list-style:none;margin:0;padding:0;background:none;border:0;box-shadow:none}
 body:not([data-ax-page="yearCompare"]) .ax-plain li{padding:11px 0;border-top:1px solid var(--line);color:var(--ink-soft);font-size:.92rem;background:none}
 body:not([data-ax-page="yearCompare"]) .ax-plain li:last-child{border-bottom:1px solid var(--line)}

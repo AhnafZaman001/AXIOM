@@ -1969,7 +1969,7 @@ function subjectWiseToppers(groupKey){
           bySubject[subj] = {percent:t.percent, students:[]};
         }
         if(t.percent === bySubject[subj].percent){
-          bySubject[subj].students.push({name:st.name, rollNo:st.rollNo, obtained:t.obtained, max:t.max, sectionLabel:def.label});
+          bySubject[subj].students.push({id:st.id, sectionKey:def.key, name:st.name, rollNo:st.rollNo, obtained:t.obtained, max:t.max, overall:t.percent, sectionLabel:def.label});
         }
       });
     });
@@ -1985,6 +1985,7 @@ const AX_GROUP_LABEL = {PM:'Pre-Medical', PE:'Pre-Engineering', ICS:'ICS', ICOM:
 const AX_ZONE_TEXT = {green:'90%+', blue:'80–89%', yellow:'70–79%', pink:'60–69%', red:'below 60%'};
 const AX_SUBJECT_COLORS = ['var(--ax-cyan)','var(--ax-lilac)','var(--ax-blue)','var(--ax-green)','var(--ax-pink)','var(--ax-yellow)','var(--ax-orange)'];
 let OS_GROUP = 'all';
+let OS_TOPPERS = {};
 let SS_METRIC = 'avg';
 let AX_SS_CTX = null;
 function axZoneColor(key){ return {green:'var(--ax-green)',blue:'var(--ax-blue)',yellow:'var(--ax-yellow)',pink:'var(--ax-pink)',red:'var(--ax-red)',grey:'var(--muted)'}[key] || 'var(--muted)'; }
@@ -2007,7 +2008,9 @@ function axDonutSvg(parts, total){
   parts.forEach(p=>{
     if(!p.count || !total) return;
     const len = p.count/total*c, dur = (len/c*0.9).toFixed(3), delay = (offset/c*0.9 + 0.15).toFixed(3);
-    body += `<circle class="ax-arc" cx="100" cy="100" r="${r}" fill="none" stroke="${p.color}" stroke-width="20" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 100 100)" style="--len:${len};--rest:${c-len};--c:${c};--dur:${dur}s;--delay:${delay}s"><title>${escapeHtml(p.label)}: ${p.count}</title></circle>`;
+    // Arcs with a filter open the same student list as their legend row.
+    const filterAttr = p.filter ? ` data-filter="${escapeHtml(p.filter)}"${p.subject!=null?` data-subject="${escapeHtml(p.subject)}"`:''}` : '';
+    body += `<circle class="ax-arc"${filterAttr} cx="100" cy="100" r="${r}" fill="none" stroke="${p.color}" stroke-width="20" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 100 100)" style="${p.filter?'cursor:pointer;':''}--len:${len};--rest:${c-len};--c:${c};--dur:${dur}s;--delay:${delay}s"><title>${escapeHtml(p.label)}: ${p.count}</title></circle>`;
     offset += len;
   });
   if(!total) body = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="var(--line)" stroke-width="20"/>`;
@@ -2076,19 +2079,24 @@ function renderOverallSummary(){
   }).join('') : `<div class="ax-empty">No data yet — import results to see the overall dashboard.</div>`;
 
   // Performance zones: one donut + legend (legend rows open the student list drawer)
-  const zoneParts = OVERALL_ZONE_ORDER.map(z=>({key:z.key, label:z.label, color:axZoneColor(z.key),
+  const zoneParts = OVERALL_ZONE_ORDER.map(z=>({key:z.key, label:z.label, color:axZoneColor(z.key), filter:`zone:${z.key}`,
     count: students.filter(s=>s.overall>=z.min && s.overall<z.max).length}));
   document.getElementById('osZoneDonut').innerHTML = axDonutSvg(zoneParts, totalStudents);
   document.getElementById('osZoneCardsWrap').innerHTML = zoneParts.map((z,zi)=>
     `<button type="button" class="ax-legend-row" style="--i:${zi}" data-filter="zone:${z.key}"><i class="ax-dot" style="background:${z.color}"></i><span>${z.label} · ${AX_ZONE_TEXT[z.key]}</span><b>${z.count}</b></button>`).join('');
 
   // Subject-wise toppers
+  // Ties can run to dozens of students, so each subject shows the top score and
+  // a student count; clicking it opens the full list in the stat-list popup.
   const toppers = subjectWiseToppers(groupKey);
+  OS_TOPPERS = toppers;
   const subjNames = Object.keys(toppers).sort();
   document.getElementById('osSubjectToppersWrap').innerHTML = subjNames.length ? subjNames.map((subj,si)=>{
     const {percent, students} = toppers[subj];
-    return `<div class="ax-topper" style="--i:${si}"><div class="ax-topper-subj">${escapeHtml(subj)}</div><div class="ax-topper-pct">${axRound1(percent)}%</div>
-      ${students.map(t=>`<div class="ax-topper-name">${escapeHtml(t.name)}</div><div class="ax-topper-meta">${t.rollNo!=null&&t.rollNo!==''?`Roll ${escapeHtml(t.rollNo)} · `:''}${escapeHtml(axShortSection(t.sectionLabel))}${t.obtained!=null&&t.max!=null?` · ${t.obtained}/${t.max}`:''}</div>`).join('')}</div>`;
+    const n = students.length;
+    return `<button type="button" class="ax-topper ax-topper-btn" style="--i:${si}" data-topper-subject="${escapeHtml(subj)}" title="See the ${n} student${n===1?'':'s'} with the highest ${escapeHtml(subj)} score">
+      <div class="ax-topper-subj">${escapeHtml(subj)}</div><div class="ax-topper-pct">${axRound1(percent)}%</div>
+      <div class="ax-topper-count">${n} student${n===1?'':'s'} <span aria-hidden="true">›</span></div></button>`;
   }).join('') : `<div class="ax-empty">No subject data yet.</div>`;
 
   // Section ranking
@@ -2168,14 +2176,28 @@ document.getElementById('osQuickStats').addEventListener('click', (e)=>{
   openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across ${OS_GROUP==='all'?'all sections':(AX_GROUP_LABEL[OS_GROUP]||OS_GROUP)}`, list);
 });
 
-document.getElementById('osZoneCardsWrap').addEventListener('click', (e)=>{
+function openOverallZoneList(e){
   const el = e.target.closest('[data-filter]');
   if(!el) return;
   const key = el.getAttribute('data-filter');
   const zk = key.slice(5);
   const z = OVERALL_ZONE_ORDER.find(x=>x.key===zk);
+  if(!z) return;
   const list = getOverallFilteredStudents(key);
-  openStatListDrawer(`${z.label} (${z.range})`, `${list.length} student${list.length===1?'':'s'} across all sections`, list);
+  openStatListDrawer(`${z.label} (${z.range})`, `${list.length} student${list.length===1?'':'s'} across ${OS_GROUP==='all'?'all sections':(AX_GROUP_LABEL[OS_GROUP]||OS_GROUP)}`, list);
+}
+// Donut arcs and legend rows open the same list.
+document.getElementById('osZoneCardsWrap').addEventListener('click', openOverallZoneList);
+document.getElementById('osZoneDonut').addEventListener('click', openOverallZoneList);
+
+document.getElementById('osSubjectToppersWrap').addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-topper-subject]');
+  if(!el) return;
+  const subj = el.getAttribute('data-topper-subject');
+  const entry = OS_TOPPERS[subj];
+  if(!entry) return;
+  const list = entry.students.slice().sort((a,b)=>String(a.sectionLabel).localeCompare(String(b.sectionLabel)) || (Number(a.rollNo)||0)-(Number(b.rollNo)||0));
+  openStatListDrawer(`${subj} toppers — ${axRound1(entry.percent)}%`, `${list.length} student${list.length===1?'':'s'} tied for the highest ${subj} score`, list);
 });
 
 function setActivePage(page){
@@ -2629,6 +2651,8 @@ function renderTeacherReport(){
     const zones = [...OVERALL_ZONE_ORDER, {key:'grey', label:'Absent'}].map(zone=>({
       ...zone,
       color: axZoneColor(zone.key),
+      filter: zone.key,
+      subject: a.subject,
       count: rows.reduce((sum,row)=>sum + row[zone.key + 'Count'], 0)
     }));
     const recorded = zones.reduce((sum,zone)=>sum + zone.count, 0);
@@ -2646,8 +2670,8 @@ function renderTeacherReport(){
         <h3 class="ax-h3">Performance and attendance</h3>
         <p class="ax-card-sub">Latest recorded result per student in this subject</p>
         ${recorded ? axDonutSvg(zones, recorded) : '<div class="ax-empty">No scores or absences recorded yet.</div>'}
-        ${zones.map(zone=>`<div class="ax-legend-row"><i class="ax-dot" style="background:${zone.color}"></i>
-          <span>${zone.label}${AX_ZONE_TEXT[zone.key] ? ' · ' + AX_ZONE_TEXT[zone.key] : ''}</span><b>${zone.count}</b></div>`).join('')}
+        ${zones.map(zone=>`<button type="button" class="ax-legend-row" data-filter="${zone.key}" data-subject="${escapeHtml(a.subject)}"><i class="ax-dot" style="background:${zone.color}"></i>
+          <span>${zone.label}${AX_ZONE_TEXT[zone.key] ? ' · ' + AX_ZONE_TEXT[zone.key] : ''}</span><b>${zone.count}</b></button>`).join('')}
       </section>
     </div>`;
 
@@ -2679,10 +2703,11 @@ function renderTeacherReport(){
 // Returns roster-shaped student list for the Teacher Report's Green/Blue/
 // Yellow/Pink/Red/Absent KPI cards — scoped to this teacher's own subjects
 // and sections, using each student's latest test in that subject.
-function getTeacherFilteredStudents(teacherName, filterKey){
+function getTeacherFilteredStudents(teacherName, filterKey, onlySubject){
   const assignments = getTeacherAssignments(teacherName);
   const out = [];
   assignments.forEach(a=>{
+    if(onlySubject && a.subject !== onlySubject) return;
     a.rows.forEach(r=>{
       const store = workspace.sections[r.def.key];
       if(!store) return;
@@ -2708,14 +2733,18 @@ function getTeacherFilteredStudents(teacherName, filterKey){
 }
 
 document.getElementById('teacherReportBody').addEventListener('click', (e)=>{
-  const el = e.target.closest('#trQuickStats [data-filter]');
+  // Hero zone cards (all subjects) plus each subject's donut arcs and legend rows.
+  const el = e.target.closest('#trQuickStats [data-filter], .ax-legend-row[data-filter], .ax-arc[data-filter]');
   if(!el) return;
   const key = el.getAttribute('data-filter');
+  const subject = el.getAttribute('data-subject') || null;
   const teacherName = document.getElementById('teacherSelect').value;
   if(!teacherName) return;
-  const list = getTeacherFilteredStudents(teacherName, key);
-  const title = `${ZONE_LABEL[key]||key} — ${teacherName}`;
-  openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across ${teacherName}'s sections`, list);
+  const list = getTeacherFilteredStudents(teacherName, key, subject);
+  const zoneDef = OVERALL_ZONE_ORDER.find(z=>z.key===key);
+  const zoneName = subject && zoneDef ? `${zoneDef.label} (${zoneDef.range})` : (ZONE_LABEL[key]||key);
+  const title = `${zoneName} — ${subject ? subject + ' · ' : ''}${teacherName}`;
+  openStatListDrawer(title, `${list.length} student${list.length===1?'':'s'} across ${teacherName}'s sections${subject ? ' in ' + subject : ''}`, list);
 });
 
 /* ---- 028_independent-roster-widgets.js ---- */
