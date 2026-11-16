@@ -3,8 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AXIOM — Guide the Unknown</title>
-<meta name="description" content="AXIOM turns every test score into a story. See every student, know every trend, and guide every learner forward.">
+<title>AXIOM | Academic Performance Analytics for Schools &amp; Colleges</title>
+<meta name="description" content="Turn student result workbooks into academic performance dashboards, section comparisons, year comparisons and reports with AXIOM by Keystone Labs.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://axiom.keystonelabs.site/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AXIOM by Keystone Labs">
+<meta property="og:title" content="AXIOM — Academic Performance Analytics">
+<meta property="og:description" content="Turn student result workbooks into academic performance dashboards, section comparisons, year comparisons and reports with AXIOM by Keystone Labs.">
+<meta property="og:url" content="https://axiom.keystonelabs.site/">
+<meta property="og:image" content="https://axiom.keystonelabs.site/assets/axiom-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="AXIOM by Keystone Labs: academic performance analytics for schools and colleges">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AXIOM — Academic Performance Analytics">
+<meta name="twitter:description" content="Turn student result workbooks into academic performance dashboards, section comparisons, year comparisons and reports with AXIOM by Keystone Labs.">
+<meta name="twitter:image" content="https://axiom.keystonelabs.site/assets/axiom-og.png">
+<meta name="twitter:image:alt" content="AXIOM by Keystone Labs: academic performance analytics for schools and colleges">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://keystonelabs.site/#organization", "name": "Keystone Labs", "url": "https://keystonelabs.site/"}, {"@type": "WebSite", "@id": "https://axiom.keystonelabs.site/#website", "name": "AXIOM", "url": "https://axiom.keystonelabs.site/", "publisher": {"@id": "https://keystonelabs.site/#organization"}}, {"@type": "SoftwareApplication", "@id": "https://axiom.keystonelabs.site/#application", "name": "AXIOM", "url": "https://axiom.keystonelabs.site/", "applicationCategory": "EducationalApplication", "operatingSystem": "Web browser", "description": "Turn student result workbooks into academic performance dashboards, section comparisons, year comparisons and reports with AXIOM by Keystone Labs.", "publisher": {"@id": "https://keystonelabs.site/#organization"}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -81,16 +98,35 @@ nav .pill{background:var(--ink);color:#2A1854;font-weight:700;padding:10px 18px;
 .rm .beat{visibility:visible!important;opacity:1!important;margin:0 auto 9vh}.rm .cue{display:none}
 @media (prefers-reduced-motion:reduce){.rock,.crystal,.pod{animation:none}}
 @media (max-width:640px){header{padding-inline:18px}nav a:not(.pill){display:none}.trio{gap:6px}}
+/* Public content remains readable without JavaScript or animation libraries. */
+header{background:rgba(13,6,25,.96)}
+.public-intro{padding:150px 7vw 80px;min-height:75svh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.public-intro h1{font:700 clamp(2rem,5vw,4rem)/1.15 var(--ui);max-width:1000px;text-wrap:balance}
+.intro-copy{font-size:clamp(1rem,2vw,1.2rem);line-height:1.7;max-width:740px;margin-top:24px;color:#D7CFEC}
+.intro-links{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:center}.intro-links .lnk{margin-top:30px}
+.intro-note{max-width:620px;margin-top:26px;line-height:1.6;color:var(--v3);font-size:.9rem}
+.public-footer{padding:40px 7vw;line-height:1.8;border-top:1px solid #4C2E8C}.public-footer a{color:var(--v3)}.public-footer nav{margin-top:18px;flex-wrap:wrap}
+.ld{display:none}.beat:first-child{visibility:visible;opacity:1}
+html:not(.motion-ready) #story{height:auto;padding:100px 7vw 30px}html:not(.motion-ready) .beats{position:static;display:block}html:not(.motion-ready) .beat{visibility:visible;opacity:1;margin:0 auto 45px}html:not(.motion-ready) .cue{display:none}
+@media(max-width:640px){.public-intro{padding-top:120px}.intro-links{gap:12px}.public-footer nav a{display:inline!important}.game{box-shadow:3px 3px 0 var(--c)}.cards{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="ld" id="ld" aria-hidden="true"><i></i></div>
 <div class="cur" id="cur" aria-hidden="true"></div>
 <header>
-  <a class="logo" href="landing.html"><b>A</b><span>AXIOM<small>Student Performance Tracker</small></span></a>
-  <nav><a href="login.html">Sign In</a><a class="pill" href="login.html">Get Started</a></nav>
+  <a class="logo" href="/"><b>A</b><span>AXIOM<small>Student Performance Tracker</small></span></a>
+  <nav><a href="#features">Features</a><a href="#w2">Reports</a><a href="/sign-in">Sign In</a><a class="pill" href="/sign-in">Get Started</a></nav>
 </header>
 <main>
+<section class="public-intro" id="features" aria-labelledby="public-title">
+  <p class="kick">Keystone Labs · AXIOM</p>
+  <h1 id="public-title">Academic performance analytics<br>for schools and colleges</h1>
+  <p class="intro-copy">Turn student result workbooks into a clear view of performance. Compare sections and academic years, examine individual results, and prepare reports for administrative decisions.</p>
+  <div class="intro-links"><a class="btn" href="/sign-in">Sign in to AXIOM <span aria-hidden="true">→</span></a><a class="lnk" href="#w1">Explore performance analysis</a><a class="lnk" href="#w2">Compare results and reports</a></div>
+  <p class="intro-note">For school, college and academy administrators. Your institution’s results remain in your authorized workspace.</p>
+</section>
 <section id="story">
   <div class="stars" aria-hidden="true"></div>
   <div class="mp" id="mp" aria-hidden="true">
@@ -166,11 +202,12 @@ nav .pill{background:var(--ink);color:#2A1854;font-weight:700;padding:10px 18px;
 <section class="pg" id="end" style="--c:#CFF37A">
   <div class="wl">Mission complete</div><h2>Ready to see it live?</h2>
   <p class="tag">Track every student in minutes.</p>
-  <a class="btn" href="login.html">Launch Dashboard <span>→</span></a>
+  <a class="btn" href="/sign-in">Launch Dashboard <span>→</span></a>
   <a class="lnk" href="#compass">Discover another planet</a>
   <div class="cr">An idea by Muhammad Zaman Khan</div>
 </section>
 </main>
+<footer class="public-footer"><p>AXIOM is an academic performance analytics product by <a href="https://keystonelabs.site/">Keystone Labs</a>.</p><nav aria-label="Footer"><a href="/">AXIOM overview</a><a href="#w1">Performance insights</a><a href="#w2">Comparisons and reports</a><a href="/sign-in">Sign in</a></nav></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
@@ -188,6 +225,7 @@ if(window.gsap){
     addEventListener('pointerover',e=>document.body.classList.toggle('hov',!!e.target.closest('a,button,.dt,.tc')));
   }
   if(!rm){
+    document.documentElement.classList.add("motion-ready");
     const bt=qa('.beat'),n=bt.length;
     gsap.set(bt,{autoAlpha:0});gsap.set(bt[0],{autoAlpha:1});
     const tl=gsap.timeline({defaults:{ease:'none'},scrollTrigger:{trigger:'#story',start:'top top',end:'+='+n*80+'%',pin:true,scrub:.6}});
@@ -205,7 +243,7 @@ if(window.gsap){
     ScrollTrigger.batch('.cards article',{start:'top 90%',once:true,onEnter:b=>gsap.to(b,{autoAlpha:1,y:0,stagger:.12})});
   }
 }
-qa('a[href^="#"]').forEach(a=>a.onclick=e=>{e.preventDefault();q(a.getAttribute('href')).scrollIntoView({behavior:'smooth'})});
+qa('a[href^="#"]').forEach(a=>a.onclick=e=>{const target=q(a.getAttribute('href'));if(target){e.preventDefault();target.scrollIntoView({behavior:rm?'auto':'smooth'})}});
 
 /* Compass: click to stop the needle and pick a world */
 (()=>{

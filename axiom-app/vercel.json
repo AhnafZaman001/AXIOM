@@ -2,15 +2,93 @@
   "redirects": [
     {
       "source": "/",
-      "has": [{ "type": "host", "value": "axiom-hsus.vercel.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "axiom-hsus.vercel.app"
+        }
+      ],
       "destination": "https://axiom.keystonelabs.site/",
       "permanent": false
     },
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "axiom-hsus.vercel.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "axiom-hsus.vercel.app"
+        }
+      ],
       "destination": "https://axiom.keystonelabs.site/:path*",
       "permanent": false
+    },
+    {
+      "source": "/landing.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/landing",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "destination": "/app",
+      "permanent": true
+    },
+    {
+      "source": "/login.html",
+      "destination": "/sign-in",
+      "permanent": true
+    },
+    {
+      "source": "/login",
+      "destination": "/sign-in",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/landing.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/sign-in",
+      "destination": "/login.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/app",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/sign-in",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
+      "source": "/assets/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
     }
   ]
 }
