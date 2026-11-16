@@ -35,3 +35,11 @@ Run `node --test tests/seo.test.cjs` from this directory. Browser checks use Pla
 Lighthouse results are lab diagnostics, not field Core Web Vitals. Check real-user LCP, INP and CLS in Search Console/PageSpeed once sufficient traffic is available. Never report a Lighthouse score as proof that all real-user Core Web Vitals pass.
 
 References: [Google canonicals](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls), [sitemaps](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap), [Core Web Vitals](https://developers.google.com/search/docs/appearance/core-web-vitals), [ownership verification](https://support.google.com/webmasters/answer/9008080).
+
+## Deployment verification: 16 November 2026
+
+The HTTPS URL-prefix property `https://axiom.keystonelabs.site/` was verified in Search Console using Google's supplied HTML file. Retain that file in the deployment to keep ownership verification. The sitemap was submitted and Search Console reported Success with one discovered page. Discovery and ownership verification do not mean that Google has already indexed or ranked the homepage.
+
+Two mobile Lighthouse runs on the live public homepage, using the same 390 × 844 viewport and default simulated mobile throttling, measured performance 91 before the performance module and 97 afterwards. The later run measured accessibility 100, best practices 100 and SEO 100, LCP 1.5 seconds, total blocking time 170 milliseconds and CLS 0.018. These are individual lab runs with ordinary variability, not production SLOs or field INP measurements. The earlier run was after the crawlable homepage module, not the original authenticated homepage.
+
+Remaining work is observational and editorial: monitor actual indexing and field performance in Search Console as data arrives, and execute the permissioned backlink/resource plan. No rankings, backlinks or rich-result eligibility are guaranteed. The schema intentionally omits unverified ratings, prices and reviews.
