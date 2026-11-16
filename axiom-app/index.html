@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>AXIOM | Academic Performance Analytics for Schools &amp; Colleges</title>
 <meta name="description" content="Turn student result workbooks into academic performance dashboards, section comparisons, year comparisons and reports with AXIOM by Keystone Labs.">
@@ -23,7 +24,8 @@
 <meta name="twitter:image:alt" content="AXIOM by Keystone Labs: academic performance analytics for schools and colleges">
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://keystonelabs.site/#organization", "name": "Keystone Labs", "url": "https://keystonelabs.site/"}, {"@type": "WebSite", "@id": "https://axiom.keystonelabs.site/#website", "name": "AXIOM", "url": "https://axiom.keystonelabs.site/", "publisher": {"@id": "https://keystonelabs.site/#organization"}}, {"@type": "SoftwareApplication", "@id": "https://axiom.keystonelabs.site/#application", "name": "AXIOM", "url": "https://axiom.keystonelabs.site/", "applicationCategory": "EducationalApplication", "operatingSystem": "Web browser", "description": "Turn student result workbooks into academic performance dashboards, section comparisons, year comparisons and reports with AXIOM by Keystone Labs.", "publisher": {"@id": "https://keystonelabs.site/#organization"}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet"></noscript>
 <style>
 :root{--bg:#0D0619;--v1:#4C2E8C;--v2:#8B5CF6;--v3:#B9A2F0;--lime:#CFF37A;--ink:#F4F1FB;--pix:'Silkscreen','Courier New',monospace;--ui:'Inter',system-ui,sans-serif}
 *{box-sizing:border-box;margin:0}
@@ -101,14 +103,14 @@ nav .pill{background:var(--ink);color:#2A1854;font-weight:700;padding:10px 18px;
 /* Public content remains readable without JavaScript or animation libraries. */
 header{background:rgba(13,6,25,.96)}
 .public-intro{padding:150px 7vw 80px;min-height:75svh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
-.public-intro h1{font:700 clamp(2rem,5vw,4rem)/1.15 var(--ui);max-width:1000px;text-wrap:balance}
+.public-intro h1{font:700 clamp(2rem,5vw,4rem)/1.15 system-ui,sans-serif;max-width:1000px;text-wrap:balance}
 .intro-copy{font-size:clamp(1rem,2vw,1.2rem);line-height:1.7;max-width:740px;margin-top:24px;color:#D7CFEC}
 .intro-links{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:center}.intro-links .lnk{margin-top:30px}
 .intro-note{max-width:620px;margin-top:26px;line-height:1.6;color:var(--v3);font-size:.9rem}
 .public-footer{padding:40px 7vw;line-height:1.8;border-top:1px solid #4C2E8C}.public-footer a{color:var(--v3)}.public-footer nav{margin-top:18px;flex-wrap:wrap}
 .ld{display:none}.beat:first-child{visibility:visible;opacity:1}
 html:not(.motion-ready) #story{height:auto;padding:100px 7vw 30px}html:not(.motion-ready) .beats{position:static;display:block}html:not(.motion-ready) .beat{visibility:visible;opacity:1;margin:0 auto 45px}html:not(.motion-ready) .cue{display:none}
-@media(max-width:640px){.public-intro{padding-top:120px}.intro-links{gap:12px}.public-footer nav a{display:inline!important}.game{box-shadow:3px 3px 0 var(--c)}.cards{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){body::after{display:none}.public-intro{padding-top:120px}.intro-links{gap:12px}.public-footer nav a{display:inline!important}.game{box-shadow:3px 3px 0 var(--c)}.cards{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -209,129 +211,8 @@ html:not(.motion-ready) #story{height:auto;padding:100px 7vw 30px}html:not(.moti
 </main>
 <footer class="public-footer"><p>AXIOM is an academic performance analytics product by <a href="https://keystonelabs.site/">Keystone Labs</a>.</p><nav aria-label="Footer"><a href="/">AXIOM overview</a><a href="#w1">Performance insights</a><a href="#w2">Comparisons and reports</a><a href="/sign-in">Sign in</a></nav></footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-<script>
-const q=s=>document.querySelector(s),qa=s=>[...document.querySelectorAll(s)];
-setTimeout(()=>q('#ld').classList.add('gone'),1500);
-const rm=!window.gsap||matchMedia('(prefers-reduced-motion:reduce)').matches;
-if(rm)document.documentElement.classList.add('rm');
-if(window.gsap){
-  gsap.registerPlugin(ScrollTrigger);
-  if(matchMedia('(hover:hover) and (pointer:fine)').matches){
-    document.documentElement.classList.add('fine');
-    const mx=gsap.quickTo('#cur','x',{duration:.25}),my=gsap.quickTo('#cur','y',{duration:.25});
-    addEventListener('pointermove',e=>{mx(e.clientX);my(e.clientY)});
-    addEventListener('pointerover',e=>document.body.classList.toggle('hov',!!e.target.closest('a,button,.dt,.tc')));
-  }
-  if(!rm){
-    document.documentElement.classList.add("motion-ready");
-    const bt=qa('.beat'),n=bt.length;
-    gsap.set(bt,{autoAlpha:0});gsap.set(bt[0],{autoAlpha:1});
-    const tl=gsap.timeline({defaults:{ease:'none'},scrollTrigger:{trigger:'#story',start:'top top',end:'+='+n*80+'%',pin:true,scrub:.6}});
-    bt.forEach((b,i)=>{
-      if(i)tl.fromTo(b,{autoAlpha:0,y:60,scale:.96},{autoAlpha:1,y:0,scale:1,duration:.6},i);
-      if(i<n-1)tl.to(b,{autoAlpha:0,y:-60,duration:.5},i+.85);
-    });
-    tl.to('.cue',{autoAlpha:0,duration:.3},0)
-      .to('.stars',{y:'-22%',duration:n},0)
-      .to('.rock',{y:i=>-(180+i*140),rotation:i=>i%2?40:-40,duration:n},0)
-      .to('.pod',{scale:1.9,xPercent:-90,y:-80,duration:n},0)
-      .to('.crystal',{y:i=>-(120+i*90),rotation:180,duration:n},0);
-    addEventListener('pointermove',e=>gsap.to('#mp',{x:(e.clientX/innerWidth-.5)*-30,y:(e.clientY/innerHeight-.5)*-20,duration:1}));
-    gsap.set('.cards article',{autoAlpha:0,y:40});
-    ScrollTrigger.batch('.cards article',{start:'top 90%',once:true,onEnter:b=>gsap.to(b,{autoAlpha:1,y:0,stagger:.12})});
-  }
-}
-qa('a[href^="#"]').forEach(a=>a.onclick=e=>{const target=q(a.getAttribute('href'));if(target){e.preventDefault();target.scrollIntoView({behavior:rm?'auto':'smooth'})}});
-
-/* Compass: click to stop the needle and pick a world */
-(()=>{
-  const nd=q('#needle'),ch=qa('.chip');let a=-75,dr=1,run=true;
-  const go=i=>q('#w'+(i+1)).scrollIntoView({behavior:'smooth'});
-  (function tick(){if(run){a+=dr*1.5;if(Math.abs(a)>=75)dr*=-1;nd.style.transform='rotate('+a+'deg)'}requestAnimationFrame(tick)})();
-  q('#dial').onclick=()=>{
-    if(!run){run=true;ch.forEach(c=>c.classList.remove('on'));return}
-    run=false;const i=a<-25?0:a>25?2:1;ch[i].classList.add('on');setTimeout(()=>go(i),900);
-  };
-  ch.forEach((c,i)=>c.onclick=()=>go(i));
-  q('#skip').onclick=()=>go(0);
-})();
-
-/* World 1: find the highlighted student with a spotlight */
-(()=>{
-  const g=q('.g1'),st=g.querySelector('.st');
-  function set(){
-    qa('.g1 .dt').forEach(d=>d.remove());
-    const t=Math.floor(Math.random()*44);
-    for(let i=0;i<44;i++){
-      const d=document.createElement('i');d.className='dt'+(i==t?' tg':'');
-      d.style.left=(4+Math.random()*90)+'%';d.style.top=(18+Math.random()*62)+'%';
-      d.onclick=()=>{
-        if(i==t){st.textContent='FOUND THEM. Early spotting changes everything.';st.className='st ok';setTimeout(set,2400)}
-        else{st.textContent='NOT QUITE. Keep looking.';st.className='st no'}
-      };
-      g.prepend(d);
-    }
-    st.textContent='';st.className='st';
-  }
-  g.addEventListener('pointermove',e=>{const r=g.getBoundingClientRect();g.style.setProperty('--x',e.clientX-r.left+'px');g.style.setProperty('--y',e.clientY-r.top+'px')});
-  set();
-})();
-
-/* World 2: move the shield, protect the crystal */
-(()=>{
-  const g=q('.g2'),c=g.querySelector('canvas'),x=c.getContext('2d'),st=g.querySelector('.st');
-  let W,H,px=0,bl=[],hp=3,sc=0,run=0,last=0,sp=0;
-  const fit=()=>{W=c.width=g.clientWidth;H=c.height=g.clientHeight;px=W/2};
-  fit();addEventListener('resize',fit);
-  const mv=e=>{const r=c.getBoundingClientRect();px=(e.clientX-r.left)/r.width*W};
-  g.addEventListener('pointermove',mv);
-  g.addEventListener('pointerdown',e=>{mv(e);if(!run)start()});
-  function start(){hp=3;sc=0;bl=[];sp=0;run=1;st.textContent='';st.className='st';last=performance.now();requestAnimationFrame(loop)}
-  function end(ok){run=0;st.textContent=ok?'SUCCESS. Every learner protected! Tap to replay.':'FAIL. Tap to try again.';st.className='st '+(ok?'ok':'no')}
-  function loop(t){
-    if(!run)return;
-    const dt=Math.min(t-last,50)/16;last=t;sp-=dt;
-    if(sp<=0){bl.push({x:20+Math.random()*(W-40),y:-10,v:1.6+Math.random()*1.4+sc*.05});sp=34-Math.min(sc,14)}
-    x.clearRect(0,0,W,H);
-    x.fillStyle='#CFF37A';x.beginPath();x.moveTo(W/2,H-46);x.lineTo(W/2+16,H-28);x.lineTo(W/2,H-10);x.lineTo(W/2-16,H-28);x.fill();
-    const sy=H-78;x.fillStyle='#8B5CF6';x.fillRect(px-38,sy,76,8);
-    bl=bl.filter(b=>{
-      b.y+=b.v*dt;
-      if(b.y>sy-10&&b.y<sy+10&&Math.abs(b.x-px)<44){sc++;return false}
-      if(b.y>H-40){hp--;return false}
-      x.fillStyle='#F49AC2';x.fillRect(b.x-7,b.y-7,14,14);return true;
-    });
-    x.fillStyle='#F4F1FB';x.font='12px monospace';x.fillText('LIVES '+hp+'   BLOCKED '+sc+'/15',10,H-12);
-    if(hp<=0)end(false);else if(sc>=15)end(true);else requestAnimationFrame(loop);
-  }
-})();
-
-/* World 3: spot the declining trend */
-(()=>{
-  const g=q('.g3'),tr=g.querySelector('.trio'),st=g.querySelector('.st');let r=0;
-  function round(){
-    tr.innerHTML='';const bad=Math.floor(Math.random()*3);
-    for(let i=0;i<3;i++){
-      const s=i==bad?-1:(Math.random()<.5?1:.3),d=[];let v=50;
-      for(let k=0;k<7;k++){v+=s*(3+Math.random()*4)+(Math.random()-.5)*4;d.push(v)}
-      const mn=Math.min(...d),mx=Math.max(...d);
-      const pts=d.map((y,k)=>(k*16+4)+','+(52-(y-mn)/(mx-mn||1)*44)).join(' ');
-      const b=document.createElement('button');b.className='tc';
-      b.innerHTML='<svg viewBox="0 0 100 56"><polyline points="'+pts+'" fill="none" stroke="currentColor" stroke-width="3"/></svg><span>Student '+'ABC'[i]+'</span>';
-      b.onclick=()=>{
-        if(i==bad){
-          r++;
-          if(r==3){r=0;round();st.textContent='SUCCESS. You spotted them all!';st.className='st ok'}
-          else{round();st.textContent='CORRECT. '+r+'/3';st.className='st ok'}
-        }else{r=0;round();st.textContent='NOT QUITE. Look at the trend.';st.className='st no'}
-      };
-      tr.appendChild(b);
-    }
-  }
-  round();
-})();
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+<script src="/js/landing.js?v=1" defer></script>
 </body>
 </html>
