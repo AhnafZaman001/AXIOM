@@ -46,16 +46,17 @@
       "source": "/login",
       "destination": "/sign-in",
       "permanent": true
+    },
+    {
+      "source": "/workspace.html",
+      "destination": "/app",
+      "permanent": true
     }
   ],
   "rewrites": [
     {
-      "source": "/",
-      "destination": "/landing.html"
-    },
-    {
       "source": "/app",
-      "destination": "/index.html"
+      "destination": "/workspace.html"
     },
     {
       "source": "/sign-in",

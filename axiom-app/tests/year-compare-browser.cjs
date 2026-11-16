@@ -6,13 +6,13 @@ const fs=require('node:fs');
 const path=require('node:path');
 const assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
-const inline=[...fs.readFileSync(path.join(root,'index.html'),'utf8').matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).find(s=>s.includes('make_xlsx_lib'));
+const inline=[...fs.readFileSync(path.join(root,'workspace.html'),'utf8').matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).find(s=>s.includes('make_xlsx_lib'));
 assert.ok(inline,'SheetJS must be available from the real app bundle');
 const fixtures=[];
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/full') {
-    let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+    let html=fs.readFileSync(path.join(root,'workspace.html'),'utf8');
     html=html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2"><\/script>/,'');
     html=html.replace('<script src="js/supabase-client.js"></script>',`<script>window.axRole='principal';window.supabaseClient={from(){return {select(){return this;},order(){return Promise.resolve({data:[]});}};}};</script>`);
     html=html.replace('<script src="js/auth-guard.js"></script>','');

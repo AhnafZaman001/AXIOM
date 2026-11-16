@@ -6,7 +6,7 @@ const baseline=cp.execFileSync('git',['show','7794596:axiom-app/js/app.js'],{enc
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://localhost');
  if(url.pathname==='/'){
-  let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  let html=fs.readFileSync(path.join(root,'workspace.html'),'utf8');
   html=html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2"><\/script>/,'').replace('<script src="js/supabase-client.js"></script>',`<script>window.axRole='principal';window.supabaseClient={from(){return {select(){return this;},order(){return Promise.resolve({data:[]});}};}};</script>`).replace('<script src="js/auth-guard.js"></script>','').replace('</head>','<style>#welcomeHero{display:none!important}</style></head>');
   res.setHeader('Content-Type','text/html');return res.end(html);
  }

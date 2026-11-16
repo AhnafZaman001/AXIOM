@@ -5,7 +5,7 @@ const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..');
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');
-  const file=path.join(root,url.pathname==='/'?'index.html':url.pathname);
+  const file=path.join(root,url.pathname==='/'?'workspace.html':url.pathname);
   if(!file.startsWith(root)||!fs.existsSync(file)){res.writeHead(404);return res.end();}
   let body=fs.readFileSync(file);
   if(url.pathname==='/')body=body.toString()

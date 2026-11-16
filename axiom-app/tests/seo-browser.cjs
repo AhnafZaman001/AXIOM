@@ -5,7 +5,7 @@ const server=http.createServer((req,res)=>{
   const u=new URL(req.url,'http://localhost');
   const redirect=config.redirects.find(r=>!r.has&&r.source===u.pathname);
   if(redirect){res.writeHead(308,{Location:redirect.destination+u.search});return res.end();}
-  const pathname=config.rewrites.find(r=>r.source===u.pathname)?.destination||u.pathname;
+  const pathname=config.rewrites.find(r=>r.source===u.pathname)?.destination||(u.pathname==='/'?'/index.html':u.pathname);
   const file=path.join(root,pathname);
   if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);return res.end();}
   res.setHeader('Content-Type',({'.html':'text/html','.css':'text/css','.js':'text/javascript','.xml':'application/xml','.png':'image/png','.webp':'image/webp'})[path.extname(file)]||'text/plain');
